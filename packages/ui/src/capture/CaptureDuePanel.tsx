@@ -29,7 +29,7 @@
  * 本文件不 import `@heyta/i18n`，只用 RN 原语。
  */
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { HeytaNativeTokens } from '@heyta/design-system';
 import type { LocalDate, LocalTime } from '@heyta/domain';
@@ -173,10 +173,13 @@ function makeStyles(tokens: HeytaNativeTokens) {
     manualInput: {
       borderWidth: tokens['border-width.thin'],
       borderColor: tokens['color.border'],
-      borderRadius: tokens['radius.sm'],
+      borderRadius: tokens['radius.md'],
       paddingVertical: tokens['space.1'],
       paddingHorizontal: tokens['space.2'],
       color: tokens['color.foreground'],
+    },
+    manualInputFocused: {
+      borderColor: tokens['color.ring'],
     },
   });
 }
@@ -265,6 +268,7 @@ export function CaptureDuePanel({
   const tokens = useHeytaTokens();
   const text = useHeytaText();
   const styles = useMemo(() => makeStyles(tokens), [tokens]);
+  const [manualFocused, setManualFocused] = useState(false);
 
   const { view, manual, timeDraft: draft, onViewChange, onManualChange, onTimeDraftChange } = state;
 
@@ -309,7 +313,9 @@ export function CaptureDuePanel({
           <TextInput
             value={draft}
             onChangeText={commitDraft}
+            onFocus={() => setManualFocused(true)}
             onBlur={() => {
+              setManualFocused(false);
               onTimeDraftChange(due.time ?? '');
             }}
             maxLength={'HH:MM'.length}
@@ -318,7 +324,7 @@ export function CaptureDuePanel({
             placeholderTextColor={tokens['color.foreground-subtle']}
             accessibilityLabel={labels.panel.time.aria}
             testID="capture-time-input"
-            style={[text['row-meta'], styles.manualInput]}
+            style={[text['row-meta'], styles.manualInput, manualFocused ? styles.manualInputFocused : null]}
           />
         ) : (
           <View style={styles.slots} testID="capture-time-slots">

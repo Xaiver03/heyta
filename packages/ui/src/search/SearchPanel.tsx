@@ -53,8 +53,8 @@
  * 宿主算光标长度用的 `buildResultEntries` 就是这个顺序（同一条判据，只有一处定义）。
  */
 
-import React, { useMemo } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View, type ViewProps } from 'react-native';
 
 import type { Note, Task } from '@heyta/domain';
 import { CornerDownRight, Folder, Search, StickyNote, Tag } from 'lucide';
@@ -162,6 +162,7 @@ export function SearchPanel({
   const tokens = useHeytaTokens();
   const text = useHeytaText();
   const styles = useMemo(() => makeStyles(tokens), [tokens]);
+  const [focused, setFocused] = useState(false);
 
   const noteRows = useMemo(() => toNoteRows(notes), [notes]);
 
@@ -197,7 +198,11 @@ export function SearchPanel({
        * 顶栏标题行删掉之后，这一行就是面板唯一的标题级文本。
        * 只挑 `font-size.lg` 会违反排版纪律（语义样式必须整条消费）。
        */}
-      <View style={styles.field}>
+      <View
+        style={[styles.field, focused ? styles.fieldFocused : null]}
+        testID={`${testID}-field`}
+        {...({ dataSet: { inputShell: 'true' } } as unknown as ViewProps)}
+      >
         <HeytaIcon
           data={Search}
           size={tokens['icon.md']}
@@ -206,6 +211,8 @@ export function SearchPanel({
         <TextInput
           value={query}
           onChangeText={onQueryChange}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
           placeholder={labels.placeholder}
           placeholderTextColor={tokens['color.foreground-subtle']}
           // 自动聚焦：用户点「搜索」就是要打字，再让他点一下输入框是多余的。
@@ -352,12 +359,20 @@ function makeStyles(tokens: HeytaNativeTokens) {
       alignItems: 'center',
       gap: tokens['space.2'],
       minHeight: tokens['touch-target.min'],
-      paddingHorizontal: tokens['space.4'],
-      paddingVertical: tokens['space.2'],
+      marginHorizontal: tokens['space.3'],
+      marginBottom: tokens['space.1'],
+      paddingHorizontal: tokens['space.3'],
+      borderWidth: tokens['border-width.thin'],
+      borderColor: tokens['color.border'],
+      borderRadius: tokens['radius.lg'],
+      backgroundColor: tokens['color.surface'],
+    },
+    fieldFocused: {
+      borderColor: tokens['color.ring'],
     },
     input: {
       flex: 1,
-      // 无边框、无底色：输入与结果通过留白分组。
+      minWidth: 0,
       borderWidth: 0,
       outlineWidth: 0,
       color: tokens['color.foreground'],

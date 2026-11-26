@@ -110,7 +110,7 @@ import {
  */
 export interface CategoryReportLabels {
   /** 顶部说明（这一页在统计什么）。 */
-  readonly note: string;
+  readonly note?: string;
   /** 完全没有记录时的一句话。 */
   readonly empty: string;
   /** 空态标题；省略时沿用 `empty`，保持宿主兼容。 */
@@ -315,9 +315,11 @@ export function CategoryReportView({
         （症状是 e2e 在 `locator.evaluate` 上超时，而不是"颜色不对"）。
         ⇒ 共享组件**必须**给它一个稳定的 testID，否则"换个实现"就等于"删掉判据"。
       */}
-      <Text testID="category-note" style={[text.caption, { color: muted }]}>
-        {labels.note}
-      </Text>
+      {labels.note === undefined ? null : (
+        <Text testID="category-note" style={[text.caption, { color: muted }]}>
+          {labels.note}
+        </Text>
+      )}
 
       {/* 落盘失败必须看得见（mobile 有；web 没有这个态）。 */}
       {labels.error === undefined ? null : (

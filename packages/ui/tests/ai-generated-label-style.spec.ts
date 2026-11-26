@@ -48,19 +48,20 @@ describe('AI 生成合成内容标识 · 灰色小字（不是 chip）', () => {
     expect(style.frame.marginTop).toBe(light.tokens['space.1']);
   });
 
-  it('文字用 caption 档（12px 辅助文字下限）——不是自拼字号', () => {
+  it('文字用 row-meta 档（12px 常规字重 400）——不靠加粗抢正文注意力', () => {
     const style = aiGeneratedLabelStyle(light.tokens, light.text);
     for (const key of ['fontSize', 'fontWeight', 'lineHeight', 'letterSpacing'] as const) {
-      expect(style.label[key], `caption 的 ${key} 必须原样继承`).toEqual(light.text.caption[key]);
+      expect(style.label[key], `row-meta 的 ${key} 必须原样继承`).toEqual(light.text['row-meta'][key]);
     }
     // 「最小字号下限」这条是 tokens.css 里写死的承诺：11px 只给极致紧凑标签，
-    // 法定标识不是标签，它得能读。
+    // 法定标识不是标签，它得能读；字重 400 确保视觉权重弱于正文。
     expect(style.label.fontSize).toBe(light.tokens['font-size.xs']);
+    expect(style.label.fontWeight).toBe('400');
   });
 
-  it('颜色是 foreground-muted（灰）——不是 primary、也不带底色', () => {
+  it('颜色是 foreground-subtle（轻灰）——不是 primary、不抢正文、也不带底色', () => {
     const style = aiGeneratedLabelStyle(light.tokens, light.text);
-    expect(style.label.color).toBe(light.tokens['color.foreground-muted']);
+    expect(style.label.color).toBe(light.tokens['color.foreground-subtle']);
     // 文字上也不许出现底色（`RnTextStyle` 本身就没有这个键 —— 那是类型层的第二道）。
     expect('backgroundColor' in style.label).toBe(false);
   });
@@ -68,17 +69,17 @@ describe('AI 生成合成内容标识 · 灰色小字（不是 chip）', () => {
   it('暗色下同样成立：换主题只换颜色，不换字形', () => {
     const style = aiGeneratedLabelStyle(dark.tokens, dark.text);
     expect(Object.keys(style.frame).sort()).toEqual(['alignSelf', 'marginTop']);
-    expect(style.label.color).toBe(dark.tokens['color.foreground-muted']);
+    expect(style.label.color).toBe(dark.tokens['color.foreground-subtle']);
     expect(style.label.fontSize).toBe(dark.tokens['font-size.xs']);
   });
 
-  it('对比度有出处：foreground-muted 在内容底色上 ≥ 4.5:1 由 tokens.spec 守着', () => {
+  it('对比度有出处：foreground-subtle 在内容底色上 ≥ 4.5:1 由 tokens.spec 守着', () => {
     // 这里**不重算** WCAG（那会变成第二套公式）。只断言"我们挑的这一对
     // 正是 design-system 已经覆盖的那一对"，让"换颜色"这件事必须回到那里去改：
-    // `packages/design-system/tests/tokens.spec.ts` 的玻璃档用例逐对算
-    // `--ht-color-foreground-muted` × 内容色，门槛 4.5:1。
+    // `packages/design-system/tests/tokens.spec.ts` 逐对算
+    // `--ht-color-foreground-subtle` × surface / surface-sunken，门槛 4.5:1。
     const style = aiGeneratedLabelStyle(light.tokens, light.text);
-    expect(style.label.color).toBe(light.tokens['color.foreground-muted']);
-    expect(light.tokens['color.foreground-muted']).not.toBe(light.tokens['color.foreground-subtle']);
+    expect(style.label.color).toBe(light.tokens['color.foreground-subtle']);
+    expect(light.tokens['color.foreground-subtle']).not.toBe(light.tokens['color.foreground-muted']);
   });
 });

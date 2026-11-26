@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=1440, initial-scale=1" />
+<title>方向 A · 他的样子</title>
+<style>
+  :root{
+    --primary:#2563eb; --primary-600:#2563eb; --primary-700:#1d4ed8; --primary-subtle:#eff6ff; --primary-subtle-2:#dbeafe;
+    --bg:#ffffff; --rail:#f8fafc; --sunken:#f1f5f9;
+    --fg:#0f172a; --fg-muted:#475569; --fg-subtle:#57677d;
+    --border:#e6ebf2; --border-strong:#d3dbe6;
+    --ok:#059669; --ok-subtle:#ecfdf5; --amber:#b45309; --amber-subtle:#fffbeb; --red:#dc2626; --red-subtle:#fef2f2; --sky:#0284c7; --sky-subtle:#f0f9ff;
+    --r-sm:8px; --r-md:12px; --r-lg:16px; --r-xl:20px; --r-full:9999px;
+    --font:'PingFang SC',-apple-system,BlinkMacSystemFont,'Helvetica Neue','Segoe UI','Noto Sans SC',sans-serif;
+    --mono:'JetBrains Mono',ui-monospace,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:#e9edf3;font-family:var(--font);color:var(--fg);-webkit-font-smoothing:antialiased}
+  .app{width:1440px;height:1060px;margin:0 auto;background:var(--bg);display:grid;grid-template-columns:272px 1fr;overflow:hidden}
+  /* left rail */
+  .rail{background:var(--rail);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:18px 12px 14px}
+  .rail-top{display:flex;align-items:center;justify-content:space-between;padding:4px 8px 16px}
+  .brand{display:flex;align-items:center;gap:9px;font-weight:600;font-size:16px;letter-spacing:.2px}
+  .brand .dot{width:26px;height:26px;border-radius:9px;background:linear-gradient(145deg,#3b82f6,#2563eb);display:grid;place-items:center;color:#fff;font-size:14px}
+  .newbtn{width:32px;height:32px;border-radius:10px;border:1px solid var(--border);background:#fff;display:grid;place-items:center;color:var(--fg-muted);cursor:pointer}
+  .newbtn:hover{border-color:var(--border-strong);color:var(--primary)}
+  .hist-group{padding:14px 8px 4px;font-size:12px;color:var(--fg-subtle);letter-spacing:.3px}
+  .hist-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:10px;font-size:14px;color:var(--fg-muted);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .hist-item span{overflow:hidden;text-overflow:ellipsis}
+  .hist-item:hover{background:#eef2f7}
+  .hist-item.active{background:#fff;color:var(--fg);box-shadow:0 1px 2px rgba(15,23,42,.06),0 0 0 1px var(--border);font-weight:500}
+  .hist-item .ic{width:16px;height:16px;color:var(--fg-subtle);flex:none}
+  .rail-spacer{flex:1}
+  .rail-foot{display:flex;align-items:center;gap:10px;padding:10px;border-radius:12px}
+  .rail-foot:hover{background:#eef2f7}
+  .avatar{width:30px;height:30px;border-radius:50%;background:#dbeafe;color:#1d4ed8;display:grid;place-items:center;font-size:13px;font-weight:600;flex:none}
+  .rail-foot .nm{font-size:13px;color:var(--fg);font-weight:500;line-height:1.2}
+  .rail-foot .sub{font-size:11px;color:var(--fg-subtle)}
+  /* main */
+  .main{display:flex;flex-direction:column;min-width:0;background:var(--bg)}
+  .top{height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;border-bottom:1px solid var(--border)}
+  .top .t{display:flex;align-items:center;gap:10px;font-size:15px;font-weight:600}
+  .ctx-chip{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px;border-radius:var(--r-full);background:var(--sunken);color:var(--fg-muted);font-size:12px;font-weight:500}
+  .ctx-chip .b{width:6px;height:6px;border-radius:50%;background:var(--primary)}
+  .top-actions{display:flex;align-items:center;gap:8px}
+  .ghost{height:32px;padding:0 12px;border-radius:9px;border:1px solid var(--border);background:#fff;color:var(--fg-muted);font-size:13px;display:inline-flex;align-items:center;gap:7px;cursor:pointer}
+  .ghost:hover{border-color:var(--border-strong);color:var(--fg)}
+  .iconbtn{width:32px;height:32px;border-radius:9px;color:var(--fg-subtle);display:grid;place-items:center;cursor:pointer}
+  .iconbtn:hover{background:var(--sunken);color:var(--fg)}
+  /* thread */
+  .thread{flex:1;min-height:0;overflow:auto;padding:26px 0 8px}
+  .col{max-width:760px;margin:0 auto;padding:0 28px}
+  .msg{display:flex;gap:14px;margin-bottom:26px}
+  .msg .who{flex:none}
+  .who.user{width:32px;height:32px;border-radius:50%;background:#dbeafe;color:#1d4ed8;display:grid;place-items:center;font-size:13px;font-weight:600}
+  .who.ai{width:32px;height:32px;border-radius:10px;background:linear-gradient(145deg,#3b82f6,#2563eb);display:grid;place-items:center;color:#fff}
+  .body{min-width:0;flex:1}
+  .user-bubble{display:inline-block;max-width:100%;background:var(--primary-subtle);color:#0b2447;padding:11px 15px;border-radius:14px 14px 14px 4px;font-size:15px;line-height:1.55}
+  .ai-name{font-size:12px;color:var(--fg-subtle);margin-bottom:8px;font-weight:500}
+  .tool-line{display:inline-flex;align-items:center;gap:8px;height:28px;padding:0 12px 0 10px;border:1px solid var(--border);border-radius:var(--r-full);background:var(--rail);color:var(--fg-muted);font-size:12.5px;margin-bottom:14px}
+  .tool-line .ic{color:var(--ok)}
+  .tool-line b{color:var(--fg);font-weight:600}
+  .prose{font-size:15.5px;line-height:1.7;color:#1e293b}
+  .prose p+p{margin-top:12px}
+  .prose strong{font-weight:600;color:var(--fg)}
+  .prose .em{color:var(--primary);font-weight:600}
+  /* task card */
+  .card{border:1px solid var(--border);border-radius:var(--r-lg);background:#fff;margin:16px 0 14px;overflow:hidden;box-shadow:0 1px 2px rgba(15,23,42,.04)}
+  .card-head{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border);background:var(--rail)}
+  .card-head .h{font-size:13px;font-weight:600;color:var(--fg);display:flex;align-items:center;gap:8px}
+  .card-head .cnt{font-size:12px;color:var(--fg-subtle)}
+  .trow{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border)}
+  .trow:last-child{border-bottom:0}
+  .trow:hover{background:#fafcff}
+  .cb{width:18px;height:18px;border-radius:5px;border:1.6px solid var(--border-strong);flex:none;display:grid;place-items:center}
+  .cb.done{background:var(--primary);border-color:var(--primary);color:#fff}
+  .trow .title{flex:1;min-width:0;font-size:14.5px;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .trow .title .sub{display:block;font-size:12px;color:var(--fg-subtle);font-weight:400;margin-top:2px}
+  .prio{flex:none;height:22px;padding:0 9px;border-radius:var(--r-full);font-size:11.5px;font-weight:600;display:inline-flex;align-items:center;gap:5px}
+  .prio.h{background:var(--red-subtle);color:var(--red)}
+  .prio.m{background:var(--amber-subtle);color:var(--amber)}
+  .prio.l{background:var(--sky-subtle);color:var(--sky)}
+  .due{flex:none;font-size:12.5px;color:var(--fg-muted);display:inline-flex;align-items:center;gap:6px;min-width:118px;justify-content:flex-end}
+  .due .arrow{color:var(--fg-subtle)}
+  .due .moved{color:var(--amber);font-weight:600}
+  /* confirm */
+  .confirm{border:1px solid #dbe7ff;background:linear-gradient(180deg,#f7faff,#f2f7ff);border-radius:var(--r-lg);padding:14px 16px;margin:6px 0 16px}
+  .confirm .line{font-size:14px;color:#1e3a8a;font-weight:600;display:flex;align-items:center;gap:8px}
+  .confirm .note{font-size:12.5px;color:var(--fg-muted);margin-top:4px}
+  .confirm .btns{display:flex;gap:8px;margin-top:12px}
+  .btn-primary{height:34px;padding:0 16px;border-radius:9px;background:var(--primary);color:#fff;font-size:13.5px;font-weight:600;border:0;cursor:pointer}
+  .btn-primary:hover{background:var(--primary-700)}
+  .btn-ghost{height:34px;padding:0 14px;border-radius:9px;background:#fff;color:var(--fg-muted);font-size:13.5px;border:1px solid var(--border-strong);cursor:pointer}
+  .caret{display:inline-block;width:8px;height:16px;background:var(--primary);border-radius:2px;vertical-align:-2px;margin-left:2px;animation:blink 1s steps(1) infinite}
+  @keyframes blink{50%{opacity:0}}
+  /* follow-ups */
+  .follow{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+  .chip{height:32px;padding:0 13px;border-radius:var(--r-full);border:1px solid var(--border);background:#fff;color:var(--fg-muted);font-size:13px;display:inline-flex;align-items:center;gap:7px;cursor:pointer}
+  .chip:hover{border-color:var(--primary);color:var(--primary);background:var(--primary-subtle)}
+  .chip .plus{color:var(--fg-subtle)}
+  /* composer */
+  .composer-wrap{padding:10px 0 20px}
+  .composer{max-width:760px;margin:0 auto;padding:0 28px}
+  .inputbox{border:1px solid var(--border-strong);border-radius:var(--r-xl);background:#fff;box-shadow:0 6px 20px rgba(15,23,42,.06);transition:.15s}
+  .inputbox:focus-within{border-color:var(--primary);box-shadow:0 6px 24px rgba(37,99,235,.12)}
+  .inputbox textarea{width:100%;min-height:56px;max-height:140px;border:0;outline:0;resize:none;padding:15px 16px 4px;font-family:var(--font);font-size:15px;color:var(--fg);background:transparent}
+  .inputbox textarea::placeholder{color:var(--fg-subtle)}
+  .inputbar{display:flex;align-items:center;gap:8px;padding:6px 10px 10px}
+  .tool{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;color:var(--fg-subtle);cursor:pointer;flex:none}
+  .tool:hover{background:var(--sunken);color:var(--fg)}
+  .sel{height:30px;padding:0 10px;border-radius:var(--r-full);background:var(--sunken);color:var(--fg-muted);font-size:12.5px;display:inline-flex;align-items:center;gap:6px;cursor:pointer;flex:none}
+  .sel .b{width:6px;height:6px;border-radius:50%;background:var(--ok)}
+  .grow{flex:1}
+  .send{width:36px;height:36px;border-radius:50%;background:var(--primary);color:#fff;display:grid;place-items:center;cursor:pointer;flex:none;border:0}
+  .send:hover{background:var(--primary-700)}
+  .hintline{max-width:760px;margin:8px auto 0;padding:0 28px;font-size:11.5px;color:var(--fg-subtle);text-align:center}
+  svg{display:block}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- RAIL -->
+  <aside class="rail">
+    <div class="rail-top">
+      <div class="brand"><span class="dot">✦</span> heyta</div>
+      <button class="newbtn" title="新对话"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+    </div>
+    <div class="hist-group">今天</div>
+    <div class="hist-item active"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span>品牌物料 · 任务顺延</span></div>
+    <div class="hist-item"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span>本周复盘提纲</span></div>
+    <div class="hist-item"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span>客户邮件跟进</span></div>
+    <div class="hist-group">昨天</div>
+    <div class="hist-item"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span>番茄钟排程建议</span></div>
+    <div class="hist-item"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span>习惯打卡提醒</span></div>
+    <div class="rail-spacer"></div>
+    <div class="rail-foot">
+      <div class="avatar">邓</div>
+      <div><div class="nm">邓湘雷</div><div class="sub">本地数据 · 已同步</div></div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <section class="main">
+    <div class="top">
+      <div class="t">AI 助手
+        <span class="ctx-chip"><span class="b"></span>Q4 品牌物料</span>
+      </div>
+      <div class="top-actions">
+        <button class="ghost"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M4 12h16M4 18h10"/></svg>上下文</button>
+        <div class="iconbtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg></div>
+      </div>
+    </div>
+
+    <div class="thread">
+      <div class="col">
+        <!-- user -->
+        <div class="msg">
+          <div class="who user">邓</div>
+          <div class="body">
+            <div class="user-bubble">帮我把「Q4 品牌物料」这周到期的任务列出来，超期的顺延到明天，再按优先级排一下。</div>
+          </div>
+        </div>
+        <!-- assistant -->
+        <div class="msg">
+          <div class="who ai"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg></div>
+          <div class="body">
+            <div class="ai-name">heyta 助手</div>
+            <div class="tool-line"><svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>已读取 <b>3 个项目 · 12 个任务</b></div>
+            <div class="prose">
+              <p>这周「Q4 品牌物料」共有 <strong>5 个任务</strong>到期，其中 <span class="em">2 个已超期</span>。我把超期的顺延到明天（11/26），并按优先级重排如下：</p>
+            </div>
+
+            <div class="card">
+              <div class="card-head"><div class="h"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>本周到期 · 5 项</div><div class="cnt">按优先级</div></div>
+              <div class="trow"><div class="cb"></div><div class="title">品牌手册 V3 终稿审定<span class="sub">设计组 · 进行中</span></div><div class="prio h">高</div><div class="due"><span class="moved">11/26</span><span class="arrow">←</span>11/24</div></div>
+              <div class="trow"><div class="cb"></div><div class="title">电商主图 6 张交付<span class="sub">摄影 · 待开始</span></div><div class="prio h">高</div><div class="due"><span class="moved">11/26</span><span class="arrow">←</span>11/25</div></div>
+              <div class="trow"><div class="cb"></div><div class="title">朋友圈九宫格排期<span class="sub">运营 · 进行中</span></div><div class="prio m">中</div><div class="due">11/27</div></div>
+              <div class="trow"><div class="cb"></div><div class="title">线下物料打样确认<span class="sub">采购 · 待开始</span></div><div class="prio m">中</div><div class="due">11/28</div></div>
+              <div class="trow"><div class="cb"></div><div class="title">品牌色卡归档<span class="sub">设计组 · 待开始</span></div><div class="prio l">低</div><div class="due">11/29</div></div>
+            </div>
+
+            <div class="confirm">
+              <div class="line"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>将顺延 2 项任务的到期日</div>
+              <div class="note">确认前不会写入任何变更。</div>
+              <div class="btns"><button class="btn-primary">确认执行</button><button class="btn-ghost">放弃</button></div>
+            </div>
+
+            <div class="prose"><p>要不要把其中「高优先级」的 2 个也加进今天的番茄钟？<span class="caret"></span></p></div>
+
+            <div class="follow">
+              <span class="chip"><span class="plus">+</span>只看超期的</span>
+              <span class="chip"><span class="plus">+</span>按负责人分组</span>
+              <span class="chip"><span class="plus">+</span>加入今日番茄钟</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- COMPOSER -->
+    <div class="composer-wrap">
+      <div class="composer">
+        <div class="inputbox">
+          <textarea placeholder="问点什么，或直接让我处理任务…"></textarea>
+          <div class="inputbar">
+            <div class="tool" title="附件"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M21.4 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.2-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></div>
+            <div class="tool" title="提及任务"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.9 7.9"/></svg></div>
+            <div class="sel"><span class="b"></span>DeepSeek V4</div>
+            <div class="grow"></div>
+            <button class="send" title="发送"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
+          </div>
+        </div>
+      </div>
+      <div class="hintline">助手可能出错，执行任务变更前请核对。</div>
+    </div>
+  </section>
+</div>
+</body>
+</html>

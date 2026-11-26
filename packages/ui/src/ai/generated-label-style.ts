@@ -6,7 +6,7 @@
  * react-native（RN 源码是 Flow 语法，Vite 直接解析失败）。把"长什么样"
  * 提成纯函数，判据才测得到它，而不是只能靠人看截图。
  *
- * 形状与位置的理由（为什么是灰字不是胶囊、为什么在被标识内容下方）
+ * 形状与位置的理由（为什么是极轻的次要灰字、为什么在被标识内容下方）
  * 写在 `AiGeneratedLabel.tsx` 文件头 —— 那里是这一族的**唯一叙事点**，
  * 这里只放数据。
  */
@@ -19,7 +19,7 @@ export interface AiGeneratedLabelStyle {
     readonly alignSelf: 'flex-start';
     readonly marginTop: number;
   };
-  /** 文字：caption 档 + 灰色。 */
+  /** 文字：row-meta 档（12px / 400 regular）+ foreground-subtle 弱灰。 */
   readonly label: RnTextStyle;
 }
 
@@ -36,8 +36,8 @@ export function aiGeneratedLabelStyle(
       marginTop: tokens['space.1'],
     },
     label: {
-      ...text.caption,
-      color: tokens['color.foreground-muted'],
+      ...text['row-meta'],
+      color: tokens['color.foreground-subtle'],
     },
   };
 }

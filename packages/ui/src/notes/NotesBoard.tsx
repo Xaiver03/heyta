@@ -74,7 +74,7 @@
  */
 
 import React, { useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View, type ViewProps } from 'react-native';
 import type { HeytaNativeTokens } from '@heyta/design-system';
 import type { Note } from '@heyta/domain';
 import { Pin, PinOff, Plus, StickyNote, Trash2 } from 'lucide';
@@ -95,8 +95,8 @@ import {
 export interface NotesBoardLabels {
   /** 一条便签都没有时那一句。 */
   readonly empty: string;
-  /** 空态下面那句补充说明（"写点什么，它会留在所有设备上"之类的引导）。 */
-  readonly emptyHint: string;
+  /** 空态补充说明（可选；AGENTS §0.2 后默认不传）。 */
+  readonly emptyHint?: string;
   readonly composerPlaceholder: string;
   readonly add: string;
   /**
@@ -176,36 +176,35 @@ function makeStyles(tokens: HeytaNativeTokens) {
     board: {
       gap: tokens['space.3'],
     },
-    /** 输入行：输入框吃掉剩余宽度，按钮贴右。 */
+    /** 单行紧凑输入壳：左置 `+` 图标 + 输入区，回车提交。 */
     composer: {
       flexDirection: 'row',
-      alignItems: 'stretch',
+      alignItems: 'center',
       gap: tokens['space.2'],
+      minHeight: tokens['touch-target.min'],
+      paddingLeft: tokens['space.3'],
+      paddingRight: tokens['space.3'],
+      borderWidth: tokens['border-width.thin'],
+      borderColor: tokens['color.border'],
+      borderRadius: tokens['radius.lg'],
+      backgroundColor: tokens['color.surface'],
+    },
+    composerFocused: {
+      borderColor: tokens['color.ring'],
+    },
+    leadingIcon: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0,
     },
     input: {
       flex: 1,
+      minWidth: 0,
       minHeight: tokens['touch-target.min'],
-      paddingHorizontal: tokens['size.field-padding-x'],
-      borderRadius: tokens['radius.md'],
-      backgroundColor: tokens['color.surface'],
+      paddingHorizontal: 0,
+      borderWidth: 0,
+      backgroundColor: 'transparent',
       color: tokens['color.foreground'],
-    },
-    addButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: tokens['space.1'],
-      minHeight: tokens['touch-target.min'],
-      paddingHorizontal: tokens['size.field-padding-x'],
-      borderRadius: tokens['radius.md'],
-      backgroundColor: tokens['color.primary'],
-    },
-    /** 空内容时按钮**仍然可见但置灰**：完全隐藏会让用户找不到"怎么加"。 */
-    addDisabled: {
-      opacity: tokens['state.disabled-opacity'],
-    },
-    addText: {
-      color: tokens['color.on-primary'],
     },
     list: {
       gap: tokens['space.2'],
@@ -295,6 +294,7 @@ export function NotesBoard({
   const styles = useMemo(() => makeStyles(tokens), [tokens]);
   const rows = useMemo(() => toNoteRows(notes, excerptLength), [notes, excerptLength]);
   const [composer, setComposer] = useState<NoteComposerState>(NOTE_COMPOSER_INITIAL);
+  const [composerFocused, setComposerFocused] = useState(false);
   const draft = composer.draft;
 
   /**
@@ -319,6 +319,7 @@ export function NotesBoard({
     // 宿主把 composer 关掉（`showComposer=false`）时 `onAdd` 可以不给 —— 那条路上没有提交入口。
     if (onAdd === undefined) return;
     const submitted = draft;
+    if (isNoteDraftBlank(submitted)) return;
     submittingRef.current = true;
     void runNoteSubmit(submitted, onAdd)
       .then((outcome) => {
@@ -332,7 +333,14 @@ export function NotesBoard({
   return (
     <View style={styles.board} testID={testID}>
       {showComposer ? (
-      <View style={styles.composer} testID="notes-composer">
+      <View
+        style={[styles.composer, composerFocused ? styles.composerFocused : null]}
+        testID="notes-composer"
+        {...({ dataSet: { inputShell: 'true' } } as unknown as ViewProps)}
+      >
+        <View style={styles.leadingIcon} aria-hidden>
+          <HeytaIcon data={Plus} size={tokens['icon.sm']} color={tokens['color.foreground-subtle']} />
+        </View>
         <TextInput
           style={[text['row-meta'], styles.input]}
           value={draft}
@@ -343,26 +351,12 @@ export function NotesBoard({
             // 打字不清提示（`noteComposerTyping`）：见 model 里那条注释。
             setComposer((state) => noteComposerTyping(state, next));
           }}
+          onFocus={() => setComposerFocused(true)}
+          onBlur={() => setComposerFocused(false)}
           onSubmitEditing={submit}
           returnKeyType="done"
           testID="notes-input"
         />
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={labels.add}
-          // 空内容时置灰不可点：与 `submit()` 的挡板同一个判据，只是提前到视觉上。
-        // 🔴 用**平铺** `aria-*`，不要用对象形态 `accessibilityState` / `accessibilityValue`：
-        // RNW 0.21 会把对象形态**整个丢掉**（实测 `aria-checked` / `aria-valuenow` 都不出现），
-        // 而 RN 0.71+ 两端都认平铺形态。判据见 `pnpm check:rn-aria`。
-          aria-disabled={isNoteDraftBlank(draft)}
-          disabled={isNoteDraftBlank(draft)}
-          onPress={submit}
-          style={[styles.addButton, isNoteDraftBlank(draft) ? styles.addDisabled : null]}
-          testID="notes-submit"
-        >
-          <HeytaIcon data={Plus} size={tokens['icon.xs']} color={tokens['color.on-primary']} />
-          <Text style={[text.caption, styles.addText]}>{labels.add}</Text>
-        </Pressable>
       </View>
       ) : null}
 

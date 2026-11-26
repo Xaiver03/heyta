@@ -536,10 +536,14 @@ export function TimelineBoard(props: TimelineBoardProps): React.JSX.Element {
           borderRadius: tokens['radius.sm'],
         },
         axisClickable: { cursor: 'pointer' },
+        /* 未排期泳道：跟上方轨道一样轻盈 —— 透明底 + 一条细分隔线，
+           不再是一整条全宽灰底（在画面里会突兀地压住轨道）。 */
         lane: {
-          backgroundColor: tokens['color.surface-sunken'],
-          borderRadius: tokens['radius.sm'],
-          padding: tokens['space.3'],
+          backgroundColor: 'transparent',
+          borderTopWidth: tokens['border-width.thin'],
+          borderTopColor: tokens['color.border-subtle'],
+          paddingVertical: tokens['space.3'],
+          paddingHorizontal: tokens['space.2'],
           gap: tokens['space.2'],
         },
         laneTitle: { color: tokens['color.foreground-muted'] },

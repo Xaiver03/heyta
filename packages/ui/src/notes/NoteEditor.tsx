@@ -89,10 +89,15 @@ function makeStyles(tokens: HeytaNativeTokens) {
       minHeight: tokens['touch-target.min'] * 4,
       paddingTop: tokens['space.2'],
       paddingHorizontal: tokens['size.field-padding-x'],
+      borderWidth: tokens['border-width.thin'],
+      borderColor: tokens['color.border'],
       borderRadius: tokens['radius.md'],
       backgroundColor: tokens['color.surface'],
       color: tokens['color.foreground'],
       textAlignVertical: 'top',
+    },
+    fieldFocused: {
+      borderColor: tokens['color.ring'],
     },
     /**
      * 操作行：「取消」贴左、「保存」贴右 —— 与 `SearchScreen` 那个出口同一侧，
@@ -149,6 +154,7 @@ export function NoteEditor({
   const text = useHeytaText();
   const styles = useMemo(() => makeStyles(tokens), [tokens]);
   const [draft, setDraft] = useState(initialContent);
+  const [focused, setFocused] = useState(false);
 
   const blank = isNoteDraftBlank(draft);
   const canSubmit = !blank && !busy;
@@ -163,12 +169,14 @@ export function NoteEditor({
   return (
     <View style={styles.editor} testID={testID}>
       <TextInput
-        style={[text['row-meta'], styles.field]}
+        style={[text['row-meta'], styles.field, focused ? styles.fieldFocused : null]}
         value={draft}
         placeholder={labels.placeholder}
         placeholderTextColor={tokens['color.foreground-subtle']}
         accessibilityLabel={labels.placeholder}
         onChangeText={setDraft}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
         multiline
         autoFocus={autoFocus}
         textAlignVertical="top"

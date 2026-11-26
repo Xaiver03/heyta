@@ -126,6 +126,7 @@ export function DatePicker({
 
   // 可见月份。初始跟到已选日期，没选就停在"今天"那一月。
   const [month, setMonth] = useState<LocalDate>(() => startOfMonth(value ?? today));
+  const [timeFocused, setTimeFocused] = useState(false);
 
   // 🔴 外部把 value 跳到别的月时（点快捷项"下周一"）月份必须跟上，
   // 否则用户点了"下周一"，网格还停在当月 —— 看不到自己刚选的那天。
@@ -333,7 +334,9 @@ export function DatePicker({
           <TextInput
             value={timeDraft}
             onChangeText={editTimeText}
+            onFocus={() => setTimeFocused(true)}
             onBlur={() => {
+              setTimeFocused(false);
               setTimeDraft(time.value ?? '');
             }}
             editable={time.enabled}
@@ -351,8 +354,8 @@ export function DatePicker({
               paddingVertical: tokens['space.1'],
               paddingHorizontal: tokens['space.2'],
               borderWidth: tokens['border-width.thin'],
-              borderColor: tokens['color.border'],
-              borderRadius: tokens['radius.sm'],
+              borderColor: timeFocused ? tokens['color.ring'] : tokens['color.border'],
+              borderRadius: tokens['radius.md'],
               color: tokens['color.foreground'],
             }}
           />

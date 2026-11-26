@@ -215,6 +215,11 @@ export interface OrganizerListProps {
    *   那个同名 prop 的注释，以及 `scripts/verify-mobile-trash.sh` 第 6b 步）。
    */
   readonly askOnlyWhenImpact?: boolean;
+  /**
+   * 行名字体档位。默认 `row-title`（16px，任务行正文，与移动端一致）；
+   * Web 侧栏传 `body-sm`（14px），让清单/标签行与导航行同档、整体更紧凑。
+   */
+  readonly nameTextStyle?: 'row-title' | 'body-sm';
   readonly labels: OrganizerListLabels;
   /** 点了某一行（**不是**删除）。不传 = 这些行不可点。 */
   readonly onFilterWith?: (item: OrganizerItem, context: OrganizerRowContext) => void;
@@ -331,9 +336,14 @@ function makeStyles(tokens: HeytaNativeTokens) {
       flex: 1,
       minHeight: tokens['touch-target.min'],
       paddingHorizontal: tokens['size.field-padding-x'],
+      borderWidth: tokens['border-width.thin'],
+      borderColor: tokens['color.border'],
       borderRadius: tokens['radius.md'],
       backgroundColor: tokens['color.surface'],
       color: tokens['color.foreground'],
+    },
+    inputFocused: {
+      borderColor: tokens['color.ring'],
     },
     busy: {
       opacity: tokens['state.disabled-opacity'],
@@ -377,6 +387,7 @@ function OrganizerRow({
   onRemove,
   onRename,
   onArchive,
+  nameTextStyle,
   editing,
   setEditing,
   pendingRemove,
@@ -402,6 +413,7 @@ function OrganizerRow({
   readonly onRemove: OrganizerListProps['onRemove'];
   readonly onRename: OrganizerListProps['onRename'];
   readonly onArchive: OrganizerListProps['onArchive'];
+  readonly nameTextStyle: 'row-title' | 'body-sm';
   readonly editing: boolean;
   readonly setEditing: (id: string | null) => void;
   /** 这一行是不是处在"等一下，先确认删除"的状态。 */
@@ -450,6 +462,7 @@ function OrganizerRow({
   // 草稿**留在行里**而不是提到列表里：行按 id 加了 key，所以"改到一半的这条是谁"
   // 天然跟着行走；提到父层就要自己维护 (id → 草稿) 的表，那张表迟早和列表脱节。
   const [draft, setDraft] = useState<string | null>(null);
+  const [renameFocused, setRenameFocused] = useState(false);
 
   const stopEditing = (): void => {
     setDraft(null);
@@ -478,9 +491,11 @@ function OrganizerRow({
     return (
       <View style={styles.row} testID={`${key}-row`}>
         <TextInput
-          style={[text['row-title'], styles.input]}
+          style={[text['row-title'], styles.input, renameFocused ? styles.inputFocused : null]}
           value={draft ?? item.name}
           onChangeText={setDraft}
+          onFocus={() => setRenameFocused(true)}
+          onBlur={() => setRenameFocused(false)}
           onSubmitEditing={submitRename}
           selectTextOnFocus
           autoFocus
@@ -519,7 +534,7 @@ function OrganizerRow({
   const body = (
     <>
       {renderLeading === undefined ? null : renderLeading(item, context)}
-      <Text style={[text['row-title'], styles.name]} numberOfLines={1}>
+      <Text style={[text[nameTextStyle], styles.name]} numberOfLines={1}>
         {item.name}
       </Text>
       {/* 计数位只在非零时出现（见文件头）。 */}
@@ -776,6 +791,7 @@ export function OrganizerList({
   removeImpact,
   childRemoveImpact,
   askOnlyWhenImpact,
+  nameTextStyle = 'row-title',
   labels,
   onFilterWith,
   onRemove,
@@ -859,6 +875,7 @@ export function OrganizerList({
             impact={removeImpact?.[node.id]}
             childImpact={childRemoveImpact?.[node.id]}
             askOnlyWhenImpact={askOnlyWhenImpact}
+            nameTextStyle={nameTextStyle}
             renderLeading={renderLeading}
             renderItemExtra={renderItemExtra}
             busy={busy}
@@ -889,6 +906,7 @@ export function OrganizerList({
                   impact={removeImpact?.[child.id]}
                   childImpact={childRemoveImpact?.[child.id]}
                   askOnlyWhenImpact={askOnlyWhenImpact}
+                  nameTextStyle={nameTextStyle}
                   renderLeading={renderLeading}
                   renderItemExtra={renderItemExtra}
                   busy={busy}

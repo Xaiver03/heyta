@@ -97,9 +97,9 @@ import {
 /** 面板全部文案，**每一项都由宿主注入**（`@heyta/ui` 不 import `@heyta/i18n`）。 */
 export interface EventBoardLabels {
   readonly empty: string;
-  readonly emptyHint: string;
+  readonly emptyHint?: string;
   readonly archivedEmpty: string;
-  readonly archivedEmptyHint: string;
+  readonly archivedEmptyHint?: string;
   readonly composerPlaceholder: string;
   readonly add: string;
   /** 还没选日期时日期按钮上的字。 */

@@ -175,13 +175,6 @@ export interface QuadrantBoardProps {
   /** 标题为空时的替代文案（空标题是真实存在的）。 */
   readonly fallbackTitle?: string;
   /**
-   * 哪一格正处于拖拽悬停 —— 只影响**边框**（用 `color.primary`）。
-   *
-   * 拖拽状态由宿主算（共享层不认识 dnd-kit）；`null` / 省略 = 没有悬停。
-   * ⚠️ 它**不是**无障碍信息：读屏拿到的是每格的 `cellA11y`。
-   */
-  readonly highlightedQuadrant?: Quadrant | null;
-  /**
    * 每格内的**宿主覆盖层插槽**（绝对定位、铺满该格）。
    *
    * web 用它挂 dnd-kit 的 droppable 节点（只需要一个有尺寸的 DOM 节点，
@@ -340,10 +333,6 @@ function makeStyles(tokens: HeytaNativeTokens) {
       borderBottomWidth: tokens['border-width.thin'],
       borderBottomColor: tokens['color.border'],
     },
-    /** 拖拽悬停：换语义底色，不动几何（动几何会让整格抖一下）。 */
-    cellHighlighted: {
-      backgroundColor: tokens['color.primary-subtle'],
-    },
     /**
      * 🔴 **空格铺满是正确形态**（2026-10-06 产品负责人看过 W5 实装后拍板，
      * 附滴答桌面截图为证：2×2 等分占满视口、空象限居中一句"没有任务"）。
@@ -429,7 +418,6 @@ export function QuadrantBoard({
   renderCellBodyWrapper,
   busyTaskId,
   fallbackTitle,
-  highlightedQuadrant,
   renderCellOverlay,
   renderHeaderTrailing,
   twoColumns = false,
@@ -442,6 +430,13 @@ export function QuadrantBoard({
   // 这里只把结果摆出来 —— 组件里因此没有分支。
   const cards = useMemo(() => toQuadrantCards(tasks, now), [tasks, now]);
   const styles = useMemo(() => makeStyles(tokens), [tokens]);
+
+  /**
+   * 🔴 2026-11-25：**灰色选中态在"那一条任务"上，不在"整格"上**。
+   * （产品负责人：「不是整个象限变灰，是选中的那条任务变灰」。）
+   * 整格不再有任何悬停底色；行级悬停与拖拽插入线都由 web 宿主在
+   * `renderRowWrapper` 里画（共享层不认识 DOM 指针）。
+   */
 
   /**
    * 🔴 响应式判定**来自宿主**（`twoColumns` prop，理由见 props 注释）。
@@ -478,7 +473,6 @@ export function QuadrantBoard({
           {row.map((card, cellIndex) => {
             const title = labels.title(card.quadrant);
             const hint = labels.hint(card.quadrant);
-            const highlighted = highlightedQuadrant === card.quadrant;
             /**
              * 🔴 十字：2×2 时左列画竖线（右缘）、上排画横线（下缘）；
              * 单列时每格之间画一条横线（最后一格不画）。除此之外没有任何边框。
@@ -501,11 +495,7 @@ export function QuadrantBoard({
                 busyTaskId={busyTaskId}
                 fallbackTitle={fallbackTitle}
                 density="compact"
-                /*
-                 * 空格要不要写引导，**由宿主决定**（`labels.empty`）。
-                 * web 那份实现成"只有第一个空象限返回『拖任务到这里』，其余空串"，
-                 * 所以"同屏最多一处"由一份判断守着，不在这里重算。
-                 */
+                /* 空格只写事实（`labels.empty` 现在恒为「没有任务」），不写操作引导。 */
                 emptyMessage={labels.empty(card.quadrant) || undefined}
               />
             );
@@ -516,7 +506,6 @@ export function QuadrantBoard({
                   styles.cell,
                   showVertical ? styles.dividerRight : null,
                   showHorizontal ? styles.dividerBottom : null,
-                  highlighted ? styles.cellHighlighted : null,
                 ]}
                 testID={card.testID}
                 accessibilityRole="summary"
@@ -529,8 +518,12 @@ export function QuadrantBoard({
               >
                 <View style={styles.header}>
                   <View style={styles.headerRow}>
-                    <View style={[styles.swatch, { backgroundColor: tokens[card.token] }]} />
-                    <Text style={[text['row-meta'], styles.cellTitle]}>{title}</Text>
+                    {/*
+                      🔴 2026-11-25：**去掉标题前那个色点图标**，改成给标题**文字**上象限色
+                      （与滴答一致：象限名本身就是彩色的，不需要再放一个色块"图标"）。
+                      产品负责人：「还在上面放些图标……」。颜色仍是唯一的语义载体，只是不再叠一个点。
+                    */}
+                    <Text style={[text['row-meta'], styles.cellTitle, { color: tokens[card.token] }]}>{title}</Text>
                     {renderHeaderTrailing === undefined ? null : (
                       <View style={styles.headerTrailing}>{renderHeaderTrailing(card)}</View>
                     )}

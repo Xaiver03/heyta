@@ -1103,9 +1103,6 @@ function makeStyles(tokens: HeytaNativeTokens) {
     monthCard: {
       flexShrink: 0,
       gap: 0,
-      borderBottomWidth: tokens['border-width.thin'],
-      borderEndWidth: tokens['border-width.thin'],
-      borderColor: tokens['color.border'],
     },
     monthCardFill: {
       flexGrow: 1,
@@ -1126,8 +1123,22 @@ function makeStyles(tokens: HeytaNativeTokens) {
       borderColor: tokens['color.border'],
       backgroundColor: tokens['color.surface'],
     },
-    /* flat（Apple 形态）：不描边、不铺白底。 */
-    flatCard: { borderWidth: 0, backgroundColor: 'transparent' },
+    /*
+     * flat（Apple 形态）：不描边、不铺白底。
+     *
+     * 🔴 只写 `borderWidth: 0` **盖不住** `monthCard` 的 `borderBottomWidth` /
+     *    `borderEndWidth`：在 RN/RNW 的样式合并里，单独的下/尾边宽度会在
+     *    `borderWidth` 之后生效，于是无框模式仍悬着一条最右 + 最底的 **L 形亮边**
+     *    （暗色下尤其刺眼）。四边必须**逐条**归零，并把颜色一起做成透明，
+     *    才能彻底消掉那条残留外框。
+     */
+    flatCard: {
+      borderWidth: 0,
+      borderBottomWidth: 0,
+      borderEndWidth: 0,
+      borderColor: 'transparent',
+      backgroundColor: 'transparent',
+    },
     /** 日档的那条工具栏卡：外壳与另两张相同，只需要"不许被压"。 */
     dayToolbarCard: { flexShrink: 0 },
     /* 板内头部已搬进 `CalendarToolbar`（批二）—— 原来这里的
@@ -1180,8 +1191,11 @@ function makeStyles(tokens: HeytaNativeTokens) {
       paddingVertical: tokens['space.1'],
     },
     bar: { flexDirection: 'row', alignItems: 'center', flexShrink: 0 },
-    /* 彩色块 chip 的浅底：铺满条、strong 色、0.16 透明度（不新增 token，RN/RNW 原生支持 opacity）。 */
-    barTint: { ...StyleSheet.absoluteFillObject, borderRadius: tokens['radius.sm'], opacity: 0.16 },
+    /* 彩色块 chip 的浅底：铺满条、strong 色、低透明度（不新增 token，RN/RNW 原生支持 opacity）。
+       暗色下 0.16 让 chip 与暗底区分度不够、同色字因此显暗，这里微调到 0.22：
+       chip 的色块边界更清楚，同色标题随之更易读；状态语义（逾期=danger、
+       完成=foreground-subtle、其余=清单色/primary）一个都没变。 */
+    barTint: { ...StyleSheet.absoluteFillObject, borderRadius: tokens['radius.sm'], opacity: 0.22 },
     barTitle: { flex: 1, minWidth: 0 },
     dayHeader: { flexDirection: 'row', alignItems: 'center', gap: tokens['space.2'] },
     dayTitle: { flex: 1 },

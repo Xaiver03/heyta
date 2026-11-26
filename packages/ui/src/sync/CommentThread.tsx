@@ -61,6 +61,7 @@ export function CommentThread(props: CommentThreadProps) {
   const text = useHeytaText();
   const tokens = useHeytaTokens();
   const [draft, setDraft] = useState('');
+  const [focused, setFocused] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   // 🔴 「空草稿」是**还没做**，不是**做错了**。草稿一为空就画报错，会在两条真路径上诉称失败
   //    （2026-10-25 移动设备腿逐张看图抓到）：发送成功那一拍组件把草稿清空 ⇒ 回执与
@@ -104,9 +105,25 @@ export function CommentThread(props: CommentThreadProps) {
       <TextInput
         value={draft}
         onChangeText={setDraft}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
         placeholder={props.labels.composerPlaceholder}
+        placeholderTextColor={tokens['color.foreground-subtle']}
         accessibilityLabel={props.labels.composerPlaceholder}
         multiline
+        style={[
+          text['row-meta'],
+          {
+            minHeight: tokens['touch-target.min'],
+            paddingHorizontal: tokens['size.field-padding-x'],
+            paddingVertical: tokens['space.2'],
+            borderWidth: tokens['border-width.thin'],
+            borderColor: focused ? tokens['color.ring'] : tokens['color.border'],
+            borderRadius: tokens['radius.md'],
+            backgroundColor: tokens['color.surface'],
+            color: tokens['color.foreground'],
+          },
+        ]}
         testID="comment-composer-input"
       />
       {showError && (

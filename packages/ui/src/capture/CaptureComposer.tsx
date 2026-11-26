@@ -75,7 +75,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, TextInput, View, type ViewProps } from 'react-native';
 import type { HeytaNativeTokens } from '@heyta/design-system';
 import { today } from '@heyta/domain';
 import type { CaptureExclusion, LocalDate, LocalTime } from '@heyta/domain';
@@ -316,17 +316,6 @@ function makeStyles(tokens: HeytaNativeTokens) {
     descriptionInput: {
       minHeight: tokens['touch-target.min'],
       paddingHorizontal: tokens['size.field-padding-x'],
-      /**
-       * 🔴 2026-11-16：从"无边界输入面"改成**浅底 + 一条细线**。
-       *
-       * 产品负责人看任务页的第一句是「默认下面好像有一层灰色的底层遮罩」——
-       * 根因是页面底 `#f8fafc` 与白卡片只差 7/255。页面改白之后，
-       * `color.surface`（白）的输入面在它上面**完全消失**：截图里只剩 placeholder 一行字，
-       * 读起来不像输入框。滴答清单的 composer 同样是"浅底 + 极细的边"。
-       *
-       * ⚠️ 这条同时推翻 2026-10-07「无描边交互」在**输入面**这一格的适用性：
-       * 产品 2026-11-16 的口径是「全局不用彻底禁止描边」。按钮仍不画静止描边。
-       */
       borderWidth: tokens['border-width.thin'],
       borderColor: tokens['color.border'],
       borderRadius: tokens['radius.lg'],
@@ -334,115 +323,53 @@ function makeStyles(tokens: HeytaNativeTokens) {
       color: tokens['color.foreground-muted'],
       textAlignVertical: 'center',
     },
+    descriptionFocused: {
+      borderColor: tokens['color.ring'],
+    },
     wrap: {
-      /**
-       * 🔴 这里曾是 `space.2`（8dp），而 `projectWrap` 也是 8dp ⇒
-       * 「标题输入 → 快捷胶囊 → 落点标签 → 落点胶囊」四段的间距**完全一样**。
-       * 真机实测（新建面板）：输入行底 1010 → 落点标签 1034（24px=8dp）→
-       * 落点胶囊 1112（也是 24px=8dp）。眼睛读不出"标签属于它下面那枚胶囊"。
-       *
-       * 段落之间拉到 12dp，标签→控件收到 4dp（`projectWrap`），
-       * 两档之比 3:1 —— 这是 `docs/agents/ux-principles.md` §6b 第三条要求的
-       * "标签离它控制的东西更近"。
-       */
       gap: tokens['space.3'],
     },
-    /** 输入行：输入框吃掉剩余宽度，按钮贴右。 */
-    /**
-     * 输入区**外框**（2026-11-16 产品口径：「主要是 UX」+ 参照 DSH 的 composer）。
-     *
-     * 形状从"输入框 | 日期胶囊 | 添加按钮"三个并排控件，收成**一个容器内上下两层**：
-     * 上层输入、下层工具行。这与参照图一致，也解决三个并排控件在 375dp 上
-     * 争宽度、placeholder 被挤断的问题（真机「添加任务，回车确认（可写「明天下」
-     * 就是这么断的）。
-     *
-     * 🔴 承载只靠**一圈细边**（白底 + `color.border`）：页面改白之后，
-     * 靠灰底分层会把它变成"又一块灰"。
-     */
+    /** 单行紧凑输入壳：左置 `+` 图标 + 输入区 + 右侧日期触发器，回车提交。 */
     compose: {
-      flexDirection: 'column',
+      flexDirection: 'row',
+      alignItems: 'center',
       gap: tokens['space.2'],
-      padding: tokens['space.2'],
+      minHeight: tokens['touch-target.min'],
+      paddingLeft: tokens['space.3'],
+      paddingRight: tokens['space.2'],
       borderWidth: tokens['border-width.thin'],
       borderColor: tokens['color.border'],
       borderRadius: tokens['radius.lg'],
       backgroundColor: tokens['color.surface'],
     },
-    /** 工具行：日期胶囊在左，主操作在右（参照图里工具行的排法）。 */
-    toolRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: tokens['space.2'],
+    composeFocused: {
+      borderColor: tokens['color.ring'],
     },
-    /** 中间那段空白：把主操作推到工具行右端。 */
-    toolSpacer: {
-      flex: 1,
+    leadingIcon: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0,
     },
     input: {
-      /*
-        🔴 **不要 `flex: 1`**（2026-11-16）。它是"输入框与按钮并排一行"那个时代的写法；
-        `compose` 改成列之后，`flex: 1` 让输入框**吃掉外框的剩余高度** ——
-        实拍：输入文字与工具行之间凭空多出 45pt 空白，外框整体被撑高一倍。
-        列方向里它只需要"撑满宽度 + 不小于触控下限"。
-      */
-      alignSelf: 'stretch',
+      flex: 1,
+      minWidth: 0,
       minHeight: tokens['touch-target.min'],
-      paddingHorizontal: tokens['size.field-padding-x'],
-      /**
-       * 🔴 2026-11-16：输入框**自己不再画框** —— 它现在住在 `compose` 那个外框里。
-       * 两层各画一圈边会变成"框中框"（参照图里也只有外框一圈）。
-       */
+      paddingHorizontal: 0,
       borderWidth: 0,
       backgroundColor: 'transparent',
       color: tokens['color.foreground'],
     },
-    /**
-     * 主操作：**圆形图标键**（2026-11-16，参照 DSH 的发送键）。
-     * 从"圆角矩形 + 「添加」二字"改成圆形 —— 文字版在窄屏会把工具行挤成两行，
-     * 而"+"在这个位置是共识符号（无障碍名仍由 `labels.add` 提供，见 JSX）。
-     * `aspectRatio: 1` + `minHeight` 保证它是正圆且不小于 44dp 触控下限。
-     */
-    addButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      /*
-        🔴 用**显式宽高**而不是 `aspectRatio: 1`：在 `flexDirection: 'row'` 的容器里，
-        Yoga 会先按可用宽度分配、再由 `aspectRatio` 反推高度 —— 窄屏上算出
-        比 `minHeight` 更大的正方形，圆形按钮**溢出外框**（真机与 390 视口实拍都出现）。
-        显式 `width`/`height` 是确定的，且两者都取 44dp 触控下限。
-      */
-      width: tokens['touch-target.min'],
-      height: tokens['touch-target.min'],
-      paddingHorizontal: 0,
-      borderRadius: tokens['radius.full'],
-    },
-    addEnabled: {
-      backgroundColor: tokens['color.primary'],
-    },
-    addDisabled: {
-      backgroundColor: tokens['color.primary'],
-      opacity: tokens['state.disabled-opacity'],
-    },
-    /**
-     * 日期胶囊：**长在输入行内部右侧**，与输入框同一个高度档（一档一个高度，
-     * `docs/agents/ux-principles.md` §1）。它常驻，不随聚焦长出 ——
-     * "没选日期"与"选了但看不见"必须在截图上分辨得出来。
-     */
+    /** 日期触发器：内联在输入行右侧，不另画内框；空态仅图标，有值时切主色。 */
     capsule: {
       flexDirection: 'row',
       alignItems: 'center',
+      flexShrink: 0,
       gap: tokens['space.1'],
       minHeight: tokens['touch-target.min'],
-      paddingHorizontal: tokens['size.field-padding-x'],
+      paddingHorizontal: tokens['space.2'],
       borderRadius: tokens['radius.md'],
-      borderWidth: tokens['border-width.thin'],
-      borderColor: tokens['color.border'],
+      borderWidth: 0,
       backgroundColor: 'transparent',
-    },
-    /** 有值时换主色描边与主色字：空态只画图标，不靠底色说话。 */
-    capsuleOn: {
-      borderColor: tokens['color.primary'],
     },
     capsuleText: {
       color: tokens['color.primary'],
@@ -579,8 +506,10 @@ export function CaptureComposer({
   const styles = useMemo(() => makeStyles(tokens), [tokens]);
 
   const [draft, setDraft] = useState('');
+  const [focused, setFocused] = useState(false);
   /** 第二行。只在 `descriptionInput` 时被渲染与提交，否则恒为空串。 */
   const [descriptionDraft, setDescriptionDraft] = useState('');
+  const [descriptionFocused, setDescriptionFocused] = useState(false);
   /** 用户显式忽略的识别。**是"这段字是标题的一部分"，不是"删掉这几个字"。** */
   const [ignored, setIgnored] = useState<readonly CaptureExclusion[]>([]);
   /** 面板里点出来的截止值。绑在"被消费的那段字"上，那段字一变它就作废（`model.ts` §二·五）。 */
@@ -652,6 +581,7 @@ export function CaptureComposer({
   const canSubmit = captureCanSubmit(parsed);
 
   function submit(): void {
+    if (!canSubmit) return;
     const plan = toCaptureSubmitPlan(parsed, anchorDate, override);
     if (plan === undefined) return;
     /*
@@ -768,7 +698,18 @@ export function CaptureComposer({
         分组后是 4 / 12 / 4 三档，层次回来了。
       */}
       <View style={styles.titleGroup}>
-      <View style={styles.compose}>
+      <View
+        style={[styles.compose, focused ? styles.composeFocused : null]}
+        testID="capture-compose"
+        {...({ dataSet: { inputShell: 'true' } } as unknown as ViewProps)}
+      >
+        <View style={styles.leadingIcon} aria-hidden>
+          <HeytaIcon
+            data={Plus}
+            size={tokens['icon.sm']}
+            color={tokens['color.foreground-subtle']}
+          />
+        </View>
         <TextInput
           ref={inputRef}
           style={[text['row-meta'], styles.input]}
@@ -777,6 +718,8 @@ export function CaptureComposer({
           placeholderTextColor={tokens['color.foreground-subtle']}
           accessibilityLabel={labels.addLabel}
           onChangeText={onDraftChange}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
           onSubmitEditing={submit}
           returnKeyType="done"
           // 🔴 原生端**不**透传 `autoFocus`（那个竞态正是这么来的，见 prop 说明）；
@@ -784,26 +727,13 @@ export function CaptureComposer({
           {...(autoFocus === undefined || managesFocusItself ? {} : { autoFocus })}
           testID="capture-input"
         />
-
-        {/*
-          工具行（2026-11-16）：日期胶囊在左、主操作在右 —— 与输入框同处**一个外框**内。
-          此前这三件是并排的一行，窄屏上 placeholder 被挤断（真机「（可写「明天下」
-          就是这么断的），而"输入→落点→提交"其实是**上下两层**的阅读顺序。
-        */}
-        <View style={styles.toolRow}>
-        {/*
-          🔴 日期胶囊：**这条新任务会落在哪一天几点**，由这一枚说。
-          它常驻（不随聚焦长出）—— 藏起来会让"没选日期"和"选了但看不见"在截图上
-          不可分辨，而这是这条线上唯一致命的错法（猜错哪一天）。
-          空态只画图标，不写「未设置」（`labels.capsule` 那一格的理由）。
-        */}
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={labels.capsuleAria(capsuleText)}
           onPress={() => {
             setPanelOpen((open) => !open);
           }}
-          style={[styles.capsule, capsuleKind === 'empty' ? null : styles.capsuleOn]}
+          style={styles.capsule}
           testID="capture-due-capsule"
         >
           <HeytaIcon
@@ -822,33 +752,22 @@ export function CaptureComposer({
             color={tokens['color.foreground-subtle']}
           />
         </Pressable>
-        {/* 撑开：让主操作贴右（参照图里发送键在右下角）。 */}
-        <View style={styles.toolSpacer} />
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={labels.add}
-        // 🔴 用**平铺** `aria-*`，不要用对象形态 `accessibilityState` / `accessibilityValue`：
-        // RNW 0.21 会把对象形态**整个丢掉**（实测 `aria-checked` / `aria-valuenow` 都不出现），
-        // 而 RN 0.71+ 两端都认平铺形态。判据见 `pnpm check:rn-aria`。
-          aria-disabled={!canSubmit}
-          disabled={!canSubmit}
-          onPress={submit}
-          style={[styles.addButton, canSubmit ? styles.addEnabled : styles.addDisabled]}
-          testID="capture-submit"
-        >
-          <HeytaIcon data={Plus} size={tokens['icon.md']} color={tokens['color.on-primary']} />
-        </Pressable>
-        </View>
       </View>
 
       {descriptionInput ? (
         <TextInput
-          style={[text['row-meta'], styles.descriptionInput]}
+          style={[
+            text['row-meta'],
+            styles.descriptionInput,
+            descriptionFocused ? styles.descriptionFocused : null,
+          ]}
           value={descriptionDraft}
           placeholder={labels.descriptionPlaceholder ?? ''}
           placeholderTextColor={tokens['color.foreground-subtle']}
           accessibilityLabel={labels.descriptionPlaceholder ?? ''}
           onChangeText={setDescriptionDraft}
+          onFocus={() => setDescriptionFocused(true)}
+          onBlur={() => setDescriptionFocused(false)}
           returnKeyType="done"
           onSubmitEditing={submit}
           testID="capture-description"

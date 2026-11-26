@@ -246,6 +246,17 @@ function readReducedTransparencyOnce(): boolean {
 }
 
 /** 从系统配色方案解析出一套完整主题。`value` 省略时由 Provider 调用。 */
+/** 按比例缩放 `font-size.*` 数值 token（只影响文字，不动间距/图标/触控目标）。 */
+function scaleFontSizeTokens(tokens: HeytaNativeTokens, scale: number): HeytaNativeTokens {
+  const out: Record<string, unknown> = { ...tokens };
+  for (const key of Object.keys(out)) {
+    if (key.startsWith('font-size.') && typeof out[key] === 'number') {
+      out[key] = (out[key] as number) * scale;
+    }
+  }
+  return out as unknown as HeytaNativeTokens;
+}
+
 export function resolveHeytaUiTheme(options?: {
   scheme?: ReturnType<typeof useColorScheme>;
   reducedMotion?: boolean;
@@ -273,6 +284,11 @@ export function resolveHeytaUiTheme(options?: {
    * 省略 = 保持基准档 16（与旧行为一致）。
    */
   screenWidth?: number;
+  /**
+   * 用户字号比例（1 = 设计基准；0.88 = 紧凑，1.12 = 宽松）。
+   * 只缩放 `font-size.*` token —— 间距、图标、触控目标不受影响。
+   */
+  fontScale?: number;
 }): HeytaUiTheme {
   // 🔴 `resolveThemeName` 负责把 `null` / `'unspecified'` 归一成 `'light'`。
   // 直接拿 scheme 当索引会得到 undefined，而 RN 拿到 undefined 颜色
@@ -291,14 +307,18 @@ export function resolveHeytaUiTheme(options?: {
    * 连拿不到 `react-native` 的共享组件也跟着对了。
    */
   const tokens = withResolvedScreenGutter(baseTokens, options?.screenWidth);
+  const scaledTokens =
+    options?.fontScale !== undefined && options.fontScale !== 1
+      ? scaleFontSizeTokens(tokens, options.fontScale)
+      : tokens;
   return {
     theme,
     preset: options?.preset,
     reducedMotion,
     reducedTransparency,
-    tokens,
+    tokens: scaledTokens,
     // 排版与主题无关 —— 换主题只该换颜色，不该让版面重排。
-    text: resolveAllTextStyles(tokens),
+    text: resolveAllTextStyles(scaledTokens),
     native: resolveNativeAccessors(tokens, options?.packagedFonts ?? DEFAULT_PACKAGED_FONTS),
   };
 }

@@ -66,7 +66,7 @@ export interface TrashBoardLabels {
    */
   readonly intro: string;
   readonly emptyTitle: string;
-  readonly emptyHint: string;
+  readonly emptyHint?: string;
   /**
    * 一行的种类徽标（任务 / 便签 / …）。
    *
