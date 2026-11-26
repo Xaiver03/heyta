@@ -1,42 +1,19 @@
-import { CalendarDays, Check, Clock3 } from 'lucide-react';
-import { useI18n } from '@heyta/i18n';
-
-/** A small plan takes shape once on entry; no account data or looping attention cues. */
+/**
+ * 登录对话框左侧的插画栏（电脑端）。
+ *
+ * 2026-11-27：从"抽象计划示意 + 一段文案"换成**整块插画**，与移动端首启页同一套
+ * 纸感漫画（`assets/illustrations/onboarding/bg-*.jpg`，同一份素材，不复制）。
+ *
+ * - 只做氛围，`aria-hidden`；不承载信息，也不放说明文字（界面只用排版/画面表达）。
+ * - 手机/窄屏由 CSS `@media` 整块隐藏（`.ht-sheet__auth-plan { display:none }`），
+ *   所以这次只影响电脑端。
+ * - 素材用 `new URL(..., import.meta.url)` 让 Vite 打包，不在 public 里另存一份。
+ */
 export function AuthPlanScene(): React.JSX.Element {
-  const { t } = useI18n();
-  return <aside className="ht-sheet__auth-plan" aria-hidden="true" data-testid="auth-plan-scene">
-    <svg className="ht-auth-plan-backdrop" viewBox="0 0 360 640" preserveAspectRatio="xMidYMid slice" focusable="false">
-      <g className="ht-auth-plan-backdrop-lines" fill="none" stroke="currentColor">
-        <path d="M-40 580C30 470 110 530 168 394S248 270 408 212" />
-        <path d="M-70 548C20 438 94 502 140 368S224 238 398 180" />
-        <path d="M-100 516C10 406 78 474 112 342S200 206 388 148" />
-      </g>
-      <circle className="ht-auth-plan-backdrop-node" cx="167" cy="396" r="10" fill="currentColor" />
-      <circle className="ht-auth-plan-backdrop-node ht-auth-plan-backdrop-node--next" cx="280" cy="244" r="5" fill="currentColor" />
-    </svg>
-    <div className="ht-auth-plan-intro">
-      <span className="ht-sheet__auth-plan-kicker">{t('web.auth.plan.kicker')}</span>
-      <h2 className="ht-type-section-title">{t('web.auth.plan.title')}</h2>
-    </div>
-    <div className="ht-auth-plan-stack">
-      <div className="ht-auth-plan-paper" />
-      <div className="ht-sheet__auth-preview">
-        <div className="ht-sheet__auth-preview-heading ht-type-headline">
-          <CalendarDays /><span>{t('web.auth.plan.previewTitle')}</span>
-        </div>
-        <div className="ht-auth-plan-days">{Array.from({ length: 7 }, (_, i) => <span key={i} className={i === 2 ? 'ht-auth-plan-day--today' : undefined}>{String(i + 1).padStart(2, '0')}</span>)}</div>
-        <div className="ht-sheet__auth-preview-row">
-          <span className="ht-sheet__auth-preview-check"><Check /></span><span>{t('web.auth.plan.previewFirst')}</span>
-        </div>
-        <div className="ht-sheet__auth-preview-row">
-          <span className="ht-sheet__auth-preview-check"><Check /></span><span>{t('web.auth.plan.previewSecond')}</span>
-        </div>
-        <div className="ht-sheet__auth-preview-row">
-          <Clock3 /><span>{t('web.auth.plan.previewThird')}</span>
-        </div>
-        <div className="ht-auth-plan-progress"><span /></div>
-      </div>
-    </div>
-    <p className="ht-sheet__auth-plan-local ht-type-caption">{t('web.auth.plan.local')}</p>
-  </aside>;
+  const art = new URL('../../../../../assets/illustrations/onboarding/bg-tasks.jpg', import.meta.url).href;
+  return (
+    <aside className="ht-sheet__auth-plan" aria-hidden="true" data-testid="auth-plan-scene">
+      <img className="ht-auth-plan-illustration" src={art} alt="" aria-hidden="true" draggable={false} />
+    </aside>
+  );
 }

@@ -906,12 +906,12 @@ export function AuthScreen({
           所以只留这一个，挂在三支之外；颜色降到 `muted`（它是一次**退路**，
           不该和主按钮抢注意力）。
         */}
-        {/* 整屏档的"返回"移到顶栏（见上）；只有内嵌档仍保留正文底部这一条出口。 */}
-        {embedded ? (
-          <Pressable accessibilityRole="button" onPress={onBack} testID="mobile-central-auth-back">
-            <Text variant="body-sm" tone="muted">{t('mobile.auth.back')}</Text>
-          </Pressable>
-        ) : null}
+        {/*
+          🔴 2026-11-26：内嵌档（欢迎页升起的抽屉）**不再摆「返回」文字**。
+          用户：「移动端不需要 Back/返回，左滑就是返回」。抽屉的关闭交给
+          系统返回手势（宿主 `WelcomeScreen` 里的 `BackHandler`）与面板顶部那个 ×；
+          整屏档（从设置进入）仍用顶栏返回箭头，那一档是独立页面、需要显式退路。
+        */}
       </ScrollView>
 
       {openLegalDocument !== null ? (() => {

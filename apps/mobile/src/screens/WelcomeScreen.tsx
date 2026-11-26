@@ -40,6 +40,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
+  BackHandler,
   Easing,
   Image,
   Keyboard,
@@ -52,6 +53,7 @@ import {
 } from 'react-native';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { resolveHeytaUiTheme } from '@heyta/ui';
 import type { HeytaNativeTokens } from '@heyta/design-system';
 import type { MessageKey } from '@heyta/i18n';
 import { useI18n } from '@heyta/i18n';
@@ -139,12 +141,18 @@ function makeStyles(tokens: HeytaNativeTokens) {
       paddingHorizontal: tokens['screen.gutter'],
       gap: tokens['space.2'],
     },
+    /**
+     * 登录抽屉：**暖纸卡浮在插画上**。
+     * 🔴 高度从 88% 收到 72%：88% 时揭开的漫画只剩顶部一条被切半的第三格，
+     * 等于"插画被盖没了"；72% 能留出上方一整块完整漫画，眼睛先看到图、再落到表单。
+     * 底色是暖纸（与漫画同色），所以卡顶与漫画之间没有冷灰接缝 —— 是一张纸的延续。
+     */
     sheet: {
       position: 'absolute',
       left: 0,
       right: 0,
       bottom: 0,
-      maxHeight: '88%',
+      maxHeight: '72%',
       borderTopLeftRadius: tokens['radius.xl'],
       borderTopRightRadius: tokens['radius.xl'],
       backgroundColor: tokens['color.background'],
@@ -195,8 +203,19 @@ export interface WelcomeScreenProps {
  */
 export function WelcomeScreen(props: Parameters<typeof WelcomeScreenInner>[0]) {
   const { locale } = useI18n();
+  /**
+   * 🔴 首启页固定「浅色 + 暖纸」表面：四张漫画的纸底是 #FAF7F1，`paper-50` 是 #FBFAF7，
+   * 几乎同一张纸。登录抽屉的底色取 `tokens['color.background']`，
+   * 只要不锁暖纸，就会落回默认的**冷石板灰 #F1F5F9** —— 点开登录那一刻，
+   * 整屏从暖纸掉进冷灰，读起来就是"插画没了、上下两块"。
+   *
+   * 必须用 `value`（而不是 `schemeOverride`）：`HeytaUiProvider` 嵌在外层 Provider 里时
+   * 会**沿用外层主题**，`schemeOverride`/`preset` 在这种位置会被忽略（见 ui/theme.tsx 的
+   * `inherited` 分支）。`value` 是唯一会覆盖外层的入口。
+   */
+  const theme = useMemo(() => resolveHeytaUiTheme({ scheme: 'light', preset: 'warm' }), []);
   return (
-    <ThemeProvider locale={locale} schemeOverride="light">
+    <ThemeProvider locale={locale} value={theme}>
       <WelcomeScreenInner {...props} />
     </ThemeProvider>
   );
@@ -256,6 +275,23 @@ function WelcomeScreenInner({
   useEffect(() => {
     if (keyboardHeight === 0) baseWindowHeight.current = windowHeight;
   }, [keyboardHeight, windowHeight]);
+
+  /**
+   * Android 返回键 / 返回手势 = 关闭登录抽屉。
+   * 🔴 移动端登录面板**不摆 Back/返回文字**（用户 2026-11-26：「左滑不就是返回吗」），
+   * 所以抽屉的关闭必须由系统返回手势承担 —— 否则删掉 Back 之后抽屉就关不掉了
+   * （面板顶部那个 × 仍可关，但手势是主路径）。返回 true = 由我们消费，不上交系统退栈。
+   */
+  useEffect(() => {
+    if (!authOpen) return undefined;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      setAuthOpen(false);
+      return true;
+    });
+    return () => {
+      sub.remove();
+    };
+  }, [authOpen]);
 
   /**
    * 换页节奏与交叉淡入时长都从 token 推，不写裸毫秒。

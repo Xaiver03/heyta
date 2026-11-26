@@ -334,7 +334,8 @@ describe('未登录 / 未配置时是明确的空状态', () => {
     const el = await renderPanel('zh-CN');
     const text = el.textContent ?? '';
 
-    expect(text).toContain(translate('zh-CN', 'web.auth.plan.title'));
+    // 左栏现在是一整块插画（不再是「计划」文案）：面板不空 = 插画在。
+    expect(el.querySelector('[data-testid="auth-plan-scene"]')).not.toBeNull();
     // 空状态不能说成"已登录"。
     expect(text).not.toContain(translate('zh-CN', 'web.auth.signedIn.title'));
   });
@@ -343,7 +344,7 @@ describe('未登录 / 未配置时是明确的空状态', () => {
     const el = await renderPanel('en');
     const text = el.textContent ?? '';
 
-    expect(text).toContain(translate('en', 'web.auth.plan.title'));
+    expect(el.querySelector('.ht-auth-plan-illustration')).not.toBeNull();
     expect(CJK.test(text)).toBe(false);
   });
 });
