@@ -49,8 +49,32 @@ describe('toggle_checklist_item', () => {
   });
 });
 
+describe('set_checklist_item_reminder（#29 检查项级提醒）', () => {
+  it('date + time ⇒ set-checklist-item-reminder', () => {
+    expect(
+      intentOf('set_checklist_item_reminder', { taskId: 't1', itemText: '甲', date: '2027-06-01', time: '09:30' }),
+    ).toEqual({
+      action: 'set-checklist-item-reminder', taskId: 't1', itemText: '甲', date: '2027-06-01', time: '09:30',
+    });
+  });
+  it('clear:true ⇒ 清除意图', () => {
+    expect(intentOf('set_checklist_item_reminder', { taskId: 't1', itemText: '甲', clear: true })).toEqual({
+      action: 'set-checklist-item-reminder', taskId: 't1', itemText: '甲', clear: true,
+    });
+  });
+  it('未知/缺项/只给 date 或 time/clear 与 date 冲突/类型错 ⇒ 拒', () => {
+    rejected('set_checklist_item_reminder', { taskId: 't1', itemText: '甲', date: '2027-06-01', time: '09:30', x: 1 }, 'x');
+    rejected('set_checklist_item_reminder', { itemText: '甲', date: '2027-06-01', time: '09:30' }, 'taskId');
+    rejected('set_checklist_item_reminder', { taskId: 't1', date: '2027-06-01', time: '09:30' }, 'itemText');
+    rejected('set_checklist_item_reminder', { taskId: 't1', itemText: '甲', date: '2027-06-01' }, 'date');
+    rejected('set_checklist_item_reminder', { taskId: 't1', itemText: '甲', clear: true, date: '2027-06-01', time: '09:30' }, '二选一');
+    rejected('set_checklist_item_reminder', { taskId: 't1', itemText: '甲' }, 'date');
+    rejected('set_checklist_item_reminder', { taskId: 't1', itemText: '甲', clear: 'yes' }, 'clear');
+  });
+});
+
 describe('目录声明', () => {
-  for (const name of ['set_task_checklist', 'toggle_checklist_item']) {
+  for (const name of ['set_task_checklist', 'toggle_checklist_item', 'set_checklist_item_reminder']) {
     it(name, () => {
       const t = findTool(name);
       expect(t?.kind).toBe('write');

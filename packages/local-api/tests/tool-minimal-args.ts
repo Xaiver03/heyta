@@ -120,6 +120,7 @@ export const TOOL_MINIMAL_ARGS: Readonly<Record<string, Record<string, unknown>>
   // 批7：任务结构化子项
   set_task_checklist: { taskId: 't1', items: [{ text: 'x' }] },
   toggle_checklist_item: { taskId: 't1', itemText: 'x', done: true },
+  set_checklist_item_reminder: { taskId: 't1', itemText: 'x', date: '2027-01-01', time: '09:00' },
 
   // 批8：任务指派（ADR-0062 决策 7 / ADR-0088）
   set_task_assignee: { taskId: 't1' },

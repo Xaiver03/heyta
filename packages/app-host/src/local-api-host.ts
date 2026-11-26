@@ -2228,6 +2228,68 @@ async function submitIntent(
       return { ok: true, taskId: intent.taskId };
     }
 
+    case 'set-checklist-item-reminder': {
+      // #29：检查项级提醒（内联在 Task.checklist 上，写它是一条 TASK UPD）。
+      // 与任务级 `create-reminder`（REMINDER 实体）不同一条通道 —— 这里按**文本**唯一匹配子项。
+      const task = actions.findTask(intent.taskId);
+      if (task === undefined) {
+        return { ok: false, reason: 'not-found', message: '没有找到这个任务。' };
+      }
+      const list = task.checklist ?? [];
+      const matches = list.filter((it) => it.text === intent.itemText);
+      if (matches.length === 0) {
+        return {
+          ok: false,
+          reason: 'invalid',
+          message: `没有文本为「${intent.itemText}」的检查项；先用 set_task_checklist 建立，或用 get_task 查看现有子项。`,
+        };
+      }
+      if (matches.length > 1) {
+        return {
+          ok: false,
+          reason: 'invalid',
+          message: `有 ${String(matches.length)} 个检查项都叫「${intent.itemText}」，请先改名区分。`,
+        };
+      }
+      const itemId = matches[0]!.id;
+      if (intent.clear === true) {
+        await actions.setChecklistItemReminder(intent.taskId, itemId, undefined);
+        return { ok: true, taskId: intent.taskId };
+      }
+      if (intent.date === undefined || intent.time === undefined) {
+        // pack 已挡过一次；这是**第二条腿**（MCP 侧调用方不经过助手的形状检查）。
+        return {
+          ok: false,
+          reason: 'invalid',
+          message: '要设检查项提醒就得给 date + time，或用 clear=true 清除。',
+        };
+      }
+      const at = localDateTimeToEpoch(`${intent.date}T${intent.time}`);
+      if (at === undefined) {
+        return {
+          ok: false,
+          reason: 'invalid',
+          message: `无法理解这个时刻「${intent.date} ${intent.time}」。日期应为 YYYY-MM-DD，时间应为 HH:MM。`,
+        };
+      }
+      const rejection = reminderRejection(at, now());
+      if (rejection === 'not-a-time') {
+        return { ok: false, reason: 'invalid', message: '这个提醒时刻不是一个可用的时间。' };
+      }
+      if (rejection === 'in-the-past') {
+        return { ok: false, reason: 'invalid', message: '提醒时刻已经过了 —— 要么往前调，要么这条就不必了。' };
+      }
+      if (rejection === 'too-far') {
+        return {
+          ok: false,
+          reason: 'invalid',
+          message: `这个提醒太远（超过最长提前量 ${String(Math.round(MAX_REMINDER_LEAD_MS / DAY_MS))} 天）。`,
+        };
+      }
+      await actions.setChecklistItemReminder(intent.taskId, itemId, at);
+      return { ok: true, taskId: intent.taskId };
+    }
+
     // ─────────────────────────────────────────────────────────────────────
     // 批次 4：任务标记（重要 / 置顶）/ 批量移动 / 习惯打卡撤销
     // ─────────────────────────────────────────────────────────────────────
