@@ -91,7 +91,7 @@ node scripts/ticktick-coverage-report.mjs --fix  # 按五档规则回填档列
 | 产品实现度（**surface-matrix 原始**） | 有 47 / 半有 11 / 无 21 | 同上 |
 | 产品实现度（**本图谱 §3 经代码核查更正后**）| **有 53 / 半有 15 / 无 11** | 子 agent 只读核实，10 格「无→有/半有」更正见附录 D/D2/D3 |
 | 一手靶子·**Android 端** | **≈172 张**（`.local/ticktick-teardown/screens/` 124 张 + `mobile-ia/` 42 张 Android + `ticktick-calendar/img/` 6 张） | `ls` 现量；capture.sh 证实是 `com.ticktick.task` + adb |
-| 一手靶子·**macOS 端** | **15 张**（2026-11-25 真机+screencapture 按窗口 id 截，`.local/ticktick-teardown/mac/`，不入库：主窗/日历/四象限/专注/习惯/设置全树/日历订阅/通知/付费墙 等） | `ls .local/ticktick-teardown/mac/*.png` |
+| 一手靶子·**macOS 端** | **19 张**（2026-11-25 真机+screencapture 按窗口 id 截，`.local/ticktick-teardown/mac/`，不入库：主窗/日历/四象限/专注/习惯/设置全树/日历订阅/通知/付费墙 等） | `ls .local/ticktick-teardown/mac/*.png` |
 | 一手靶子·**Windows 端** | **0 张**（只有 BAML 静态结构，无界面截图） | `git ls-files` 无 win 截图 |
 | 交互级**逐屏拆解**已做 | 仅 3 族：收集框弹层（capture 分册）、Android 新建链路+顶栏（android 分册）、日历右上角（calendar README） | 各分册 §编号 |
 | **判据覆盖** | **66 格有 spec / 13 格无**；13 格里 11 格是无功能（正常），**2 格「有功能却无 spec」=判据缺口：`#15 委派`、`#18 智能清单设置`** | 附录 D3（spec-map）|
