@@ -118,17 +118,12 @@ export interface ShellPanelSection {
 }
 
 /**
- * 侧栏主导航：**4 项**。对应 `apps/web/src/features/shell/view-tabs.ts` 的 `PRIMARY_NAV` ——
- * 今天 / 明天 / 最近 7 天 / 已完成。
+ * 侧栏主导航：**3 项**。对应 `apps/web/src/features/shell/view-tabs.ts` 的 `PRIMARY_NAV` ——
+ * 今天 / 最近 7 天 / 已完成。
  *
- * 🔴 **这一段就是漂移史本身，读它就是读这个文件为什么存在。**
- * 「已完成」曾经漏掉，是 §2 #1 的漂移；「最近 7 天」是**同一种漂移的第二次**
- * （真应用 2026-10-01 加了它，登记处没跟上，于是 `pnpm -r test` 在
- * `mockup-shell-shape` 上红了整整一天）；「明天」是**第三次**
- * （真应用 2026-11-07 由 `69fa5352` 引入，同样没跟，同样红）。
- *
- * ⚠️ **条数不写死在这里也没用** —— 上一版这里写的是"3 项"，而判据读的是数组本身，
- * 所以那句散文漂了**没有任何门禁会红**。要改这一组，就同时改这一段的数字。
+ * 🔴 这一段是"登记处 ⟷ 真应用"对账的一侧，读它就是读这个文件为什么存在。
+ * 「已完成」「最近 7 天」都曾因真应用加了而登记处没跟上、在
+ * `mockup-shell-shape` 上红过。要改这一组，就同时改这一段的数字。
  *
  * 🔴 「收集箱」这一项在 2026-10-04 被**删掉**（不是这里漏画）：产品负责人
  * 「已经有一个收集箱的标题了，为什么还要个收集箱？在信息架构上面是重复的」。
@@ -137,10 +132,6 @@ export interface ShellPanelSection {
  */
 export const SHELL_PRIMARY_NAV: readonly ShellPrimaryNavItem[] = [
   { labelKey: 'web.shell.nav.today', icon: 'sun' },
-  // 「明天」（R10，2026-11-07，`69fa5352`）。位置在「今天」与「最近 7 天」之间：
-  // 真应用 `view-tabs.ts` 的 `PRIMARY_NAV` 就是这么排的（**按时间远近**）。
-  // 它不是「最近 7 天」的快捷方式 —— 那个窗口含今天，这个只含明天那一天。
-  { labelKey: 'web.shell.nav.tomorrow', icon: 'calendar-days' },
   { labelKey: 'web.shell.nav.next7Days', icon: 'calendar-range' },
   { labelKey: 'web.shell.nav.completed', icon: 'check-circle' },
 ];

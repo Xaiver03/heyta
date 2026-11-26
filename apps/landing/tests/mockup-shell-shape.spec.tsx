@@ -286,12 +286,8 @@ describe('#1 主导航：登记处 ⟷ 真应用 `PRIMARY_NAV`', () => {
     // 这条字面清单是**解析器的阳性对照**：它证明上面那串真读出了东西，
     // 而不是在 `PRIMARY_NAV` 改名/挪位置之后恒返回空集。
     //
-    // ⚠️ 「明天」2026-11-07 由 `69fa5352`（R10）加进来，位置在「今天」与「最近 7 天」之间
-    //（**按时间远近排**，不是"最近 7 天的快捷方式"）。这条清单当时没跟，
-    // 于是本文件红了 —— 阳性对照红说明的是**真源变了**，不是判据坏了。
     expect(appKeys).toEqual([
       'web.shell.nav.today',
-      'web.shell.nav.tomorrow',
       'web.shell.nav.next7Days',
       'web.shell.nav.completed',
     ]);
