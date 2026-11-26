@@ -19,6 +19,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { IDBFactory } from 'fake-indexeddb';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { markWelcomeSeen } from '../src/features/onboarding/first-run.js';
 
 import { initOpLog, __resetOpLogForTests } from '../src/lib/oplog.js';
 import { useTaskStore } from '../src/features/tasks/store.js';
@@ -39,6 +40,8 @@ let container: HTMLDivElement | undefined;
 beforeEach(async () => {
   localStorage.clear();
   privacyConsentActions.localOnly();
+  // 首启导览(#69)是全局浮层；这些用例测的不是它，先标记已看过以隔离。
+  markWelcomeSeen();
   usePrivacyStore.setState({ open: false, reason: 'first-launch', notPersisted: false });
   __resetOpLogForTests();
   await initOpLog();

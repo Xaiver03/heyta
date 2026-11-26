@@ -29,6 +29,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { IDBFactory } from 'fake-indexeddb';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { markWelcomeSeen } from '../src/features/onboarding/first-run.js';
 
 import { __resetAuthForTests } from '../src/features/auth/store.js';
 import { __resetOpLogForTests, initOpLog } from '../src/lib/oplog.js';
@@ -103,6 +104,8 @@ beforeEach(async () => {
   // 面板自己的判据在 `tests/privacy-consent-sheet.spec.tsx`。
   // ⚠️ 走生产代码 `privacyConsentActions.accept()`，不往 localStorage 手写自造串。
   privacyConsentActions.accept();
+  // 首启导览(#69)是全局浮层；这些用例测的不是它，先标记已看过以隔离。
+  markWelcomeSeen();
 });
 
 afterEach(() => {
