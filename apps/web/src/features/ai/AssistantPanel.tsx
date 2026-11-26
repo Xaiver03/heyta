@@ -457,9 +457,13 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
    * 「说了会发」与「真的发了」必须由同一个判断派生。
    */
   const memoryItems = Object.values(entities.userMemories);
-  const memoryActive =
-    props.memoryEnabled === true &&
-    memoryItems.some((m) => m.status === 'active' && m.text.trim() !== '');
+  /**
+   * 披露按**开关**算，不按「当前有没有条目」算。
+   *
+   * 反过来的话会有一个真实的窃听空子：用户看过一次不含记忆的披露并点了同意，
+   * 之后又说了一句「记住…」——下一轮就带着记忆出境，而用户从没同意过这一项。
+   */
+  const memoryActive = props.memoryEnabled === true;
   const [caret, setCaret] = useState(0);
   const [mentionIndex, setMentionIndex] = useState(0);
   /** 按过 Esc 之后，直到下一次输入才重新弹候选。 */

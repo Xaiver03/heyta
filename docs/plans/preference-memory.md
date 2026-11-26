@@ -341,7 +341,7 @@ AI 记忆
 | 写路径（新增 / 改 / 忘 / 确认 / 明说捕获） | ✅ | `packages/app-host/src/user-memory-actions.ts`；12 条单测 |
 | 设置页「记住的事」（可写可删 + 待确认 + 忘记） | ✅ | `MemoryPanel.tsx` + 12 条词条 + 5 条面板测试 |
 | system prompt 注入（常驻 + 情境，900/600 字符预算） | ✅ | `assistantSystemPrompt(now, memoryBlock)` |
-| 出境披露（`memory.items`，仅开关打开且有生效条目） | ✅ | `assistantEgressFields({memory})` + 面板接线 |
+| 出境披露（`memory.items`；按**开关**披露，避免「先同意后加记忆」绕过） | ✅ | `assistantEgressFields({memory})` + 面板接线 |
 | 明说捕获接线（发送时解析并落库） | ✅ | `AssistantPanel.send()` → `captureStatedMemory` |
 | 会话内「记忆 · N」行（web + mobile，可落盘恢复） | ✅ | `ChatItem role:'memory'` + 历史恢复 + 两端渲染 |
 | 自动抽取（M9） | ⬜ 未做 | 待拍板（§10 第 2 条） |
@@ -349,6 +349,8 @@ AI 记忆
 | 编辑条目的界面 | ⬜ 未做 | action 已支持 `update`，界面只有增/删 |
 | 移动端注入 | ⬜ 未做 | 移动端尚未把 `memory` 传给 `requestAssistantTurn`（fail-closed：不传 = 不注入） |
 
-**已跑的判据**：`domain` 1412+25；`app-host` 的 `user-memory-actions` 12 + `assistant-memory` 6；`web` 的 `memory-panel` 39、`assistant-history` 19、`ai-assistant-panel` 32、`ai-assistant-disclosure` 11；`check:ui-language`、`check:i18n-vars`、`check:design-token-refs`、`check:theme`、`check:control-semantics`、`check:settings-row-anatomy`、`check:layering`、`check:ai-coverage` 全绿。
+**已跑的判据**：`domain` 1412+25；`app-host` 的 `user-memory-actions` 12 + `assistant-memory` 6；`web` 的 `user-memory-store` 6（op 落盘 → 物化可见）、`memory-panel` 39、`assistant-history` 19、`ai-assistant-panel` 32、`ai-assistant-disclosure` 11；`check:ui-language`、`check:i18n-vars`、`check:design-token-refs`、`check:theme`、`check:control-semantics`、`check:settings-row-anatomy`、`check:layering`、`check:ai-coverage` 全绿。
 
-**已知红灯（与本次无关，未修）**：`check:reachability` 的 `CALENDAR_EVENT` 零写路径、`FILTER`/`SECTION` 未进 `ACTION_FAMILIES`；`check:design` 的 `apps/mobile/src/screens/TimetablePeriodsEditor.tsx` 裸颜色。
+**能失败**：把 `parseStatedMemory` 的输入改成常量（永远解析不出明说）后，`domain/tests/user-memory.spec.ts` 立即红，随后 `git checkout` 还原 —— 不是「跑了绿」就算数。
+
+**已知红灯（与本次无关，未修）**：`check:reachability` 的 `CALENDAR_EVENT` 零写路径、`FILTER`/`SECTION` 未进 `ACTION_FAMILIES`（后两者即使登记也会因宿主零调用点而红，属既有的「最后一米」账）。`check:design` 的那处裸颜色已顺手修掉，现绿。

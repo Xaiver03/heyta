@@ -40,7 +40,7 @@ export function TimetablePeriodsEditor({
 
   return (
     <Modal transparent animationType="fade" visible onRequestClose={onClose}>
-      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center' }}>
+      <View style={{ flex: 1, backgroundColor: tk['material.scrim'], justifyContent: 'center' }}>
         <View
           style={{
             marginHorizontal: tk['space.4'],
