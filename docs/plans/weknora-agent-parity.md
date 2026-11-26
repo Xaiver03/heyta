@@ -71,6 +71,15 @@
 
 ---
 
+## 3.5 实测证据（2026-11-26）
+
+默认云端 Harness 路径的实测截图 10 张在
+[`docs/research/assistant-parity-2026-11-26/`](../research/assistant-parity-2026-11-26/README.md)：
+流式中段、完成态 Markdown（表格/代码/列表）、出境披露（含 `memory.*`）、记忆面板（空/已加/编辑）、
+以及带「Memory · 1」行的回答。那次实测同时抓出三个缺陷（默认路径不流式、绕过记忆注入、
+读工具被说成"已执行"），修复与产品判断见
+[`assistant-quality-2026-11.md`](assistant-quality-2026-11.md)。
+
 ## 4. 分期与验收
 
 ### P0 · Web Markdown（最小可感知）

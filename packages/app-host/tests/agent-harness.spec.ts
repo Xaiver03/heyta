@@ -179,7 +179,7 @@ describe('工具超时与并行（最佳实践对齐）', () => {
 describe('有界重试（只读工具）', () => {
   it('只读工具失败一次后重试成功', async () => {
     let n = 0;
-    const transport: CloudToolTransport = { invoke: async () => { n += 1; return n === 1 ? { ok: false, message: 'transient' } : { ok: true, data: 1 }; } };
+    const transport: CloudToolTransport = { invoke: async () => { n += 1; return n === 1 ? { ok: false, reason: 'transient', message: 'transient' } : { ok: true, data: 1 }; } };
     const scripted: HarnessModelReply[] = [{ toolCalls: [{ id: 'c1', name: 'list_tasks', arguments: {} }] }, { text: 'ok' }];
     const result = await runCloudAgentTurn('x', { transport, tools, systemPrompt: 's', retryAttempts: 1, retryBackoffMs: 1, isRetryable: () => true, callModel: async () => scripted.shift()! });
     expect(result.steps[0]!.ok).toBe(true);
@@ -187,7 +187,7 @@ describe('有界重试（只读工具）', () => {
   });
   it('写工具失败不重试', async () => {
     let n = 0;
-    const transport: CloudToolTransport = { invoke: async () => { n += 1; return { ok: false, message: 'boom' }; } };
+    const transport: CloudToolTransport = { invoke: async () => { n += 1; return { ok: false, reason: 'boom', message: 'boom' }; } };
     const scripted: HarnessModelReply[] = [{ toolCalls: [{ id: 'c1', name: 'create_task', arguments: {} }] }, { text: 'ok' }];
     await runCloudAgentTurn('x', { transport, tools, systemPrompt: 's', retryAttempts: 2, retryBackoffMs: 1, isRetryable: () => false, callModel: async () => scripted.shift()! });
     expect(n).toBe(1);

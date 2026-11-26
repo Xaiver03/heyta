@@ -434,7 +434,11 @@ describe('提醒：update / delete', () => {
 
   it('update-reminder：无法理解的时刻 ⇒ invalid，且**不调** rescheduleReminder', async () => {
     state.reminders['r1'] = { id: 'r1', triggerAt: 1 };
-    for (const [date, time] of [['2026-13-40', '99:99'], ['not-a-date', '09:00'], ['2026-10-04', '25:00']]) {
+    for (const [date, time] of [
+      ['2026-13-40', '99:99'],
+      ['not-a-date', '09:00'],
+      ['2026-10-04', '25:00'],
+    ] as const) {
       const result = await makeHost().submit({ action: 'update-reminder', reminderId: 'r1', date, time });
       expect(result.ok, `${date} ${time}`).toBe(false);
       if (!result.ok) expect(result.reason, `${date} ${time}`).toBe('invalid');

@@ -8,8 +8,8 @@ import {
   newAssistantSessionId,
   saveAssistantSessions,
   type AssistantSessionInput,
-  type HistoryStorage,
 } from '../src/assistant-sessions.js';
+import type { HistoryStorage } from '../src/assistant-local-history.js';
 import type { ChatItem } from '../src/assistant-local-transcript.js';
 
 function memory(): HistoryStorage & { removed: () => number } {

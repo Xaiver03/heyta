@@ -87,7 +87,7 @@ function deltaE(a: [number, number, number], b: [number, number, number]): numbe
     ];
   };
   const f = (t: number) => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
-  const lab = (c: [number, number, number]) => {
+  const lab = (c: [number, number, number]): [number, number, number] => {
     const [x, y, z] = xyz(c).map(f) as [number, number, number];
     return [116 * y - 16, 500 * (x - y), 200 * (y - z)];
   };

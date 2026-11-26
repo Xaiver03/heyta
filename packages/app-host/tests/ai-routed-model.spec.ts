@@ -157,14 +157,14 @@ describe('toolChoice 透传（routed model）', () => {
   it('options.toolChoice 进入 AiInvocation.toolChoice', async () => {
     let seen: AiInvocation | undefined;
     const invoke: RoutedInvoke = async (_r, inv) => { seen = inv; return okOutcome({ text: 'ok', toolCalls: [] }); };
-    const call = createRoutedModelCall({ routing, toolChoice: 'required', invoke });
+    const call = createRoutedModelCall({ routing, consents: [], toolChoice: 'required', invoke });
     await call({ messages: [{ role: 'user', content: 'x' }], tools });
     expect(seen!.toolChoice).toBe('required');
   });
   it('未设则不出现（旧行为）', async () => {
     let seen: AiInvocation | undefined;
     const invoke: RoutedInvoke = async (_r, inv) => { seen = inv; return okOutcome({ text: 'ok', toolCalls: [] }); };
-    const call = createRoutedModelCall({ routing, invoke });
+    const call = createRoutedModelCall({ routing, consents: [], invoke });
     await call({ messages: [{ role: 'user', content: 'x' }], tools });
     expect('toolChoice' in seen!).toBe(false);
   });
@@ -178,7 +178,7 @@ describe('工具调用增量流式（onToolCall）', () => {
       deps?.onDelta?.({ type: 'tool-call', id: 'c1', name: 'list_tasks' });
       return okOutcome({ text: '', toolCalls: [{ id: 'c1', name: 'list_tasks', arguments: {} }] });
     };
-    const call = createRoutedModelCall({ routing, invoke, onToolCall: (c) => seen.push(c) });
+    const call = createRoutedModelCall({ routing, consents: [], invoke, onToolCall: (c) => seen.push(c) });
     await call({ messages: [{ role: 'user', content: 'x' }], tools });
     expect(seen).toEqual([{ id: 'c1', name: 'list_tasks' }]);
   });
