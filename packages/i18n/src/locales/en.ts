@@ -815,6 +815,11 @@ export const en = {
   'web.tasks.detail.section.time': 'Time',
   'web.tasks.detail.section.organize': 'Organize',
   'web.tasks.detail.section.automation': 'Automation',
+  // Assignee (#15): assign a task to a member inside a shared list. Hidden for personal lists.
+  'web.tasks.detail.assign.label': 'Assignee',
+  'web.tasks.detail.assign.unassigned': 'Unassigned',
+  'web.tasks.detail.assign.me': 'Me',
+  'web.tasks.detail.assign.member': 'Member {id}',
   // The summary that collapses the raw custom RRULE input inside the repeat
   // field (audit §4.6: show natural-language presets first, tuck the raw RRULE
   // under "Advanced"). Same word as the auth panel's "Advanced" disclosure.

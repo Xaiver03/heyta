@@ -86,6 +86,7 @@ import { currentState, dispatchChecked, dispatchIntent } from '../../lib/oplog.j
 import { DangerConfirmDialog } from '../../lib/dialog/DangerConfirmDialog.js';
 import { useSyncStore } from '../sync/store.js';
 import { ShareCommentsSection } from '../share/ShareCommentsSection.js';
+import { useShareMembers } from '../share/use-share-members.js';
 import { text } from '../../lib/text.js';
 import { NoteField } from './NoteEditor.js';
 import { ChecklistEditor } from './ChecklistEditor.js';
@@ -732,6 +733,16 @@ export function TaskDetailCard({
   const selectedId = useSelected('task');
   const picked = selectedId === null ? undefined : store.entities.tasks[selectedId];
   /**
+   * 委派（#15）：只有**共享清单**里的任务才有可指派的成员池。
+   * `shareId` 从任务所属清单上取（`Project.shareId`，缺席 = 个人清单）。
+   * 🔴 这两个 hook 必须在"任务不存在就返回 null"之前调用（hooks 不可条件调用），
+   * 所以它们读的是 `picked` 而不是下面那个已判活/已删的 `task`。
+   */
+  const shareId =
+    picked?.projectId === undefined ? undefined : store.entities.projects[picked.projectId]?.shareId;
+  const shareMembers = useShareMembers(shareId);
+  const myAccountId = useSyncStore((state) => state.accountId);
+  /**
    * 🔴 "在不在"要判两件事：**表里有这条**，且它**没被删掉**。
    *
    * 软删（`DEL` op → reducer 写 `deletedAt`）不会把任务从 `entities.tasks` 里拿掉 ——
@@ -959,6 +970,40 @@ export function TaskDetailCard({
         <option value={String(Priority.Medium)}>{t('web.ai.prioritize.priority.medium')}</option>
         <option value={String(Priority.High)}>{t('web.ai.prioritize.priority.high')}</option>
       </select>
+
+      {/*
+        指派（#15 委派 UI）。只有共享清单（`shareId` 在册）才画这一格 ——
+        个人清单里"指派"没有意义（没有成员池），画一个永远只有一个选项的下拉
+        等于界面上多一个假控件。成员名册来自 `useShareMembers`（服务端
+        `ShareApiClient.listMembers`），写入走**既有**的 `store.setAssignee`
+        → `patchDetails(assigneeUserId)`（ADR-0088 的唯一写入通道，一条 UPD op）。
+        原生 `<select>`，与上面优先级同一档（键盘 / 读屏 / 移动端都不自造）。
+        `value=""` = 未指派；成员选项的 value 是成员账号 id（字符串）。
+        ⚠️ 名册没取到时只剩「未指派」一项 —— 那是降级，不是第二套判据。
+      */}
+      {shareId === undefined ? null : (
+        <>
+          <h3 style={blockLabelStyle}>{t('web.tasks.detail.assign.label')}</h3>
+          <select
+            data-testid="task-assignee-select"
+            aria-label={t('web.tasks.detail.assign.label')}
+            value={task.assigneeUserId ?? ''}
+            onChange={(event) => {
+              const next = event.target.value;
+              void store.setAssignee(task.id, next === '' ? undefined : next);
+            }}
+          >
+            <option value="">{t('web.tasks.detail.assign.unassigned')}</option>
+            {shareMembers.map((member) => (
+              <option key={member.memberId} value={member.userId}>
+                {member.userId === myAccountId
+                  ? t('web.tasks.detail.assign.me')
+                  : t('web.tasks.detail.assign.member', { id: member.userId })}
+              </option>
+            ))}
+          </select>
+        </>
+      )}
 
       {/* ══ 分组四：自动化（W6）═════════════════════════════════════ */}
       <h3 style={groupHeaderStyle} data-testid="task-detail-group">
