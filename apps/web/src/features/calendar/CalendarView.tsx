@@ -40,9 +40,9 @@ import { CATEGORY_SLOT_TOKEN_BY_SLOT, type TokenName } from '@heyta/design-syste
 import {
   CalendarBoard as SharedCalendarBoard,
   HeytaUiProvider,
-  priorityColorToken,
   stepCalendarCursor,
 } from '@heyta/ui';
+import { resolveCalendarBarAccent } from './calendar-display-pref.js';
 
 import { CalendarCapturePopover } from './CalendarCapturePopover.js';
 import { CalendarDragBar, CalendarDragProvider, CalendarDropDay, CalendarDropHour } from './CalendarDnd.js';
@@ -99,11 +99,8 @@ export function CalendarView(): React.JSX.Element {
    * 🔴 判断只有一份：这里只把"用户选了哪种"翻成回调，颜色取值仍由 token 唯一决定。
    */
   const barAccentOf = useCallback(
-    (task: Task): TokenName | undefined => {
-      if (view.colorBy === 'off') return undefined;
-      if (view.colorBy === 'priority') return priorityColorToken(task.priority);
-      return task.projectId === undefined ? undefined : projectAccentToken.get(task.projectId);
-    },
+    (task: Task): TokenName | undefined =>
+      resolveCalendarBarAccent(view.colorBy, task, (projectId) => projectAccentToken.get(projectId)),
     [view.colorBy, projectAccentToken],
   );
 

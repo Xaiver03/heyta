@@ -23,10 +23,14 @@
  * 于是「切换」与「持久化」是同一条路径的两个半段，不会出现"界面变了但没存"。
  */
 
+import type { TokenName } from '@heyta/design-system';
+import type { Task } from '@heyta/domain';
+import { priorityColorToken } from '@heyta/ui';
+
 /** 日历着色模式：按清单（默认）/ 按优先级 / 不着色。 */
 export type CalendarColorBy = 'list' | 'priority' | 'off';
 
-/** 一份完整的显示偏好。所有字段都是**可选输入**读、读出来一定齐全。 */
+/** 一份完整的显示偏好。读出来字段一定齐全。 */
 export interface CalendarDisplayPref {
   readonly showCompleted: boolean;
   readonly showCountdown: boolean;
@@ -86,4 +90,24 @@ export function saveCalendarDisplayPref(pref: CalendarDisplayPref): void {
   } catch {
     // 隐私模式下写入抛错 —— 本次界面仍生效，只是刷新后回到默认。
   }
+}
+
+/**
+ * 「配色」真正决定一根任务条用哪个强调色 token —— **判断只有这一份**。
+ *
+ * `CalendarView` 只把三样东西交给它：用户的配色模式、这条任务、以及"清单 → token"表。
+ * 于是"按清单 / 按优先级 / 不着色"的效果**可以在模型层单独测**，不必挂一个日历进 DOM。
+ *
+ * - `off` ⇒ `undefined`（共享板退回默认色，不是透明/灰色）；
+ * - `priority` ⇒ 复用 `@heyta/ui` 的 `priorityColorToken`（全仓唯一一份优先级→色映射）；
+ * - `list`（默认）⇒ 所属清单的强调色；无清单/未设色 ⇒ `undefined`。
+ */
+export function resolveCalendarBarAccent(
+  colorBy: CalendarColorBy,
+  task: Task,
+  projectAccentOf: (projectId: string) => TokenName | undefined,
+): TokenName | undefined {
+  if (colorBy === 'off') return undefined;
+  if (colorBy === 'priority') return priorityColorToken(task.priority);
+  return task.projectId === undefined ? undefined : projectAccentOf(task.projectId);
 }

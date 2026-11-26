@@ -17,6 +17,7 @@
  * 都在 `docs/plans/ticktack-calendar-features.md` §5.1「登记待合并」里。
  * 这里放一个按不动的开关，比没有更糟。
  *
+ * 样式**只复用既有 `.ht-settings` 族**（不新造 ht-* 前缀族 —— `check:row-single-source` 盯着）。
  * 三项偏好由 `store.ts` 读 / 写 `calendar-display-pref`（`localStorage`，设备本地，
  * 不进 op-log —— 它是"我这台机器怎么看"，不是用户数据）。刷新后仍在。
  */
@@ -26,7 +27,6 @@ import { useI18n } from '@heyta/i18n';
 import { RadioGroup, SideSheet, Switch } from '../../components/hta/index.js';
 import { useCalendarViewStore } from './store.js';
 import type { CalendarColorBy } from './calendar-display-pref.js';
-import './calendar-display-settings.css';
 
 export function CalendarDisplaySettingsSheet({
   open,
@@ -47,8 +47,8 @@ export function CalendarDisplaySettingsSheet({
       title={t('web.calendar.display.title')}
       onCancel={onClose}
     >
-      <div className="ht-cal-display">
-        <div className="ht-cal-display__group">
+      <div className="ht-settings">
+        <div className="ht-settings__section">
           <RadioGroup
             name="calendar-color-by"
             legend={t('web.calendar.display.colorBy')}
@@ -64,7 +64,7 @@ export function CalendarDisplaySettingsSheet({
             testID="calendar-color-by"
           />
         </div>
-        <div className="ht-cal-display__switches">
+        <div className="ht-settings__section">
           <Switch
             label={t('web.calendar.more.showCompleted')}
             checked={view.showCompleted}
