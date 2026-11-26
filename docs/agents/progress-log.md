@@ -536,3 +536,17 @@ web 侧与本次改动相关的 5 个 spec **66/66**（`--testTimeout=60000`）�
 
 ⚠️ 一条流程教训顺手记下：**合任何一笔之前，先把这笔改到的 workspace 包 build 掉再 typecheck**
 （`apps/desktop` 读 `@heyta/node-host` 的 dist 类型，两个 worktree 各自绿、合并后红过一次）。
+
+### 2026-11-27 四象限文案回归修复 + 日历「长按网格按 15 分钟建事件」
+
+- **四象限**：`9c1f5d1e` 把 `web.quadrant.do/plan/delegate/drop` 从动作词改成任务类型，
+  与 `web.quadrant.q1..q4`（本就＝类型）重复，界面只剩「重要且紧急」一类。已回退为
+  **标题＝马上做/计划做/交给别人/先不做**，**副标题＝重要且紧急/…**；`QuadrantBoard`
+  补回副标题渲染（此前只有大标题、说明仅进 a11y）。判据：`apps/mobile/tests/quadrant-display.spec.ts` 6 绿、
+  `apps/web/tests/quadrant-{row-parity,empty-state}` 12 绿。
+- **右侧 ⋯ 浮层**：现实现是**锚定在下方的下拉卡片**（非全屏/非贴底 sheet），点外部关闭；
+  模拟器已截图取证（`apps/mobile/evidence/quadrant-week-menu-fix-20261126/03-…png`）。
+- **日历「一周」**：移动端 = `CalendarMultiDayTimeline` 7 列 + 纵向小时轴（与 Android 同组件；Web 走共享 `CalendarBoard`，形状不同是载体差异）。
+- **新增：长按时间网格建任务**（周/3日时间轴）：落点按 **15 分钟**对齐，弹层含 `KeyboardAvoidingView`；
+  写入走 `createTaskActions.create(dueDate)`。模拟器实拍：长按 → 04:00 弹层 → 建出 04:00 的块。
+- 证据目录：`apps/mobile/evidence/quadrant-week-menu-fix-20261126/`（01–08）。真机已装当前构建并启动。
