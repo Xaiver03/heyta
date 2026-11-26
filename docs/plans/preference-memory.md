@@ -353,4 +353,16 @@ AI 记忆
 
 **能失败**：把 `parseStatedMemory` 的输入改成常量（永远解析不出明说）后，`domain/tests/user-memory.spec.ts` 立即红，随后 `git checkout` 还原 —— 不是「跑了绿」就算数。
 
-**已知红灯（与本次无关，未修）**：`check:reachability` 的 `CALENDAR_EVENT` 零写路径、`FILTER`/`SECTION` 未进 `ACTION_FAMILIES`（后两者即使登记也会因宿主零调用点而红，属既有的「最后一米」账）。`check:design` 的那处裸颜色已顺手修掉，现绿。
+**门禁（本次跑过的，全绿）**：`check:design`、`check:ui-language`、`check:i18n-vars`、`check:ai-tools`、`check:ai-coverage`、`check:settings-row-anatomy`、`check:layering`、`check:docs-voice`、`check:egress-wording`、`check:doc-citations`、`check:control-semantics`、`check:theme`、`check:design-token-refs`。
+
+**已知红灯（与本次无关，未修）**：
+
+| 门禁 | 现量 | 归属 |
+|---|---|---|
+| `check:reachability` | `CALENDAR_EVENT` 零写路径；`FILTER`/`SECTION` 未进 `ACTION_FAMILIES`（登记后仍会因宿主零调用点红） | 既有的「最后一米」账，不是本实体 |
+| `check:l4` | `apps/mobile/src/screens` 内联样式 62 > 基线 52 | 既有移动端内联样式 |
+| `check:empty-state` | 5 处手写空态（calendar / admin / quadrant / settings） | 既有 |
+| `check:overlay` | `AiPrioritize.tsx` 已不在扫描面，账本未删 | 既有账本漂移 |
+| `pnpm check:docs` | `.local/admin-redesign/*` 6 处 + `ADR-0089` 1 处死链 | 本机笔记与既有 ADR；本次 5 份文档 0 处 |
+
+`check:design` 原先那处移动端裸颜色已顺手修掉（`TimetablePeriodsEditor` 的遮罩改用 `material.scrim`）。
