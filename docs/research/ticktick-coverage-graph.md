@@ -94,7 +94,7 @@ node scripts/ticktick-coverage-report.mjs --fix  # 按五档规则回填档列
 | 一手靶子·**macOS 端** | **      30 张**（2026-11-25 真机+screencapture 按窗口 id 截，`.local/ticktick-teardown/mac/`，不入库：主窗/日历/四象限/专注/习惯/设置全树/日历订阅/通知/付费墙 等） | `ls .local/ticktick-teardown/mac/*.png` |
 | 一手靶子·**Windows 端** | **0 张**（只有 BAML 静态结构，无界面截图） | `git ls-files` 无 win 截图 |
 | 交互级**逐屏拆解**已做 | 仅 3 族：收集框弹层（capture 分册）、Android 新建链路+顶栏（android 分册）、日历右上角（calendar README） | 各分册 §编号 |
-| **判据覆盖** | **66 格有 spec / 13 格无**；13 格里 11 格是无功能（正常），**2 格「有功能却无 spec」=判据缺口：`#15 委派`、`#18 智能清单设置`** | 附录 D3（spec-map）|
+| **判据覆盖** | **68 格有 spec / 11 格无**；11 格无 spec 全部实现度=无（无功能，正常），**「有功能却无 spec」的真判据缺口 = 0**（曾记的 #15/#18 经 2026-11-26 现量复核已有 spec：`task-tools-batch8.spec.ts`+`local-api-host-batch4.spec.ts` / `project-settings-tools.spec.ts`） | 附录 D3（spec-map，经现量复核更正）|
 
 🔴 **一句话定性：我们的靶子几乎全在 Android 端；heyta 的主战场是 Web（对标 macOS/Windows 桌面），而桌面端的交互级一手证据基本为零。** 这就是「总觉得有东西没学到」的物理原因 —— 不是没拆，是**拆错了端**。
 
@@ -209,7 +209,7 @@ node scripts/ticktick-coverage-report.mjs --fix  # 按五档规则回填档列
 
 **结论先行：判据不缺。** 79 格中 63 格有功能，**这 63 格全部有判据**（56 格初筛即命中；7 格是文件名假象、内容核实实有：「今天／最近 7 天／已完成」在 `task-filter.spec.ts`、习惯详情/统计在 `habit-*.spec`、通知中心在 `inbox/notification-model.spec`、模块开关有 modules 相关）。余下 16 格「无判据」**全部是实现度=无、本来没功能** —— 记在附录 A，它们是**功能缺口，不是判据缺口**。
 
-> 🔴 **最终口径以附录 D3（spec-map 精确复核）为准**：66 格有 spec / 13 格无，其中 **2 格「有功能却无 spec」= 真判据缺口（#15 委派、#18 智能清单设置）**；上面「63 格全有」是早期初筛口径，已过时。
+> 🔴 **最终口径（2026-11-26 现量复核）**：**68 格有 spec / 11 格无**，11 格无 spec 全部实现度=无（本来没功能，正常）；**「有功能却无 spec」的真判据缺口 = 0**。曾记的 #15 委派、#18 智能清单设置 现已有 spec（`packages/local-api/tests/task-tools-batch8.spec.ts` + `packages/app-host/tests/local-api-host-batch4.spec.ts`；`packages/local-api/tests/project-settings-tools.spec.ts`）。上面「63 格全有」与「66/13」均为过期口径。
 
 ⇒ 判据侧的「学不到位」根因**不是没尺，是尺钉错了对象**（[capture 计划](../plans/capture-ticktick-alignment-2026-11.md) §0 根因③：钉「渲染形状」而非「不变量」，越改越退回原形）。把这一列升级成真正的质量列，要逐条审每个 spec「钉形状还是钉不变量」——**深水区，本版不做**，列在 §5 第 5 项。
 
@@ -301,7 +301,7 @@ node scripts/ticktick-coverage-report.mjs --fix  # 按五档规则回填档列
 | 2 | ✅ **逐格核 `?` 靶子** —— **已完成 2026-11-24**：118 张图归位、18 格逐格判定（见附录 B） | 引证落到图 | 靶子档从估计变实测 |
 | 3 | **B 档逐屏补交互拆解**：Android 端强证据（#24 日期/#25 重复/#20 关联主任务/任务行菜单，xml 成组）先整理成交互清单；桌面端待补 | 交互级拆解 | 「绿着但凭猜」 |
 | 4 | **D 档先取证后动手**：双缺的格子，按 P0→P1→P2 取证，取证完再进开发 | 取证 + 需求 | 做出来就歪 |
-| 5 | ✅ **判据列（结论级）** —— **已完成 2026-11-24**：判据基本齐（66格有spec；真判据缺口仅 #15/#18，见附录D3），更缺的是「钉形状 vs 钉不变量」（见 §3b）；逐条审 spec 质量是深水区后续 | 判据台账 | 判据钉错形状（capture §0 根因③） |
+| 5 | ✅ **判据列（结论级）** —— **已完成**（2026-11-26 现量复核：68 格有 spec / 11 格无，真判据缺口=0；#15/#18 已有 spec，见附录 D3），更缺的是「钉形状 vs 钉不变量」（见 §3b）；逐条审 spec 质量是深水区后续 | 判据台账 | 判据钉错形状（capture §0 根因③） |
 
 **进展（2026-11-24，round 1-2）**：图谱四字段里「实现度 / 一手证据（Android 端）/ 判据（结论级）」已落；**第 1 项（桌面靶子）确认是唯一关键路径且卡在屏幕录制+辅助功能权限**——Android 端该截的都截了，缺的靶子（#11/#14/#45/#47/#63/#66/#75 及 26 个 D 档桌面格）滴答桌面全有、我们一张没截。「缺口负责人」列待补（按工作线划归）。
 
@@ -598,9 +598,9 @@ node scripts/ticktick-coverage-report.mjs --fix  # 按五档规则回填档列
 ### 附录 D3 · 判据 spec 逐格映射（子 agent spec-map，2026-11-25）
 
 > 79 格逐格找判据 spec（`.local/upgrade/spec-map.md`，270 个 spec 路径已逐一 `git ls-files` 校验）。
-> **66 格有 spec / 13 格无**。13 格里 11 格是实现度=无（无功能，正常）；**2 格「有功能却无 spec」= 真判据缺口**：
-> - **#15 委派/按负责人**（半有）：全仓 `assignee/delegate` 文件名 0 命中，无 spec。
-> - **#18 智能清单设置**（半有）：`smart-list` 0 命中；`ProjectSettings` 有 `onShowInSmartList` 开关但无判据。
+> **（2026-11-26 现量复核更正）68 格有 spec / 11 格无**。11 格无 spec 全部实现度=无（无功能，正常）；**「有功能却无 spec」的真判据缺口 = 0**。此前（2026-11-25）记的 2 格缺口现已证实有 spec：
+> - **#15 委派/按负责人**（半有，无 UI）：`packages/local-api/tests/task-tools-batch8.spec.ts`（intent 映射 / 空串清除 / 必填校验）+ `packages/app-host/tests/local-api-host-batch4.spec.ts`（patchDetails 传 `assigneeUserId` / 清除写 `null`）。
+> - **#18 智能清单设置**（半有）：`packages/local-api/tests/project-settings-tools.spec.ts`（`set_project_show_in_smart_list` 的 `showInSmartList` 真/假、必填布尔、未知参数拒绝）。
 >
 > 🔴 **又纠 3 格「表记无、实测有」**（heyta 侧再次被低估）：
 > - **#10 明天**：已有 `apps/web/tests/nav-tomorrow.spec.tsx` + `task-filter.spec` 的 tomorrow 分支（R10，2026-11-07）⇒ 实现度「无」已过期，**实为有**（本表已更正为 A）。
