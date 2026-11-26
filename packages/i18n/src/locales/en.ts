@@ -436,6 +436,9 @@ export const en = {
   // ⚠️ 「7 天」= 含今天的**七个日历日**，不含逾期，不含无截止时间。
   'web.shell.nav.next7Days': 'Next 7 days',
   'web.shell.nav.completed': 'Completed',
+  'web.settings.smartList.title': 'Smart lists',
+  'web.settings.smartList.moveUp': 'Move up',
+  'web.settings.smartList.moveDown': 'Move down',
   'web.shell.nav.quadrant': 'Quadrants',
   'web.shell.nav.kanban': 'Board',
   'web.shell.nav.project': 'List',
@@ -3191,6 +3194,17 @@ export const en = {
   'web.reminder.notify.requestFailed': 'The browser could not finish the permission request. Try again or check the site settings.',
   'web.reminder.notify.limit': 'Notifications only fire while heyta is open. They do not fire when the app is closed — background wake-up needs a separate protocol we do not have yet.',
   'web.reminder.notify.body': 'Due: {title}',
+  // ── Notification behavior defaults (#57): initial values for new tasks / reminders ──
+  'web.reminder.defaults.title': 'Reminder defaults',
+  'web.reminder.defaults.leadLabel': 'Timed tasks',
+  'web.reminder.defaults.leadAtTime': 'On time',
+  'web.reminder.defaults.leadOption': '{minutes} min before',
+  'web.reminder.defaults.allDayLabel': 'All-day tasks',
+  'web.reminder.defaults.allDay.none': 'No reminder',
+  'web.reminder.defaults.allDay.sameDay': 'Same day',
+  'web.reminder.defaults.allDay.dayBefore': 'Day before',
+  'web.reminder.defaults.completionSound': 'Completion sound',
+  'web.reminder.defaults.showDetail': 'Show details in notification',
   // ── Long reminder leads (W9 ①, 2026-10-03) ──
   // 🔴 These four must stay 1:1 with `REMINDER_LONG_OFFSET_PRESETS_MS`; the mapping
   //    lives in apps/web/src/features/reminders/reminder-tiers.ts

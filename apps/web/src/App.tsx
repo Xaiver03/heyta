@@ -60,6 +60,12 @@ import {
   type MemoryOp,
   type TaskDateGroup,
   type TaskSortKey,
+  moveSmartList,
+  setSmartListVisible,
+  visibleSmartListKeys,
+  type SmartListConfig,
+  type SmartListKey,
+  type NotificationDefaults,
 } from '@heyta/domain';
 
 import { normalizeRouteOrder, withManagedEndpoint } from '@heyta/ai';
@@ -147,6 +153,11 @@ import { CalendarView } from './features/calendar/CalendarView.js';
 import { CalendarSubscriptionsAutoSync } from './features/calendar/useCalendarSubscriptionsAutoSync.js';
 import { useNoteStore } from './features/notes/store.js';
 import { ReminderNotifyPanel } from './features/reminders/ReminderNotifyPanel.js';
+import { NotificationDefaultsPanel } from './features/reminders/NotificationDefaultsPanel.js';
+import {
+  loadNotificationDefaults,
+  saveNotificationDefaults,
+} from './features/reminders/notification-defaults-pref.js';
 import { useReminderNotifications } from './features/reminders/use-reminder-notifications.js';
 import { useShareActivitySignal } from './features/share/use-share-activity-signal.js';
 import { useShareOpenPull } from './features/share/use-share-open-pull.js';
@@ -171,6 +182,8 @@ import {
   type SearchResultEntry,
 } from '@heyta/ui';
 import { FeatureModulesPanel } from './features/shell/FeatureModulesPanel.js';
+import { SmartListSettingsPanel } from './features/shell/SmartListSettingsPanel.js';
+import { loadSmartListConfig, saveSmartListConfig } from './features/shell/smart-list-pref.js';
 import {
   SHELL_MODULES,
   loadEnabledModules,
@@ -521,6 +534,16 @@ export function App(): React.JSX.Element {
   );
 
   /**
+   * 智能清单的显示 / 排序（**设备本地**，见 `features/shell/smart-list-pref.ts`）。
+   * 判断在 `@heyta/domain` 的 `smart-list.ts`；这里只持有状态与落盘。
+   */
+  const [smartListConfig, setSmartListConfig] = useState<SmartListConfig>(loadSmartListConfig);
+  /** 通知的行为默认值（设备本地，见 `features/reminders/notification-defaults-pref.ts`）。 */
+  const [notificationDefaults, setNotificationDefaults] = useState<NotificationDefaults>(
+    loadNotificationDefaults,
+  );
+
+  /**
    * 账号邮箱（头像的首字母）。
    *
    * 用 `useShallow` 只订阅这一个字段：整店订阅会让**每一次同步状态变化**
@@ -561,6 +584,21 @@ export function App(): React.JSX.Element {
       completed: count({ kind: 'completed' }),
     } as Record<'today' | 'tomorrow' | 'next7Days' | 'completed', number>;
   }, [store.entities.tasks, store.now]);
+
+  /**
+   * 智能清单渲染顺序 = 用户配置的顺序，且只留可见项（#18）。
+   * 词表 / 归并在 `@heyta/domain` 的 `smart-list.ts`；这里只做 key → NavEntry 的映射。
+   */
+  const visiblePrimaryNav = useMemo(() => {
+    const byKey = new Map<string, (typeof PRIMARY_NAV)[number]>();
+    for (const entry of PRIMARY_NAV) byKey.set(entry.filter.kind, entry);
+    const ordered: (typeof PRIMARY_NAV)[number][] = [];
+    for (const key of visibleSmartListKeys(smartListConfig)) {
+      const entry = byKey.get(key);
+      if (entry !== undefined) ordered.push(entry);
+    }
+    return ordered;
+  }, [smartListConfig]);
 
   /**
    * 任务列表的**日期分组头**（滴答同款：`已过期 / 今天, 周一 / 9月30日, 周三 / 无截止时间`）。
@@ -2571,6 +2609,28 @@ export function App(): React.JSX.Element {
     });
   }, []);
 
+  /** 智能清单：显隐 / 排序改动立刻落盘、立刻反映到侧栏（与功能模块同一条）。 */
+  const onToggleSmartList = useCallback((key: SmartListKey, visible: boolean) => {
+    setSmartListConfig((current) => {
+      const next = setSmartListVisible(current, key, visible);
+      saveSmartListConfig(next);
+      return next;
+    });
+  }, []);
+  const onMoveSmartList = useCallback((key: SmartListKey, direction: 'up' | 'down') => {
+    setSmartListConfig((current) => {
+      const next = moveSmartList(current, key, direction);
+      saveSmartListConfig(next);
+      return next;
+    });
+  }, []);
+
+  /** 通知行为默认值改动立刻落盘（与功能模块同一条：即时生效、无保存按钮）。 */
+  const onChangeNotificationDefaults = useCallback((next: NotificationDefaults) => {
+    setNotificationDefaults(next);
+    saveNotificationDefaults(next);
+  }, []);
+
 
 
   /**
@@ -2780,7 +2840,7 @@ export function App(): React.JSX.Element {
           */}
           <div className="ht-sidebar__body">
             <div className="ht-nav">
-              {PRIMARY_NAV.map((entry) => (
+              {visiblePrimaryNav.map((entry) => (
                 <NavButton
                   key={entry.labelKey}
                   entry={entry}
@@ -3903,6 +3963,10 @@ export function App(): React.JSX.Element {
                 而入口必须和那句话在同一屏上 —— 挂在详情面板里等于要用户再找第二条路）。
               */}
               <ReminderNotifyPanel />
+              <NotificationDefaultsPanel
+                defaults={notificationDefaults}
+                onChange={onChangeNotificationDefaults}
+              />
               {/*
                 共享协作的**本地**通知偏好（W5）：它是同步的下游偏好（服务端只广播信号，
                 响不响由本机过滤），所以归属是"打扰偏好"而不是"连到哪"。
@@ -4173,6 +4237,11 @@ export function App(): React.JSX.Element {
             */}
             <section className="ht-settings__group" hidden={activeSettingsSection !== 'settings-group-ai'} id="settings-group-ai" aria-label={t('mobile.settings.section.features')}>
               <FeatureModulesPanel enabled={enabledModules} onToggle={onToggleModule} />
+              <SmartListSettingsPanel
+                config={smartListConfig}
+                onToggle={onToggleSmartList}
+                onMove={onMoveSmartList}
+              />
               <AiSettings
                 active={activeSettingsSection === 'settings-group-ai'}
                 initial={aiSettings}
