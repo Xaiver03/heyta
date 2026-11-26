@@ -190,6 +190,15 @@ const CASES: readonly Case[] = [
     effect: () => alive('tags'),
   },
   {
+    tool: 'remember_memory',
+    intentAction: 'remember-memory',
+    label: '记忆',
+    args: async () => ({ text: '回答先给结论' }),
+    // 记忆是**既有实体的条数**：确认前后差 1 才算真的落了库。
+    effect: () =>
+      Object.values(engine.getState().userMemories).filter((m) => m.deletedAt === undefined).length,
+  },
+  {
     tool: 'set_task_tags',
     intentAction: 'set-task-tags',
     label: '任务的标签',

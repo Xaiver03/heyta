@@ -194,6 +194,14 @@ export const DEFAULT_TOOL_SELECTION_RULES: readonly ToolSelectionRule[] = [
     args: () => ({}),
   },
   {
+    // 陈述记忆：目录里不需要必填参数的读工具，必须有一条规则能选中它。
+    // "你记得我什么" 这类问法由本机直接答，不带着问题去问模型。
+    id: 'list.memories',
+    tool: 'list_memories',
+    pattern: /(你记得|记得我|关于我|我的偏好|我的习惯|我是什么人|了解我)/,
+    args: () => ({}),
+  },
+  {
     // ADR-0092：保存筛选（智能清单）。同一判据 —— 目录里有一条不需要必填参数的
     // 读工具，就必须有一条规则能选中它，否则它在助手前门永远选不到。
     id: 'list.filters',
