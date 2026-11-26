@@ -240,7 +240,9 @@ button.mk-nav__item:focus-visible {
   display: flex;
   align-items: center;
   gap: var(--ht-space-2);
-  padding: var(--ht-space-2);
+  min-block-size: var(--ht-touch-target-min);
+  padding-inline-start: var(--ht-space-3);
+  padding-inline-end: var(--ht-space-2);
   border-width: var(--ht-border-width-thin);
   border-style: solid;
   border-color: var(--ht-color-border);
@@ -287,26 +289,12 @@ button.mk-nav__item:focus-visible {
    `font-weight.medium`。改基础规则 = 顺手改掉另一个复刻件的保真度。
    取值由 `tests/mockup-capture-shape.spec.tsx` 从共享层源码文本逐项对账。 */
 .mk-input--capture {
-  padding-inline: var(--ht-size-field-padding-x);
+  padding-inline: 0;
   font-weight: var(--ht-font-weight-regular);
   line-height: var(--ht-line-height-normal);
   letter-spacing: var(--ht-tracking-body);
   background: transparent;
   border-radius: 0;
-}
-
-.mk-btn-primary--capture {
-  inline-size: var(--ht-touch-target-min);
-  block-size: var(--ht-touch-target-min);
-  padding-inline: 0;
-  gap: 0;
-  border-radius: var(--ht-radius-full);
-}
-
-/* 空标题 ⇒ `captureCanSubmit` 为 false ⇒ 真实现给 `addDisabled` 那一层透明度。
-   复刻原来画的是一个**全不透明**的添加按钮 —— 那是一个产品里不存在的状态。 */
-.mk-btn-primary--off {
-  opacity: var(--ht-state-disabled-opacity);
 }
 
 /* ── 任务列表 ───────────────────────────────────────────────

@@ -85,36 +85,12 @@ export const MOCK_CAPTURE_CLASS = {
   row: 'mk-compose',
   /** 输入框：基础 `.mk-input` + 捕获修饰类。 */
   input: 'mk-input mk-input--capture',
-  /** 提交按钮：基础 `.mk-btn-primary` + 捕获修饰类。 */
-  add: 'mk-btn-primary mk-btn-primary--capture',
-  /** 空标题时的按钮态：真实现给的是 `opacity: state.disabled-opacity`。 */
-  addOff: 'mk-btn-primary--off',
 } as const;
 
-/**
- * 复刻件渲染的两条文案，**用应用自己的 key**（`web.capture.*`）。
- *
- * ⚠️ 不是 `landing.mock.*`：宿主 `features/capture/CaptureComposer.tsx` 注入的
- * 就是这两条，中文逐字相同 —— 那正是最舒服的漂移藏身处（抄错 key 看不出来）。
- *
- * 共享组件要的那些 `web.capture.*` 文案里，另外几条（`addLabel` / `matchesAria` /
- * `rejected` / `unused` / `restoreAria` / `ignoreAria` / `priority.*` / `capsule*` / `panel.*`）
- * 属于**芯片、胶囊与面板**这些本复刻件不画的状态，登记在真实现那边由
- * `packages/ui/tests` 与 `apps/web/tests` 管。
- * ⚠️ 这里曾经还列着 `previewLead` / `previewEmpty` —— 「实际标题」那一行连同
- * 两条词条在 2026-11-04 一起删了，别再抄回来。
- */
 export const MOCK_CAPTURE_KEYS = {
   placeholder: 'web.capture.placeholder',
   add: 'web.capture.add',
 } as const satisfies Record<string, MessageKey>;
-
-/** 提交按钮的类名：空标题时追加"禁用态"那一笔。 */
-export function mockCaptureAddClass(canSubmit: boolean): string {
-  return canSubmit
-    ? MOCK_CAPTURE_CLASS.add
-    : `${MOCK_CAPTURE_CLASS.add} ${MOCK_CAPTURE_CLASS.addOff}`;
-}
 
 /**
  * 真实现里守着"有识别才渲染"的那**一个**条件（判据按源码文本核对）。

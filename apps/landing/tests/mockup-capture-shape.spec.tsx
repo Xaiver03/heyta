@@ -73,7 +73,6 @@ import {
   MOCK_CAPTURE_DRAFT,
   MOCK_CAPTURE_KEYS,
   MOCK_CAPTURE_LIVE_GUARD,
-  mockCaptureAddClass,
 } from '../src/mockup/capture-shape.js';
 import { readUiSource, readWebSource } from './helpers/source-text.js';
 import { readCss } from './css-source.js';
@@ -232,23 +231,21 @@ describe('真实现的锚点还在，而且捕获只剩一份实现', () => {
     expect(model).toContain('parseCapture');
   });
 
-  it('共享视图：输入行 / 提交按钮 / 芯片 / 预览都在同一个组件里', () => {
+  it('共享视图：单行输入壳 / 日期胶囊 / 芯片都在同一个组件里，无多余提交按钮', () => {
     const composer = captureComposerSource();
     for (const anchor of [
       'toCaptureChips',
       'captureCanSubmit',
       'toggleCaptureIgnore',
       'labels.placeholder',
-      'labels.add',
       'labels.rejected',
       'labels.unused',
-      // 🔴 2026-11-04：`labels.previewLead` 随「实际标题」那一行一起退役，换成胶囊那一格。
-      // 这一列的意义是"复刻件不画的那些状态，真实现确实还在渲染"—— 载体换了，意图没换。
       'labels.capsule',
       'labels.matchesAria',
     ]) {
       expect(composer, `共享 CaptureComposer 少了 ${anchor}`).toContain(anchor);
     }
+    expect(composer, '回车即提交，不应再渲染 capture-submit 按钮').not.toContain('testID="capture-submit"');
   });
 
   it('🔴 空态守卫：识别行为空时**什么都不画**（只剩这一处守卫）', () => {
@@ -283,59 +280,27 @@ describe('复刻件的取值 = 共享层那一组（逐项对账）', () => {
     expectVar(mockupCss(), MOCK_CAPTURE_CLASS.row, 'gap', tokenOf(composer, 'compose', 'gap'));
   });
 
-  it('🔴 输入框：内边距用 `size.field-padding-x`（**不是**隔壁 FocusPanel 的 `space.4`）', () => {
+  it('🔴 输入框：无水平内距、透明无边框，外层 `compose` 统一承载圆角与边框', () => {
     const composer = captureComposerSource();
     const css = mockupCss();
-    expectVar(
-      css,
-      '.mk-input--capture',
-      'padding-inline',
-      tokenOf(composer, 'input', 'paddingHorizontal'),
-    );
+    expect(styleDeclarations(styleBlock(composer, 'input')).get('paddingHorizontal')).toBe('0');
+    expect(cssDeclarations(ruleBody(css, '.mk-input--capture')).get('padding-inline')).toBe('0');
     expectVar(css, '.mk-input', 'min-block-size', tokenOf(composer, 'input', 'minHeight'));
     // 新 composer：输入框自己无框、透明、无圆角（框与底色搬到 `compose` 容器上）。
     expect(styleDeclarations(styleBlock(composer, 'input')).get('backgroundColor')).toBe("'transparent'");
     expect(cssDeclarations(ruleBody(css, '.mk-input--capture')).get('background')).toBe('transparent');
     expect(cssDeclarations(ruleBody(css, '.mk-input--capture')).get('border-radius')).toBe('0');
-    // 输入框里的字是 **placeholder**（复刻件只有 placeholder），所以取
-    // `placeholderTextColor` 那一族，而不是 `color.foreground`。
     expectVar(css, '.mk-input', 'color', 'color.foreground-subtle');
     expect(captureComposerSource()).toContain(
       "placeholderTextColor={tokens['color.foreground-subtle']}",
     );
-    // 无边界输入：共享层与复刻都明确使用 0；其余输入属性仍逐项走 token 对账。
     expect(styleDeclarations(styleBlock(composer, 'input')).get('borderWidth')).toBe('0');
     const border = cssDeclarations(ruleBody(css, '.mk-input')).get('border') ?? '';
     expect(border).toBe('0');
-    // `row-meta` 的排版四件套（字号一条，其余三条在修饰类里）。
     expectVar(css, '.mk-input', 'font-size', 'font-size.sm');
     expectVar(css, '.mk-input--capture', 'font-weight', 'font-weight.regular');
     expectVar(css, '.mk-input--capture', 'line-height', 'line-height.normal');
     expectVar(css, '.mk-input--capture', 'letter-spacing', 'tracking.body');
-  });
-
-  it('🔴 提交按钮：圆形图标键（radius.full + 触控下限尺寸 + 无水平内距）', () => {
-    const composer = captureComposerSource();
-    const css = mockupCss();
-    // 2026-11-16 起 addButton 是圆形图标键：radius.full + width/height = touch-target.min。
-    expectVar(css, '.mk-btn-primary--capture', 'border-radius', tokenOf(composer, 'addButton', 'borderRadius'));
-    expectVar(css, '.mk-btn-primary--capture', 'inline-size', tokenOf(composer, 'addButton', 'width'));
-    expectVar(css, '.mk-btn-primary--capture', 'block-size', tokenOf(composer, 'addButton', 'height'));
-    expect(cssDeclarations(ruleBody(css, '.mk-btn-primary--capture')).get('padding-inline'), '圆形按钮无水平内距').toBe('0');
-    // 承载色（启用态）与图标/文字色：同一 token 族。
-    expectVar(css, '.mk-btn-primary', 'background', tokenOf(composer, 'addEnabled', 'backgroundColor'));
-    expectVar(css, '.mk-btn-primary', 'color', 'color.on-primary');
-    expectVar(css, '.mk-btn-primary', 'font-size', 'font-size.sm');
-  });
-
-  it('🔴 空标题下的禁用态：`state.disabled-opacity`（复刻原来画的是全不透明）', () => {
-    const composer = captureComposerSource();
-    expectVar(
-      mockupCss(),
-      '.mk-btn-primary--off',
-      'opacity',
-      tokenOf(composer, 'addDisabled', 'opacity'),
-    );
   });
 });
 
@@ -343,7 +308,6 @@ describe('登记处 ⟷ 渲染 ⟷ AppWindow 三处一致', () => {
   it('登记处的 key 就是宿主注入的那两条', () => {
     expect(MOCK_CAPTURE_KEYS.placeholder).toBe('web.capture.placeholder');
     expect(MOCK_CAPTURE_KEYS.add).toBe('web.capture.add');
-    // 中英词条表里真的有它们（而不是只在登记处凭空写了一个 key）。
     expect(zhCN[MOCK_CAPTURE_KEYS.placeholder]).toBeTruthy();
     expect(zhCN[MOCK_CAPTURE_KEYS.add]).toBeTruthy();
   });
@@ -354,48 +318,31 @@ describe('登记处 ⟷ 渲染 ⟷ AppWindow 三处一致', () => {
       'MOCK_CAPTURE_CLASS.row',
       'MOCK_CAPTURE_CLASS.input',
       'MOCK_CAPTURE_KEYS.placeholder',
-      'MOCK_CAPTURE_KEYS.add',
-      'mockCaptureAddClass',
+      'MOCK_CAPTURE_ADD_ICON_SIZE',
     ]) {
       expect(source, `AppWindow 少了 ${anchor}`).toContain(anchor);
     }
     expect(source, "AppWindow 里又出现 `'web.capture…'` 字面量了").not.toContain("'web.capture");
   });
 
-  it('渲染出来：输入框恰好两个子元素（空态没有芯片 / 没有预览）', () => {
+  it('渲染出来：输入框恰好两个子元素（前置 + 图标 + 输入框，空态无芯片/无预览/无提交按钮）', () => {
     const view = renderMockup();
     const row = view.querySelector(`.${MOCK_CAPTURE_CLASS.row}`);
     expect(row, '渲染结果里没有捕获输入行 —— 判据锚点已失效').not.toBeNull();
-    expect(row?.children, '空输入框下这一行只应有「输入框 + 按钮」两个元素').toHaveLength(2);
-    // 🔴 逐字面量而不是逐 key：`web.capture.previewLead` 这条词条已经随预览行一起删了，
-    // 而"这里不许出现那行复述"这件事不该依赖一条词条存在与否来证明。
+    expect(row?.children, '空输入框下这一行只应有「前置 + 图标 + 输入框」两个元素').toHaveLength(2);
+    expect(row?.querySelector('.mk-btn-primary--capture'), '不应渲染多余提交按钮').toBeNull();
     expect(row?.textContent ?? '').not.toContain('实际标题');
     expect(row?.textContent ?? '').not.toContain(zhCN['web.capture.unused']);
   });
 
-  it('渲染出来：输入框的提示语与按钮的字都来自登记处那几个 key', () => {
+  it('渲染出来：输入框的提示语与前置 `+` 图标来自登记处', () => {
     const view = renderMockup();
+    const row = view.querySelector(`.${MOCK_CAPTURE_CLASS.row}`);
     const input = view.querySelector('.mk-input--capture');
-    const add = view.querySelector('.mk-btn-primary--capture');
     expect(input?.textContent?.trim()).toBe(zhCN[MOCK_CAPTURE_KEYS.placeholder]);
-    // 图标键没有可见文字（圆形 +），无障碍名仍来自同一个 key。
-    expect(add?.getAttribute('aria-label')).toBe(zhCN[MOCK_CAPTURE_KEYS.add]);
-  });
-
-  it('渲染出来：空草稿 ⇒ 按钮带禁用态，`+` 图标就是 `icon.sm` 的 16px', () => {
-    const view = renderMockup();
-    const add = view.querySelector('.mk-btn-primary--capture');
-    expect(mockCaptureAddClass(MOCK_CAPTURE_CAN_SUBMIT)).toBe(
-      `${MOCK_CAPTURE_CLASS.add} ${MOCK_CAPTURE_CLASS.addOff}`,
-    );
-    expect(add?.getAttribute('class')).toBe(mockCaptureAddClass(MOCK_CAPTURE_CAN_SUBMIT));
-    expect(add?.getAttribute('class')).toContain('mk-btn-primary--off');
-
-    const svg = add?.querySelector('svg');
-    expect(svg, '提交按钮里没有 `+` 图标').not.toBeNull();
+    const svg = row?.querySelector('svg');
+    expect(svg, '输入行缺少前置 `+` 图标').not.toBeNull();
     expect(svg?.getAttribute('width')).toBe(String(MOCK_CAPTURE_ADD_ICON_SIZE));
-    // 16 这个数不是随手写的：它就是 `icon.sm`（真实现那一侧）。
-    expectVar(mockupCss(), '.mk-btn-primary', 'font-size', 'font-size.sm');
     expect(captureComposerSource()).toContain("size={tokens['icon.sm']}");
   });
 });
@@ -413,9 +360,6 @@ describe('覆盖边界（写进断言，免得读的人以为它管得更宽）'
   it('复刻件画的是**空态**：草稿为空、不许提交 —— 芯片与预览的缺席由此而来', () => {
     expect(MOCK_CAPTURE_DRAFT).toBe('');
     expect(MOCK_CAPTURE_CAN_SUBMIT).toBe(false);
-    // 非空标题那一态（按钮实心）没有被画出来，但函数本身必须能表达它。
-    expect(mockCaptureAddClass(true)).toBe(MOCK_CAPTURE_CLASS.add);
-    expect(mockCaptureAddClass(true)).not.toContain('mk-btn-primary--off');
   });
 
   it('真实现那一侧的锚点：解析 / 换算都在共享层，web 只出文案', () => {

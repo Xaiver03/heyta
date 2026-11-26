@@ -81,10 +81,8 @@ import {
 } from './app-shell-shape.js';
 import {
   MOCK_CAPTURE_ADD_ICON_SIZE,
-  MOCK_CAPTURE_CAN_SUBMIT,
   MOCK_CAPTURE_CLASS,
   MOCK_CAPTURE_KEYS,
-  mockCaptureAddClass,
 } from './capture-shape.js';
 import { SHOWCASE_TASKS, showcaseQuadrantCounts } from './showcase-data.js';
 import { TaskList } from './TaskList.js';
@@ -586,10 +584,8 @@ export function AppWindow({
               */}
               {activeView === 'tasks' ? (
                 <div className={MOCK_CAPTURE_CLASS.row}>
+                  <Plus size={MOCK_CAPTURE_ADD_ICON_SIZE} aria-hidden="true" />
                   <div className={MOCK_CAPTURE_CLASS.input}>{t(MOCK_CAPTURE_KEYS.placeholder)}</div>
-                  <div className={mockCaptureAddClass(MOCK_CAPTURE_CAN_SUBMIT)} aria-label={t(MOCK_CAPTURE_KEYS.add)}>
-                    <Plus size={MOCK_CAPTURE_ADD_ICON_SIZE} />
-                  </div>
                 </div>
               ) : null}
 

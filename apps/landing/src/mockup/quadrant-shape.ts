@@ -117,7 +117,7 @@ export const MOCK_QUADRANT_SHAPE: readonly MockQuadrantShape[] = [
  */
 export const MOCK_QUADRANT_KEYS = {
   cellA11y: 'web.quadrant.a11y.cell',
-  empty: 'web.quadrant.dropHere',
+  empty: 'web.quadrant.empty',
 } as const satisfies Record<string, MessageKey>;
 
 /**
