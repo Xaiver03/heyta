@@ -316,7 +316,7 @@ describe('每一个工具都在清单里，且 kind 与目录一致', () => {
 //    它不是结论（结论是那条规则），所以不去改已接受的 ADR，只在这里写明口径。）
 // ─────────────────────────────────────────────────────────────────────────
 
-describe('分母恰好 14（W2 EVENT、COMMENT、ATTACHMENT、ADR-0091 SECTION、ADR-0092 FILTER 之后），且逐条点名', () => {
+describe('分母恰好 16（W2 EVENT、COMMENT、ATTACHMENT、ADR-0091 SECTION、ADR-0092 FILTER、ADR-0093 TASK_TEMPLATE 之后），且逐条点名', () => {
   it('分母成员逐条点名（多一个少一个都红 —— 这条挡住"顺手把视图加进分母"）', async () => {
     const [gen, upstream] = [await loadGenerator(), await upstreamDirectory()];
     const excludedNames = gen.DENOMINATOR_EXCLUSIONS.map((e) => e.entityType);
@@ -343,16 +343,24 @@ describe('分母恰好 14（W2 EVENT、COMMENT、ATTACHMENT、ADR-0091 SECTION�
     //    （`list_sections` / `create_section` / `rename_section` / `reorder_section` /
     //    `set_task_section` / `delete_section`），是"实体与它的 AI 工具同批落地"的正面形状。
     // 于是分母 = 11 + 2 = 13；覆盖面 12/13，唯一缺口 `CALENDAR_EVENT`（AI-COV-9）。
-    expect(manifest.userOperableEntityTypes.length).toBe(14);
-    expect(manifest.coverage.denominator).toBe(14);
+    // ⚠️ 2026-11 第六次搬：分母 → 16。`TASK_TEMPLATE`（ADR-0093 任务模板）进
+    //    `EntityModelMap`，本批只落"保存任务为模板 / 从模板建任务"两条手势与动作层，
+    //    AI 读写工具随后续一刀补 ⇒ 缺口按 `AI-COV-10` 登记在 `ENTITY_COVERAGE_DEBT`。
+    //    （`USER_MEMORY` 先前的 1 条读写工具也在本基线里 —— 见下方 `withTools` 名单。）
+    expect(manifest.userOperableEntityTypes.length).toBe(16);
+    expect(manifest.coverage.denominator).toBe(16);
     // 🔴 W10 **之前**这里是 `toContain('EVENT')` —— 清单的职责就是把"实体有了、
     // 工具还没接"这件事显形。W10 做完之后它必须**不再**出现（这条改向就是那件事
     // 做完了的机器化证据；反向漏做 ⇒ 这条与上面 3/9 那条一起红）。
     expect(manifest.entityTypesWithoutTools).not.toContain('EVENT');
     // 🔴 `SECTION` 同批补了读写工具 ⇒ **不许**出现在"有实体没工具"里。
     expect(manifest.entityTypesWithoutTools).not.toContain('SECTION');
-    // 现在被点名的只能是登记过的那一格：`CALENDAR_EVENT`（AI-COV-9，只读镜像无写动作）。
-    expect([...manifest.entityTypesWithoutTools].sort()).toEqual(['CALENDAR_EVENT']);
+    // 现在被点名的只能是登记过的那两格：`CALENDAR_EVENT`（AI-COV-9）与
+    // `TASK_TEMPLATE`（AI-COV-10，均无写动作/工具未接）。
+    expect([...manifest.entityTypesWithoutTools].sort()).toEqual([
+      'CALENDAR_EVENT',
+      'TASK_TEMPLATE',
+    ]);
   });
 
   it('分母的每个成员都**必须**在 `MODELED_ENTITY_TYPES` 里 —— 视图不是实体', async () => {
@@ -394,7 +402,7 @@ describe('分母恰好 14（W2 EVENT、COMMENT、ATTACHMENT、ADR-0091 SECTION�
     }
   });
 
-  it('现状基线 13/14：分母里除已登记缺口外每个实体读写都有工具（以后少一个就要在这里重新判断）', () => {
+  it('现状基线 14/16：分母里除已登记缺口外每个实体读写都有工具（以后少一个就要在这里重新判断）', () => {
     // 2026-10-03 两次搬这条基线，都在这里重新判断过：
     // ① PROJECT 补 `create_project`、HABIT 补 `list_habits` + `create_habit`（3/8）；
     // ② 补齐 TAG / NOTE / HABIT_LOG / FOCUS_SESSION / REMINDER 的读写工具（8/8）。
@@ -424,15 +432,17 @@ describe('分母恰好 14（W2 EVENT、COMMENT、ATTACHMENT、ADR-0091 SECTION�
       'SECTION',
       'TAG',
       'TASK',
+      'USER_MEMORY',
     ]);
     // 2026-10-03 合流：EVENT 的四条工具随 W10 移植进 pack 目录（读 2 / 写 2），
     // 基线从 8/8（W11 批次）与 3/9（批次二当时的中间态）收拢为 9/9；
     // 2026-10-17 起读作 9/10（COMMENT 进分母、无工具，缺口按 AI-COV-8 登记）。
     // 2026-11：COMMENT / ATTACHMENT 均补齐工具，CALENDAR_EVENT 进分母（缺口 AI-COV-9），
-    // SECTION 同批补读写工具 ⇒ 12/13。
-    expect(manifest.coverage.covered).toBe(13);
-    expect(manifest.coverage.denominator).toBe(14);
-    expect(manifest.coverage.ratio).toBe('13/14');
+    // SECTION 同批补读写工具 ⇒ 12/13。再叠 ADR-0093 `TASK_TEMPLATE`（缺口 AI-COV-10）
+    // 与 `USER_MEMORY` 的读写工具 ⇒ 14/16。
+    expect(manifest.coverage.covered).toBe(14);
+    expect(manifest.coverage.denominator).toBe(16);
+    expect(manifest.coverage.ratio).toBe('14/16');
     // `covered` 是分母名单的**统计结果**，`userOperableEntityTypes.length` 是名单本身：
     // 两个数取自生成器里两条不同的路径。2026-10-17 之前这里要求它们相等（= 分母全有工具）；
     // 现在把等式改成"**每个没工具的实体都必须有一张登记的欠账**"，
@@ -440,8 +450,8 @@ describe('分母恰好 14（W2 EVENT、COMMENT、ATTACHMENT、ADR-0091 SECTION�
     const withoutTools = manifest.entityTypesWithoutTools.length;
     expect(
       withoutTools,
-      '没工具的实体数必须与登记的缺口数一致（现量 1：AI-COV-9 CALENDAR_EVENT）',
-    ).toBe(1);
+      '没工具的实体数必须与登记的缺口数一致（现量 2：AI-COV-9 CALENDAR_EVENT / AI-COV-10 TASK_TEMPLATE）',
+    ).toBe(2);
     expect(manifest.coverage.covered + withoutTools).toBe(manifest.userOperableEntityTypes.length);
   });
 

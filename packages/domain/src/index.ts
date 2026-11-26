@@ -35,6 +35,8 @@ export * from './timeline.js';
 export * from './timeline-position.js';
 export * from './notes.js';
 export * from './sections.js';
+// ADR-0093：任务模板（`TASK_TEMPLATE`）—— 名校验 / 规范顺序 / 任务 ⇄ 模板 字段映射（纯函数）。
+export * from './task-template.js';
 export * from './trash-rows.js';
 
 export * from './events.js';

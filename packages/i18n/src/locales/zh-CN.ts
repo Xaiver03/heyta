@@ -5806,6 +5806,7 @@ export const zhCN = {
   'common.entity.CALENDAR_EVENT': '外部日历事件',
   'common.entity.SECTION': '分组',
   'common.entity.FILTER': '保存的筛选',
+  'common.entity.TASK_TEMPLATE': '任务模板',
   'common.entity.GLOBAL_CONFIG': '全局设置',
   'common.entity.MIGRATION': '数据迁移',
   'common.entity.RECOVERY': '灾难恢复',

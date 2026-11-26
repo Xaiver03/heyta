@@ -1389,3 +1389,12 @@ export {
   type FilterActionsOptions,
   type NewFilterFields,
 } from './filter-actions.js';
+
+// 任务模板（`TASK_TEMPLATE`，ADR-0093）：保存任务为模板 / 从模板建任务。
+// 个人数据，永不进 share op-log；写入只经本动作层的 `ctx.dispatch` 单入口。
+export {
+  createTaskTemplateActions,
+  type TaskTemplateActions,
+  type TaskTemplateActionsOptions,
+  type TaskTemplateWriteFields,
+} from './template-actions.js';
