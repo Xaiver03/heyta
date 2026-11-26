@@ -305,7 +305,7 @@
     "check:css-layers": "node scripts/check-css-layers.mjs",
     "gen:pwa-colors": "node scripts/gen-pwa-colors.mjs",
     "check:pwa-colors": "node scripts/gen-pwa-colors.mjs --check",
-    "check:brand-kit": "sh -c \"[ -d 品牌资料/01-brand-kit ] && python3 品牌资料/01-brand-kit/_pipeline/check_artifacts.py --quiet || echo '品牌资料未同步（.gitignore 不入库），跳过 brand-kit 自检'\""
+    "check:brand-kit": "python3 brand-kit/_pipeline/check_artifacts.py --quiet"
   },
   "devDependencies": {
     "@heyta/shared-schema": "workspace:*",
