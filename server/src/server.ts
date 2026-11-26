@@ -43,6 +43,7 @@ import { shareRoutes } from './shares/share.routes';
 import { accountSecurityRoutes } from './account/account-security.routes';
 import { accountProfileRoutes } from './account/account-profile.routes';
 import { feishuRoutes } from './feishu/feishu.routes';
+import { calendarFeedRoutes } from './calendar-feed/calendar-feed.routes';
 import { attachmentRoutes } from './attachments/attachment.routes';
 import { holidayAdjustmentRoutes } from './holidays/holiday-adjustment.routes';
 import { announcementRoutes } from './announcements/announcement.routes';
@@ -604,6 +605,9 @@ export const createServer = (
         publicUrl: fullConfig.publicUrl,
         webAppPath: fullConfig.webAppPath,
       });
+      // 日历导出订阅源：`GET /api/calendar/feed-token`（登录签发）+ `GET /calendar/<token>.ics`
+      // （公开、无 cookie，供 Google/Outlook 订阅）。无 `CALENDAR_FEED_SECRET` 时整段 503 禁用。
+      await fastifyServer.register(calendarFeedRoutes);
       // 任务附件的**字节**通道（工单 #9）。同样不在 `apiRoutes` 里：它与同步没有
       // 共享状态，而它的 20 MiB 级 `bodyLimit` 只能按路由设（全局是 20 MB，
       // 放全局会让任何一个接口都能吃满请求体额度）。
