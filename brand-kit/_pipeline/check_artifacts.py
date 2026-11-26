@@ -1213,10 +1213,12 @@ import re as _re46
 _self = open(os.path.abspath(__file__), encoding="utf-8").read()
 _n_groups = len(_re46.findall(r"(?m)^# (\d+)\)", _self))
 _readme_p = os.path.join(WD, "README.md")
-if os.path.exists(_readme_p):
+if os.environ.get("SKIP_NUM_GATES"):
+    pass
+elif os.path.exists(_readme_p):
     _txt46 = open(_readme_p, encoding="utf-8").read()
     _declared = _re46.findall(r"(\d+) 组 / (\d+) 项", _txt46)
-    _want_items = len(passes) + 1  # 本判据自身也会记一项
+    _want_items = len(passes) + 2  # 本判据 + 自检状态判据各记一项
     _bad46 = [f"{g} 组 / {i} 项" for g, i in _declared
               if (int(g), int(i)) != (_n_groups, _want_items)]
     if _bad46:
@@ -1225,6 +1227,26 @@ if os.path.exists(_readme_p):
         fail("README 没有写「N 组 / M 项」，无法核对")
     else:
         emit(f"✅ README 判据数字与脚本一致（{_n_groups} 组 / {_want_items} 项）")
+
+# 46) 自检状态.md 必须存在、结论通过、且通过项数等于本次实际值（过期就重生成）
+#     生成器调用时置 SKIP_STATUS_CHECK=1，避免"生成依赖校验、校验依赖生成"的死循环。
+_rep = os.path.join(WD, "自检状态.md")
+if os.environ.get("SKIP_NUM_GATES"):
+    pass
+elif not os.path.exists(_rep):
+    fail("没有 自检状态.md（跑 _pipeline/report_status.py 生成）")
+else:
+    _rt = open(_rep, encoding="utf-8").read()
+    _m = _re46.search(r"通过项：(\d+)", _rt)
+    _want46 = len(passes) + 1  # 本判据自身
+    if "结论：通过" not in _rt:
+        fail("自检状态.md 的结论不是「通过」")
+    elif not _m:
+        fail("自检状态.md 里找不到「通过项：N」")
+    elif int(_m.group(1)) != _want46:
+        fail(f"自检状态.md 过期：写 {_m.group(1)} 项，实际 {_want46} 项（重跑 report_status.py）")
+    else:
+        emit(f"✅ 自检状态.md 与本次结果一致（{_want46} 项）")
 
 if not fails:
     if JSON_OUT:
