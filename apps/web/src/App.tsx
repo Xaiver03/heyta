@@ -291,6 +291,14 @@ import { NavButton } from './features/shell/NavButton.js';
 import { Button } from './components/hta/index.js';
 import { EmptyState, isActive } from './features/shell/EmptyState.js';
 import { SETTINGS_ANCHORS, type SettingsAnchor } from './features/shell/settings-anchors.js';
+import { CommandPalette, type ResolvedShortcut } from './features/shell/CommandPalette.js';
+import {
+  COMMAND_PALETTE_COMBOS,
+  SHORTCUT_CATALOG,
+  SHORTCUT_OVERVIEW_COMBOS,
+  SHORTCUT_SCOPE_LABEL_KEYS,
+} from './features/shell/shortcut-catalog.js';
+import { matchShortcut, keyComboFromEvent, type Command, type ShortcutBinding } from '@heyta/ui';
 import { SyncSettingsPanel } from './features/sync/SyncSettingsPanel.js';
 import { AdminConsolePage } from './features/admin/AdminConsolePage.js';
 import { AnnouncementBanner } from './features/announcements/AnnouncementBanner.js';
@@ -917,6 +925,16 @@ export function App(): React.JSX.Element {
    * 它复用 `web.shell.search.*` 那三条词条 —— 那些词条因此不是死词条，别删。
    */
   const [searchQuery, setSearchQuery] = useState('');
+
+  /**
+   * 命令面板 / 快捷键一览（覆盖图谱 #6 / #7）。
+   *
+   * 两者共用一个非模态浮层，`mode` 决定画动作清单还是快捷键一览。
+   * 🔴 `⌘K` **仍然是搜索**（现有判据锁死，且它是键盘用户找搜索的第一反应）；
+   *    命令面板另给 `⌘⇧P` 并列 —— 不覆盖既有行为，只是多一个入口。
+   */
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [paletteMode, setPaletteMode] = useState<'commands' | 'shortcuts'>('commands');
 
   /**
    * G-11：**首启必须问过用户**。
@@ -2507,6 +2525,121 @@ export function App(): React.JSX.Element {
   }, [view, closeSecondarySurface, goToView]);
 
   /**
+   * 命令面板 / 快捷键一览的键位（覆盖图谱 #6 / #7）。
+   *
+   * 🔴 与搜索分开、并列存在：`⌘K` 仍是搜索（现有判据锁死），这里给 `⌘⇧P`（面板）
+   *    与 `⌘/`（一览）。键位判断走 `@heyta/ui` 的 `matchShortcut`（纯函数），
+   *    本处只做"命中 → 开哪个态"的接线。
+   */
+  const paletteBindings = useMemo<ShortcutBinding[]>(
+    () => [
+      ...COMMAND_PALETTE_COMBOS.map((combo) => ({ id: 'commandPalette', combo })),
+      ...SHORTCUT_OVERVIEW_COMBOS.map((combo) => ({ id: 'shortcutOverview', combo })),
+    ],
+    [],
+  );
+
+  const openPalette = useCallback((mode: 'commands' | 'shortcuts') => {
+    setPaletteMode(mode);
+    setPaletteOpen(true);
+  }, []);
+
+  const closePalette = useCallback(() => setPaletteOpen(false), []);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.altKey) return;
+      const hit = matchShortcut(paletteBindings, keyComboFromEvent(event));
+      if (hit === undefined) return;
+      event.preventDefault();
+      openPalette(hit === 'shortcutOverview' ? 'shortcuts' : 'commands');
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [paletteBindings, openPalette]);
+
+  /** 「新建任务」= 切到任务视图并把光标放进收集框（复用既有输入框，不另建一个）。 */
+  const focusCapture = useCallback(() => {
+    goToView('tasks');
+    const focus = () =>
+      document.querySelector<HTMLElement>('[data-testid="capture-input"]')?.focus();
+    // 视图切换是异步提交的：等两帧后再聚焦，避免"切过去时输入框还没挂载"。
+    requestAnimationFrame(() => requestAnimationFrame(focus));
+  }, [goToView]);
+
+  const paletteCommands = useMemo<Command[]>(() => {
+    const list: Command[] = quickActions.map((action) => ({
+      id: `nav:${action.id}`,
+      title: action.label,
+      group: 'navigate',
+      keywords: action.keywords,
+      run: action.onSelect,
+    }));
+    list.push({
+      id: 'create:task',
+      title: t('web.commandPalette.newTask'),
+      group: 'create',
+      keywords: ['task', 'add'],
+      run: focusCapture,
+    });
+    list.push({
+      id: 'open:search',
+      title: t('web.commandPalette.openSearch'),
+      group: 'open',
+      keywords: ['search'],
+      run: () => goToView('search'),
+    });
+    list.push({
+      id: 'open:settings',
+      title: t('web.commandPalette.openSettings'),
+      group: 'open',
+      keywords: ['settings', 'preferences'],
+      run: () => goToView('settings'),
+    });
+    list.push({
+      id: 'open:toggleDetail',
+      title: t('web.commandPalette.toggleDetail'),
+      group: 'open',
+      keywords: ['detail'],
+      run: toggleDetailPane,
+    });
+    return list;
+  }, [quickActions, t, goToView, toggleDetailPane, focusCapture]);
+
+  const paletteLabels = useMemo(
+    () => ({
+      title: t('web.commandPalette.title'),
+      inputAria: t('web.commandPalette.inputAria'),
+      placeholder: t('web.commandPalette.placeholder'),
+      empty: t('web.commandPalette.empty'),
+      groupLabels: {
+        navigate: t('web.commandPalette.group.navigate'),
+        create: t('web.commandPalette.group.create'),
+        open: t('web.commandPalette.group.open'),
+      },
+      shortcutsEntry: t('web.commandPalette.shortcutsEntry'),
+      shortcutsTitle: t('web.shortcuts.title'),
+      scopeLabels: {
+        global: t(SHORTCUT_SCOPE_LABEL_KEYS.global),
+        navigation: t(SHORTCUT_SCOPE_LABEL_KEYS.navigation),
+        palette: t(SHORTCUT_SCOPE_LABEL_KEYS.palette),
+      },
+    }),
+    [t],
+  );
+
+  const paletteShortcuts = useMemo<ResolvedShortcut[]>(
+    () =>
+      SHORTCUT_CATALOG.map((entry) => ({
+        id: entry.id,
+        label: t(entry.labelKey),
+        combos: entry.combos,
+        scope: entry.scope,
+      })),
+    [t],
+  );
+
+  /**
    * 把光标那一行滚进视野。
    *
    * 只能在宿主做：共享层不许碰 DOM（它要跑在 RN 上），而"按 8 次 ↓ 之后
@@ -3589,6 +3722,21 @@ export function App(): React.JSX.Element {
             </HeytaUiProvider>
             </div>
           )}
+          {/*
+            命令面板 / 快捷键一览（覆盖图谱 #6 / #7）。与搜索是**并列**的两个浮层：
+            `⌘K` 搜索、`⌘⇧P` 面板、`⌘/` 一览。它是非模态键盘浮层（不带 role=dialog），
+            动作用 `App` 里装配好的 `paletteCommands`，全部复用既有命令（quickActions /
+            goToView / toggleDetailPane），面板本身不重写任何业务逻辑。
+          */}
+          <CommandPalette
+            open={paletteOpen}
+            mode={paletteMode}
+            commands={paletteCommands}
+            shortcuts={paletteShortcuts}
+            labels={paletteLabels}
+            onClose={closePalette}
+            onOpenShortcuts={() => setPaletteMode('shortcuts')}
+          />
           {contentView === 'calendar' && (
             <>
               <CalendarView />
