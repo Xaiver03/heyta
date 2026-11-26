@@ -2721,6 +2721,7 @@ export const en = {
   'web.memory.stated.inputAria': 'One sentence to remember',
   'web.memory.stated.add': 'Remember',
   'web.memory.stated.forgetAria': 'Forget "{text}"',
+  'web.memory.stated.autoExtract': 'Automatically note preferences I mention',
   'web.memory.stated.editAria': 'Edit "{text}"',
   'web.memory.stated.save': 'Save',
   'web.memory.stated.cancelEdit': 'Cancel edit',

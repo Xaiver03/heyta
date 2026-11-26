@@ -19,6 +19,7 @@
  */
 
 import {
+  inferMemoriesFromText,
   MEMORY_TEXT_MAX,
   deriveTopicKey,
   isSensitiveMemoryText,
@@ -223,4 +224,25 @@ export function createUserMemoryActions(
       });
     },
   };
+}
+
+/**
+ * 规则推断并落库（M9）：抽到的每一条都以 `origin='extracted'` 落成 **pending**。
+ *
+ * 与 `captureStatedMemory` 的分工：那句是用户明说，直接 active；
+ * 这里是规则猜的，先待确认。抽不到或写入失败都返回已落库的那些 id，不抛。
+ */
+export async function captureInferredMemories(
+  actions: UserMemoryActions,
+  text: string,
+): Promise<readonly string[]> {
+  const ids: string[] = [];
+  for (const inferred of inferMemoriesFromText(text)) {
+    try {
+      ids.push(await actions.add({ kind: inferred.kind, text: inferred.text, origin: 'extracted' }));
+    } catch {
+      // 单条写失败（超长/敏感）不拖垮其余；用户看不到一条"半成功"的回执。
+    }
+  }
+  return ids;
 }

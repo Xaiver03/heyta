@@ -64,6 +64,12 @@ export interface AiSettingsState {
   health: AiHealthSnapshot;
   /** 🔴 记忆总开关（ADR-0014）。默认关，且只认真正的 `true`。 */
   memoryEnabled: boolean;
+  /**
+   * 从用户自己说的话里**规则推断**长期信息（M9）。默认关。
+   *
+   * 推断一律 pending；它不会让任何未确认的内容进 prompt。
+   */
+  autoExtractMemories?: boolean;
 }
 
 /**
@@ -111,6 +117,7 @@ export function defaultAiSettingsState(): AiSettingsState {
     consents: [],
     health: { version: HEALTH_SNAPSHOT_VERSION, entries: [] },
     memoryEnabled: false,
+    autoExtractMemories: false,
   };
 }
 
@@ -198,6 +205,7 @@ export function parseAiSettingsState(raw: string | undefined): AiSettingsState {
     localApi: sanitizeLocalApi(candidate.localApi, fallback.localApi),
     consents: Array.isArray(candidate.consents) ? candidate.consents : [],
     memoryEnabled: candidate.memoryEnabled === true,
+    autoExtractMemories: candidate.autoExtractMemories === true,
     health: {
       version: HEALTH_SNAPSHOT_VERSION,
       entries: toHealthSnapshot(fromHealthSnapshot(candidate.health, Date.now()), Date.now()).entries,

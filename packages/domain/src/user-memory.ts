@@ -114,6 +114,11 @@ export function isSensitiveMemoryText(text: string): boolean {
 }
 
 /** 明说记忆的解析结果。 */
+export interface InferredMemory {
+  readonly kind: UserMemoryKind;
+  readonly text: string;
+}
+
 export interface StatedMemory {
   readonly kind: UserMemoryKind;
   /** 去掉前缀之后的那句话（已 trim、已截断到 300 字符）。 */
@@ -207,6 +212,69 @@ export function parseStatedMemory(raw: string): StatedMemory | null {
   const kind: UserMemoryKind = STYLE_WORDS.some((w) => text.includes(w)) ? 'preference' : 'fact';
   return { kind, text, topicKey: deriveTopicKey(kind, text) };
 }
+
+/**
+ * 从用户**自己说的一句话**里推出可以记的长期信息（M9，opt-in）。
+ *
+ * ## 为什么是规则而不是让模型抽
+ *
+ * 模型抽取要**再发一次**用户的原话，而这条链路已经因为"明说捕获"有了一个
+ * 不需要出境的版本；规则能覆盖的高频句式（"我通常…"/"以后…"/"我是…"）
+ * 恰好就是用户最容易重复说的那几句。抽不到的，用户还可以明说或让助手
+ * 用 `remember_memory` 提议 —— 不靠猜测补。
+ *
+ * ## 三条护栏
+ *
+ *   1. **只认陈述句**：问句（`？`）、感叹句一律不抽 —— "我喜欢这个吗"不是偏好。
+ *   2. **只认以"我"开头的句子**：别人/任务里的"喜欢"不是用户的偏好。
+ *   3. **敏感内容与空句不抽**，且每条最多 120 字（推断出来的长段落没有可读性）。
+ *
+ * ⚠️ 抽出来的**一律 pending**（由调用方以 `origin='extracted'` 落库），
+ * 用户确认之后才进 prompt。这条不因为"规则很准"而放宽。
+ */
+export function inferMemoriesFromText(raw: string): readonly InferredMemory[] {
+  const found: InferredMemory[] = [];
+  const seen = new Set<string>();
+  for (const piece of raw.split(/[。！!；;\n]/)) {
+    const sentence = piece
+      .replace(/^[\s\-*•\d.、]+/, '')
+      .replace(/^(?:对了|另外|还有|顺便说一句)[，,]?/, '')
+      .trim();
+    if (sentence.length < 4 || sentence.length > 120) continue;
+    if (/[?？]/.test(sentence)) continue;
+    if (isSensitiveMemoryText(sentence)) continue;
+    if (sentence.includes('记住')) continue;
+
+    for (const rule of INFER_RULES) {
+      if (!rule.test.test(sentence)) continue;
+      const key = `${rule.kind}\u0000${sentence}`;
+      if (seen.has(key)) break;
+      seen.add(key);
+      found.push({ kind: rule.kind, text: sentence });
+      break;
+    }
+    if (found.length >= INFERRED_MEMORY_MAX) break;
+  }
+  return found;
+}
+
+/** 推断单条的上限：一次说三件事已经很多，再多就是在替用户写日记。 */
+export const INFERRED_MEMORY_MAX = 3;
+
+const INFER_RULES: readonly { readonly kind: UserMemoryKind; readonly test: RegExp }[] = [
+  { kind: 'preference', test: /^(?:以后|今后|往后)(?:都|请|就|要|别|不要)?/ },
+  {
+    kind: 'preference',
+    test: /^我(?:通常|一般|平时|习惯|喜欢|不喜欢|偏爱|总是|从来|更愿意|宁可|比较喜欢)/,
+  },
+  { kind: 'profile', test: /^我(?:是|在|住在|叫|来自)/ },
+  { kind: 'fact', test: /^我的[^，。！？]{1,24}(?:是|在|用|有)/ },
+  {
+    kind: 'preference',
+    test: /^i\s+(?:usually|always|generally|prefer|like|don'?t like|hate|never)/i,
+  },
+  { kind: 'profile', test: /^i(?:'m| am)\s+(?:a|an|from|based|living)/i },
+];
 
 /** 读路径需要的「这条还能不能用」。 */
 export function isMemoryUsable(item: UserMemory, now: number): boolean {

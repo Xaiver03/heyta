@@ -662,6 +662,19 @@ describe('「记住的事」：陈述记忆可写可删', () => {
     expect(updated).toEqual([]);
   });
 
+  it('自动记开关：默认关，点一下回调 true', () => {
+    const changes: boolean[] = [];
+    const el = render({
+      memories: [],
+      autoExtractMemories: false,
+      onAutoExtractChange: (value: boolean) => changes.push(value),
+    });
+    const toggle = el.querySelector('[data-testid="memory-auto-extract"]') as HTMLInputElement;
+    expect(toggle.checked).toBe(false);
+    click(toggle);
+    expect(changes).toEqual([true]);
+  });
+
   it('待确认条目走确认 / 不要两条路', () => {
     const confirmed: string[] = [];
     const dismissed: string[] = [];

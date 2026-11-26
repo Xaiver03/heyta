@@ -15,6 +15,8 @@ import {
   renderMemoryForPrompt,
   residentMemoryLines,
   selectMemoryForPrompt,
+  inferMemoriesFromText,
+  INFERRED_MEMORY_MAX,
   wrapMemoryForPrompt,
 } from '../src/user-memory.js';
 
@@ -221,5 +223,40 @@ describe('selectMemoryForPrompt：报告真正进了 prompt 的条目', () => {
     expect(selected.block).toBe('');
     expect(selected.resident).toEqual([]);
     expect(selected.recall).toEqual([]);
+  });
+});
+
+describe('inferMemoriesFromText：只抽用户自己的陈述句', () => {
+  it('偏好 / 身份 / 事实三类各自识别，且正文原样保留', () => {
+    const found = inferMemoriesFromText('我通常晚上写代码。以后回答先给结论。我是一名设计师。');
+    expect(found).toEqual([
+      { kind: 'preference', text: '我通常晚上写代码' },
+      { kind: 'preference', text: '以后回答先给结论' },
+      { kind: 'profile', text: '我是一名设计师' },
+    ]);
+  });
+
+  it('问句、感叹句、别人的事都不抽', () => {
+    expect(inferMemoriesFromText('我喜欢这个方案吗？')).toEqual([]);
+    expect(inferMemoriesFromText('他喜欢安静')).toEqual([]);
+    expect(inferMemoriesFromText('今天好累！')).toEqual([]);
+  });
+
+  it('敏感内容不抽；「记住：」交给明说捕获，不重复', () => {
+    expect(inferMemoriesFromText('我的密码是 abc123')).toEqual([]);
+    expect(inferMemoriesFromText('记住：我习惯先看结论')).toEqual([]);
+  });
+
+  it('一次最多三条（再多就是在替用户写日记）', () => {
+    const found = inferMemoriesFromText(
+      '我通常早起。我一般喝美式。我习惯先列清单。我喜欢安静。我住在杭州。',
+    );
+    expect(found).toHaveLength(INFERRED_MEMORY_MAX);
+  });
+
+  it('英文句也认', () => {
+    expect(inferMemoriesFromText('I usually work late.')).toEqual([
+      { kind: 'preference', text: 'I usually work late.' },
+    ]);
   });
 });

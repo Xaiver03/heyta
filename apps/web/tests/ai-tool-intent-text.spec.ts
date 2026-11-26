@@ -87,3 +87,11 @@ describe('intentText：批量改优先级', () => {
     expect(intentText(intent, tEn)).toBe('Set these task priorities: task-1 → High、task-2 → Low、task-3 → mystery');
   });
 });
+
+describe('intentText：记住一条记忆', () => {
+  it('把要记住的那句话念出来（中英各一份）', () => {
+    const intent = { action: 'remember-memory' as const, text: '回答先给结论' };
+    expect(intentText(intent, tZh)).toContain('回答先给结论');
+    expect(intentText(intent, tEn)).toContain('回答先给结论');
+  });
+});

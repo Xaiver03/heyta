@@ -104,6 +104,8 @@ export interface MemoryPanelProps {
   memories?: readonly UserMemory[];
   onAddMemory?: (text: string) => void;
   onUpdateMemory?: (id: string, text: string) => void;
+  autoExtractMemories?: boolean;
+  onAutoExtractChange?: (value: boolean) => void;
   onForgetMemory?: (id: string) => void;
   onConfirmMemory?: (id: string) => void;
   onDismissMemory?: (id: string) => void;
@@ -124,6 +126,8 @@ function StatedMemorySection(props: {
   onConfirm?: (id: string) => void;
   onDismiss?: (id: string) => void;
   onUpdate?: (id: string, text: string) => void;
+  autoExtractMemories?: boolean;
+  onAutoExtractChange?: (value: boolean) => void;
 }): React.JSX.Element {
   const { t } = useI18n();
   const [draft, setDraft] = useState('');
@@ -149,6 +153,25 @@ function StatedMemorySection(props: {
   return (
     <>
       <h3 className="ht-settings__subtitle">{t('web.memory.stated.title')}</h3>
+      {props.onAutoExtractChange !== undefined && (
+        <div className="ht-settings__toggle">
+          <label className="ht-settings__toggle-hit" htmlFor="memory-auto-extract">
+            <input
+              id="memory-auto-extract"
+              type="checkbox"
+              role="switch"
+              checked={props.autoExtractMemories === true}
+              data-testid="memory-auto-extract"
+              onChange={(e) => props.onAutoExtractChange?.(e.target.checked)}
+            />
+            <span className="ht-settings__toggle-body">
+              <span className="ht-settings__toggle-label">
+                {t('web.memory.stated.autoExtract')}
+              </span>
+            </span>
+          </label>
+        </div>
+      )}
       {active.length === 0 ? (
         <p className="ht-settings__hint" role="status" data-testid="memory-stated-empty">
           {t('web.memory.stated.empty')}
@@ -391,6 +414,8 @@ export function MemoryPanel(props: MemoryPanelProps): React.JSX.Element {
           onConfirm={props.onConfirmMemory}
           onDismiss={props.onDismissMemory}
           onUpdate={props.onUpdateMemory}
+          autoExtractMemories={props.autoExtractMemories}
+          onAutoExtractChange={props.onAutoExtractChange}
         />
       )}
 

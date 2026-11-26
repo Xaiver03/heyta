@@ -4188,6 +4188,12 @@ export function App(): React.JSX.Element {
                 memorySlot={
                   <MemoryPanel
                     memoryEnabled={aiSettings.memoryEnabled}
+                    autoExtractMemories={aiSettings.autoExtractMemories === true}
+                    onAutoExtractChange={(value) => {
+                      const next = { ...aiSettings, autoExtractMemories: value };
+                      setAiSettings(next);
+                      saveAiSettings(next);
+                    }}
                     preferenceSet={memory.preferenceSet}
                     feedbackSet={memory.feedbackSet}
                     rawPresentIds={memory.rawPresentIds}

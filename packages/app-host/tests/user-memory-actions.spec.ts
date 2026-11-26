@@ -4,6 +4,7 @@ import type { UserMemory } from '@heyta/domain';
 
 import type { ActionContext } from '../src/actions.js';
 import {
+  captureInferredMemories,
   captureStatedMemory,
   createUserMemoryActions,
 } from '../src/user-memory-actions.js';
@@ -195,6 +196,37 @@ describe('明说捕获', () => {
     const { ctx, intents } = fakeCtx();
     const actions = createUserMemoryActions(ctx, { newId: () => 'x' });
     expect(await captureStatedMemory(actions, '记住：我的银行卡号是 6222')).toBeNull();
+    expect(intents).toHaveLength(0);
+  });
+});
+
+describe('规则推断捕获（M9）', () => {
+  it('陈述句 → 落 pending，不直接进 prompt', async () => {
+    const { ctx, state } = fakeCtx();
+    const actions = createUserMemoryActions(ctx, { newId: () => 'i1' });
+    const ids = await captureInferredMemories(actions, '我通常晚上写代码。');
+    expect(ids).toEqual(['i1']);
+    expect(state.userMemories.i1).toMatchObject({
+      kind: 'preference',
+      status: 'pending',
+      origin: 'extracted',
+    });
+  });
+
+  it('同一句再说一遍：幂等，不新增', async () => {
+    const { ctx, state } = fakeCtx();
+    const actions = createUserMemoryActions(ctx, { newId: () => 'i1' });
+    await captureInferredMemories(actions, '我通常晚上写代码。');
+    const again = await captureInferredMemories(actions, '我通常晚上写代码。');
+    expect(again).toEqual(['i1']);
+    expect(Object.keys(state.userMemories)).toHaveLength(1);
+  });
+
+  it('问句与敏感句零写入', async () => {
+    const { ctx, intents } = fakeCtx();
+    const actions = createUserMemoryActions(ctx, { newId: () => 'x' });
+    expect(await captureInferredMemories(actions, '我喜欢这个吗？')).toEqual([]);
+    expect(await captureInferredMemories(actions, '我的密码是 abc123')).toEqual([]);
     expect(intents).toHaveLength(0);
   });
 });

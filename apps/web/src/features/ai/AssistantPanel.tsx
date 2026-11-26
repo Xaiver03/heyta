@@ -159,6 +159,8 @@ export interface AssistantPanelProps {
   host?: LocalApiHost;
   /** 本机记忆总开关；关闭时工具宿主不得读取偏好来源。 */
   memoryEnabled?: boolean;
+  /** 从用户自己的话里规则推断记忆（M9）。推断落 pending，默认关。 */
+  autoExtractMemories?: boolean;
   /** 估时工具需要的最小偏好提示，由外壳按当前语言与授权派生。 */
   getDurationPreferenceHints?: () => readonly { id: string; text: string }[];
   /**
@@ -686,7 +688,7 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
     // 不阻塞本轮 —— 记忆写失败不该让一句正常的提问发不出去。
     void useTaskStore
       .getState()
-      .captureStatedMemory(text)
+      .captureMemories(text, props.autoExtractMemories === true)
       .catch(() => undefined);
     setDraft('');
     // 图只属于这一条消息：发出去之后输入框回到"没附件"的状态，

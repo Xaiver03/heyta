@@ -2927,6 +2927,7 @@ export const zhCN = {
   'web.memory.stated.inputAria': '要记住的一句话',
   'web.memory.stated.add': '记住',
   'web.memory.stated.forgetAria': '忘记「{text}」',
+  'web.memory.stated.autoExtract': '自动记下我说过的偏好',
   'web.memory.stated.editAria': '修改「{text}」',
   'web.memory.stated.save': '保存',
   'web.memory.stated.cancelEdit': '取消修改',

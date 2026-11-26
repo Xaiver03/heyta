@@ -344,7 +344,7 @@ AI 记忆
 | 出境披露（`memory.items`；按**开关**披露，避免「先同意后加记忆」绕过） | ✅ | `assistantEgressFields({memory})` + 面板接线 |
 | 明说捕获接线（发送时解析并落库） | ✅ | `AssistantPanel.send()` → `captureStatedMemory` |
 | 会话内「记忆 · N」行（web + mobile，可落盘恢复） | ✅ | `ChatItem role:'memory'` + 历史恢复 + 两端渲染 |
-| 自动抽取（M9） | ⬜ 未做 | 待拍板（§10 第 2 条） |
+| 自动抽取（M9） | ✅ | 规则推断（`inferMemoriesFromText`，只认用户自己的陈述句）× opt-in 开关（默认关）；推断一律 pending |
 | 助手读写记忆工具（M10） | ✅ | `list_memories`（只出境 active）+ `remember_memory`（必须确认）；`AI-COV-10` 已闭合 |
 | 编辑条目的界面 | ✅ | `MemoryPanel` 行内编辑（Enter 保存 / Esc 取消） |
 | 移动端注入 | ✅ | `ChatRuntime.memoryItems` + `runTurn` 传 `memory`，壳从 `host.getState().userMemories` 取；`memoryEnabled=false` 时仍不注入 |

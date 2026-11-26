@@ -78,6 +78,27 @@ describe('明说捕获', () => {
   });
 });
 
+describe('自动推断（M9，默认关）', () => {
+  it('开关打开：非明说的陈述句落 pending', async () => {
+    await useTaskStore.getState().captureMemories('我通常晚上写代码。', true);
+    const items = Object.values(useTaskStore.getState().entities.userMemories);
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({ status: 'pending', origin: 'extracted' });
+  });
+
+  it('开关关闭：同一句零写入', async () => {
+    await useTaskStore.getState().captureMemories('我通常晚上写代码。', false);
+    expect(Object.keys(useTaskStore.getState().entities.userMemories)).toHaveLength(0);
+  });
+
+  it('明说优先：不再走推断，直接 active', async () => {
+    await useTaskStore.getState().captureMemories('记住：我通常晚上写代码', true);
+    const items = Object.values(useTaskStore.getState().entities.userMemories);
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({ status: 'active', origin: 'stated' });
+  });
+});
+
 describe('手动新增 / 忘记', () => {
   it('敏感内容被拒，且不落 op', async () => {
     await expect(

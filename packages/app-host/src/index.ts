@@ -652,6 +652,7 @@ export {
 } from './ai-feedback-actions.js';
 export {
   MAX_USER_MEMORIES,
+  captureInferredMemories,
   captureStatedMemory,
   createUserMemoryActions,
   type AddUserMemoryInput,
