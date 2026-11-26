@@ -87,6 +87,7 @@ import { HabitBoard, HabitProgressList, HabitTrendBoard } from '@heyta/ui';
 
 import { useTaskHost } from '../db/use-task-host';
 import { base64ToBytes, readLocalBytesBase64, readLocalTextUri } from '../lib/local-file-read';
+import { WebTimetableImport } from './WebTimetableImport';
 import {
   habitBoardLabels,
   habitListLabels,
@@ -158,6 +159,7 @@ export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
   
   const actions = useMemo<HabitActions | null>(() => (host ? createHabitActions(host) : null), [host]);
   const [importBusy, setImportBusy] = useState(false);
+  const [webImportOpen, setWebImportOpen] = useState(false);
 
   const refresh = useCallback(() => {
     if (!actions) return;
@@ -195,7 +197,7 @@ export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
         const lower = fileName.toLowerCase();
         const localUri = async (): Promise<string> => {
           const [copy] = await keepLocalCopy({ files: [{ uri: doc.uri, fileName }], destination: 'cachesDirectory' });
-          if (copy === undefined || copy.status !== 'success') throw new Error(copy === undefined ? '复制失败' : copy.copyError);
+          if (copy === undefined || copy.status !== 'success') throw new Error(copy === undefined ? t('mobile.habits.copyFailed') : copy.copyError);
           return copy.localUri;
         };
         let rawRows;
@@ -213,13 +215,17 @@ export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
           rawRows = lower.endsWith('.csv') ? parseCourseCSV(text) : parseCourseICS(text);
         }
         const plan = planCourseImport(rawRows);
+        if (plan.rows.length === 0) {
+          Alert.alert('', t('mobile.habits.importEmpty'));
+          return;
+        }
         const res = await actions.importCourses(plan.rows);
         refresh();
         Alert.alert(
           '',
           plan.report.skipped > 0
-            ? `${res.created.length} 门已导入，${plan.report.skipped} 行跳过`
-            : `${res.created.length} 门已导入`,
+            ? t('mobile.habits.importResultSkipped', { created: res.created.length, skipped: plan.report.skipped })
+            : t('mobile.habits.importResult', { created: res.created.length }),
         );
       } catch (e: unknown) {
         setError(e instanceof Error ? e.message : String(e));
@@ -562,6 +568,7 @@ export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
       actions={[
         { icon: 'task.add', label: t('web.habits.add'), onPress: () => { setAdding((v) => !v); } },
         { icon: 'action.attach', label: t('mobile.habits.importTimetable'), onPress: onImportTimetable },
+        { icon: 'action.search', label: t('mobile.habits.webImport'), onPress: () => { setWebImportOpen(true); } },
       ]}
     >
       {/*
@@ -640,6 +647,15 @@ export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
         }}
         testID="habit-list"
       />
+      {webImportOpen && actions !== null ? (
+        <WebTimetableImport
+          actions={actions}
+          onImported={refresh}
+          onClose={() => {
+            setWebImportOpen(false);
+          }}
+        />
+      ) : null}
     </Screen>
   );
 }
