@@ -353,6 +353,15 @@ AI 记忆
 
 **能失败**：把 `parseStatedMemory` 的输入改成常量（永远解析不出明说）后，`domain/tests/user-memory.spec.ts` 立即红，随后 `git checkout` 还原 —— 不是「跑了绿」就算数。
 
+**2026-11-26 收尾（第二轮）**：
+
+| 项 | 结果 |
+|---|---|
+| 助手读写记忆 | `list_memories`（只出境 active）+ `remember_memory`（**必须确认**，`aiToolProposalRequiresConfirmation` 里显式加 case）；`AI-COV-10` 关闭，覆盖面 14/15 |
+| 自动抽取 | 规则推断 `inferMemoriesFromText`（只认用户自己的陈述句，问句/敏感/别人的事不抽，最多 3 条）× `autoExtractMemories` 开关（默认关，只认字面 `true`）；一律 pending |
+| 编辑 | 记忆行内编辑（Enter 保存 / Esc 取消），`updateUserMemory` 重算主题与指纹 |
+| 全量测试 | domain 1419、local-api 407、app-host 2648、web 2649 通过（13 条既有红，见下）、mobile 1405 通过（7 条既有红） |
+
 **门禁（本次跑过的，全绿）**：`check:design`、`check:ui-language`、`check:i18n-vars`、`check:ai-tools`、`check:ai-coverage`、`check:settings-row-anatomy`、`check:layering`、`check:docs-voice`、`check:egress-wording`、`check:doc-citations`、`check:control-semantics`、`check:theme`、`check:design-token-refs`。
 
 **已知红灯（与本次无关，未修）**：
@@ -364,5 +373,8 @@ AI 记忆
 | `check:empty-state` | 5 处手写空态（calendar / admin / quadrant / settings） | 既有 |
 | `check:overlay` | `AiPrioritize.tsx` 已不在扫描面，账本未删 | 既有账本漂移 |
 | `pnpm check:docs` | `.local/admin-redesign/*` 6 处 + `ADR-0089` 1 处死链 | 本机笔记与既有 ADR；本次 5 份文档 0 处 |
+| `check:persistence-keys` | `heyta.ai.assistant.sessions`、`heyta.update.deviceId` 未登记 | 既有键，与记忆无关 |
+| `check:l4` / `check:empty-state` / `check:overlay` | 移动端内联样式 62>52；5 处手写空态；`AiPrioritize` 账本漂移 | 既有 |
+| web / mobile 全量 | web 13 条（auth / calendar / language / passkey / pwa / selection / timeline）、mobile 7 条（widget / sections / share / sync） | 均不在本次改动面，单独跑同样红 |
 
 `check:design` 原先那处移动端裸颜色已顺手修掉（`TimetablePeriodsEditor` 的遮罩改用 `material.scrim`）。
