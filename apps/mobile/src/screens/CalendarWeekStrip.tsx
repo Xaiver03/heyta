@@ -90,6 +90,11 @@ export const CalendarWeekStrip = React.memo(function CalendarWeekStrip({
           borderRadius: t['radius.full'],
           backgroundColor: t['color.primary'],
         },
+        // 圆点的固定占位：有没有内容都保留同高，避免多/少一行把下方农历顶得参差不齐。
+        dotSlot: {
+          width: t['space.1'],
+          height: t['space.1'],
+        },
       }),
     [t],
   );
@@ -132,7 +137,7 @@ export const CalendarWeekStrip = React.memo(function CalendarWeekStrip({
                 {String(dayNumber(date))}
               </Text>
             </View>
-            {hasContent?.(date) === true && !isToday ? <View style={styles.dot} /> : null}
+            <View style={styles.dotSlot}>{hasContent?.(date) === true && !isToday ? <View style={styles.dot} /> : null}</View>
             <Text variant="caption" tone="subtle">
               {lunarDayLabel(date)}
             </Text>
