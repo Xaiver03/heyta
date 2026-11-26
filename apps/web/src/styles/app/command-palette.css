@@ -1,0 +1,164 @@
+/* 命令面板 + 快捷键一览（覆盖图谱 #6 / #7）
+ *
+ * 🔴 命名挂在既有的 `.ht-sheet` 族下（`.ht-sheet__command-*`），**不新开顶层族**：
+ * `check:row-single-source` 断言「顶层 ht-* 前缀族只减不增」，新开一族就是基线 +1。
+ * 它**不带**裸 `.ht-sheet` 类，所以不会继承设置浮层那套样式，只共用命名空间。
+ *
+ * 🔴 形态与搜索浮层同族：非模态、贴顶卡片，四周留白让下层视图透出。
+ * 它是**键盘浮层**，不是对话框（见 `CommandPalette.tsx` 文件头）。
+ *
+ * 所有取值来自 token（`check:design` 扫这一层）。
+ */
+
+.ht-sheet__command-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--ht-z-overlay);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: calc(var(--ht-space-16) * 1.25) var(--ht-space-4) var(--ht-space-4);
+  background: var(--ht-material-scrim);
+}
+
+/* 卡片：宽对齐 modal-max，高随内容、上限一屏的 60%，超出时列表自己滚。 */
+.ht-sheet__command-card {
+  display: flex;
+  flex-direction: column;
+  inline-size: min(100%, var(--ht-layout-modal-max));
+  max-block-size: 60vh;
+  min-block-size: 0;
+  overflow: hidden;
+  border-radius: var(--ht-radius-lg);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  background: var(--ht-color-surface-raised);
+  box-shadow: var(--ht-shadow-xl);
+  color: var(--ht-color-foreground);
+}
+
+.ht-sheet__command-input {
+  flex: 0 0 auto;
+  inline-size: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: var(--ht-space-4) var(--ht-space-4);
+  border: 0;
+  border-block-end: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+  border-radius: 0;
+  background: transparent;
+  color: var(--ht-color-foreground);
+  font-size: var(--ht-font-size-lg);
+}
+
+.ht-sheet__command-list {
+  flex: 1 1 auto;
+  min-block-size: 0;
+  margin: 0;
+  padding: var(--ht-space-2);
+  list-style: none;
+  overflow-y: auto;
+}
+
+.ht-sheet__command-group {
+  padding: var(--ht-space-2) var(--ht-space-3) var(--ht-space-1);
+  color: var(--ht-color-foreground-subtle);
+  font-size: var(--ht-font-size-2xs);
+  font-weight: var(--ht-font-weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.ht-sheet__command-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ht-space-3);
+  padding: var(--ht-space-2) var(--ht-space-3);
+  border-radius: var(--ht-radius-md);
+  color: var(--ht-color-foreground);
+  font-size: var(--ht-font-size-sm);
+  cursor: pointer;
+}
+
+.ht-sheet__command-option--active {
+  background: var(--ht-color-primary-subtle);
+  color: var(--ht-color-primary);
+}
+
+.ht-sheet__command-title {
+  min-inline-size: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.ht-sheet__command-keys {
+  flex: 0 0 auto;
+  color: var(--ht-color-foreground-subtle);
+  font-size: var(--ht-font-size-xs);
+}
+
+.ht-sheet__command-empty {
+  padding: var(--ht-space-4);
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-sm);
+}
+
+/* ── 快捷键一览 ─────────────────────────────────────────── */
+
+.ht-sheet__command-shortcuts {
+  display: flex;
+  flex-direction: column;
+  min-block-size: 0;
+  max-block-size: 60vh;
+  overflow-y: auto;
+  padding: var(--ht-space-4);
+}
+
+.ht-sheet__command-shortcuts-title {
+  margin: 0 0 var(--ht-space-3);
+  color: var(--ht-color-foreground);
+  font-size: var(--ht-font-size-lg);
+  font-weight: var(--ht-font-weight-semibold);
+}
+
+.ht-sheet__command-shortcuts-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-4);
+}
+
+.ht-sheet__command-scope-title {
+  margin: 0 0 var(--ht-space-2);
+  color: var(--ht-color-foreground-subtle);
+  font-size: var(--ht-font-size-2xs);
+  font-weight: var(--ht-font-weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.ht-sheet__command-scope-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ht-sheet__command-shortcut-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ht-space-3);
+  padding: var(--ht-space-2) 0;
+  border-block-end: var(--ht-border-width-hairline) solid var(--ht-color-border-subtle);
+  font-size: var(--ht-font-size-sm);
+}
+
+.ht-sheet__command-shortcut-label {
+  color: var(--ht-color-foreground);
+}
+
+.ht-sheet__command-shortcut-keys {
+  flex: 0 0 auto;
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-xs);
+}

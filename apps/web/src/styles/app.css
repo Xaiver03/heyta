@@ -45,4 +45,8 @@
    保证全局焦点规则在级联最末（check:focus-single-source）。 */
 @import './app/ai-chat-direction-a.css';
 
+/* 命令面板 + 快捷键一览（覆盖图谱 #6 / #7）。位于 borderless-controls 之前，
+   保证全局焦点规则仍在级联最末（check:focus-single-source）。 */
+@import './app/command-palette.css';
+
 @import './app/borderless-controls.css';
