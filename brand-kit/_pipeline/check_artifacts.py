@@ -33,6 +33,7 @@ if LIST:
             (21, "身份标签门槛值"), (23, "胶囊文字对比度"),
             (25, "分类色槽门槛"), (26, "徽章英文名=产品文案"),
             (27, "色卡三条立场"), (29, "分享文本无标识"), (30, "手册 FAQ 依据"),
+            (41, "ΔE 实测值=现算"),
         ],
         "读产物（看图/看文件）": [
             (2, "数量"), (3, "关键产物存在"), (4, "PDF 字体/页数"),
@@ -43,6 +44,7 @@ if LIST:
         ],
         "读文档（散文/清单）": [
             (6, "i18n 词条齐备"), (10, "禁串（自造文案）"), (11, "产品清单门槛数字"),
+            (42, "docs 引用可达"),
         ],
     }
     print("brand-kit 自检判据（按「失败时该找谁」分组）")
@@ -1100,6 +1102,68 @@ if os.path.isdir(os.path.join(WD, "03-icons")):
         fail(f"03-icons 网格不统一：{sorted(_vb)}（应全为 0 0 24 24）")
     else:
         emit(f"✅ 03-icons 全部使用 24×24 网格（{len(_icons)} 枚）")
+
+# 41) 产品清单里写的"实测最差 ΔE"必须等于现算值；且暗色 token 必须解析成 hex
+#     文档里的数字是给人看的结论，最容易随调色漂掉。这里把四个数逐一回算比对。
+DOC_LIST = os.environ.get("BRAND_KIT_DOC_LIST",
+                          os.path.join(WD, "成就与成长体系_产品清单.md"))
+_dims41 = ("checkin", "focus", "tasks", "days")
+_calc = {}
+_hex_ok = True
+for _theme in ("light", "dark"):
+    _hs41 = [RT.token(f"color-milestone-{k}", _theme) for k in _dims41]
+    for _h in _hs41:
+        if not (isinstance(_h, str) and re.fullmatch(r"#[0-9a-fA-F]{6}", _h)):
+            _hex_ok = False
+    _calc[_theme] = {
+        "normal": RT.worst_pair_delta(_hs41)[0],
+        "protan": RT.worst_pair_delta(_hs41, RT.PROTANOPIA)[0],
+        "deutan": RT.worst_pair_delta(_hs41, RT.DEUTERANOPIA)[0],
+    }
+if not _hex_ok:
+    fail("里程碑暗色 token 未解析为 hex（可能是 var() 原样泄漏）")
+elif os.path.exists(DOC_LIST):
+    _doc = open(DOC_LIST, encoding="utf-8").read()
+    _want = [
+        ("亮 正常", f"{_calc['light']['normal']:.1f}"),
+        ("暗 正常", f"{_calc['dark']['normal']:.1f}"),
+        ("protan", f"{min(_calc['light']['protan'], _calc['dark']['protan']):.1f}"),
+        ("deutan", f"{min(_calc['light']['deutan'], _calc['dark']['deutan']):.1f}"),
+    ]
+    _miss = [f"{label}={val}" for label, val in _want if val not in _doc]
+    if _miss:
+        fail(f"产品清单里的 ΔE 实测值与现算不符：缺 {_miss}")
+    else:
+        emit("✅ 产品清单的 ΔE 实测值与现算一致（45.7 / 57.6 / 12.6 / 12.1 这一组）")
+
+# 42) 文档里的 `docs/....md §N` 引用必须真实存在（文件在、章节也在）
+#     物料文档引用产品文档是双向闭环的一环；被引用的文件搬去 archive/ 后，
+#     引用还留在原地就成了死链，而没有任何东西会发现。
+_doc_ref_bad = []
+_doc_refs = set()
+for _r, _d, _fs in os.walk(WD):
+    if "_pipeline" in _r:
+        continue
+    for _f in _fs:
+        if not _f.endswith(".md"):
+            continue
+        _txt = open(os.path.join(_r, _f), encoding="utf-8").read()
+        for _m in re.finditer(r"(docs/[A-Za-z0-9_./-]+\.md)`?\s*(?:§\s*([0-9]+(?:\.[0-9]+)?))?", _txt):
+            _doc_refs.add((os.path.relpath(os.path.join(_r, _f), WD), _m.group(1), _m.group(2)))
+for _src, _target, _sec in sorted(_doc_refs, key=lambda t: tuple(str(x) for x in t)):
+    _path = os.path.join(ROOT, _target)
+    if not os.path.exists(_path):
+        _doc_ref_bad.append(f"{_src} → {_target}（文件不存在）")
+        continue
+    if _sec:
+        _body = open(_path, encoding="utf-8").read()
+        _pat = rf"^#{{1,4}}\s*{re.escape(_sec)}[.\s]|^\|\s*{re.escape(_sec)}\s*\|"
+        if not re.search(_pat, _body, re.M):
+            _doc_ref_bad.append(f"{_src} → {_target} §{_sec}（章节不存在）")
+if _doc_ref_bad:
+    fail(f"文档引用失效：{_doc_ref_bad[:4]}")
+else:
+    emit(f"✅ 文档里的 docs 引用全部可达（{len(_doc_refs)} 处，含章节号）")
 
 if not fails:
     if JSON_OUT:

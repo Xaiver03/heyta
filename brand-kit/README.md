@@ -11,11 +11,11 @@
 
 ## 自检判据一览（`python _pipeline/check_artifacts.py`）
 
-耗时：全套 40 组约 **0.4s**（`--quiet` 实测 0.42s），对 `pnpm check` 可忽略。
+耗时：全套 42 组约 **0.4s**（`--quiet` 实测 0.42s），对 `pnpm check` 可忽略。
 
 **失败即给修复命令**：每条失败会按类别打印「修：python .../build_xxx.py」，不用再翻文档。
 
-三种输出：默认人读；`--list` 按「读代码 / 读产物 / 读文档」三组列出 40 组判据，并附 8 处构建期断言；`--quiet` 只在失败时说话并给一行汇总（给 CI 用）；
+三种输出：默认人读；`--list` 按「读代码 / 读产物 / 读文档」三组列出 42 组判据，并附 8 处构建期断言；`--quiet` 只在失败时说话并给一行汇总（给 CI 用）；
 `--json` 输出 `{ok, passed, failed, checks|errors, remedies}`（给流水线解析用，stdout 保证是纯 JSON）。
 
 已挂在 `check` 链上：`pnpm check:brand-kit`（紧跟 `check:brand-assets`）。
@@ -62,6 +62,8 @@
 | 38 | 手册预览图张数 = 手册页数 | 索引里的册子缺页 |
 | 39 | 01-logo 位图档位（1x=760 / 2x=1520 / 图标正方） | 导错档位，文件管理器看不出 |
 | 40 | 03-icons 全部 24×24 网格 | 图标机身大小不齐 |
+| 41 | 产品清单里的 ΔE 实测值 = 现算值；暗色 token 必须是 hex | 文档结论与实算脱节 |
+| 42 | 文档里的 `docs/…​.md §N` 引用文件与章节都在 | 被引文档搬去 archive 后成死链 |
 
 ⚠️ **PDF 每次重建字节都不同**（Chrome 打印头里带时间戳/文档 ID），PNG 与 SVG 是稳定的。
 所以比对 PDF 时看页数/字体/视觉，不要看 sha256 —— 否则每次都会以为「有改动」。
@@ -78,7 +80,7 @@
 |---|---|---|
 | 受版本控制的物料文件 | 163 | `python brand-kit/_pipeline/build_index.py` 输出的 `index: N files` |
 | 产物目录 | 11（`00-`…`10-`） | `ls -d brand-kit/[0-9][0-9]-*` |
-| 自检判据 | 40 组 / 64 项 | `python brand-kit/_pipeline/check_artifacts.py --quiet` |
+| 自检判据 | 42 组 / 66 项 | `python brand-kit/_pipeline/check_artifacts.py --quiet` |
 | 构建期断言 | 8 处 | `python brand-kit/_pipeline/check_artifacts.py --list` 末段 |
 | 接线对账 | 27 条 | `node scripts/check-brand-assets.mjs` |
 | 生成器幂等 | 两次运行字节一致 | 连跑 5 件生成器后比对非 PDF 产物 sha |
