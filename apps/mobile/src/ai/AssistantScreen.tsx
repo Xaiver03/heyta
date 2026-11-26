@@ -219,6 +219,8 @@ export function AssistantScreen({
     () => ({
       settings,
       host: toolHost,
+      // 逐字回答：XHR 增量 + 闸门（`streaming-fetch.ts`）。失败有非流式重试兜底。
+      streamingFetch,
       // 陈述记忆：壳提供数据源，控制器只负责注入；`host` 为空时返回空数组（fail-closed）。
       memoryItems: () =>
         host === null ? [] : Object.values(host.getState().userMemories ?? {}),

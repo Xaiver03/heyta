@@ -73,6 +73,8 @@ export function intentText(intent: LocalApiWriteIntent, t: Translate, locale: Lo
       return t('web.ai.tools.intentCreateHabit', { name: intent.name });
     case 'create-tag':
       return t('web.ai.tools.intentCreateTag', { name: intent.name });
+    case 'remember-memory':
+      return t('web.ai.tools.intentRemember', { text: intent.text });
     case 'set-task-tags':
       // 说的是**换成几个**：这一条是整组覆盖，确认那一刻必须看见"这是替换"。
       return t('web.ai.tools.intentSetTaskTags', {

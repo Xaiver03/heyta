@@ -941,6 +941,31 @@ describe('流式：过程边跑边说（这是"过程可见"真正的形态）',
     expect(answer?.querySelector('[data-testid="ai-chat-steps"]')?.textContent).toContain('list_tasks');
   });
 
+  it('思考片段逐片可见：没有工具行时摘要说「思考中」', async () => {
+    const stream = streamFetch();
+    const el = await render({ host: fakeHost(), fetchImpl: stream.impl });
+    await type(el, '帮我看看');
+    await click(el, 'ai-assistant-send-button');
+    await click(el, 'ai-assistant-send');
+    await settle();
+
+    stream.push(0, JSON.stringify({ choices: [{ delta: { reasoning_content: '先看任务' } }] }));
+    await settle();
+
+    const live = el.querySelector('[data-testid="ai-chat-live"]');
+    expect(live?.textContent).toContain('思考中');
+    expect(live?.textContent).not.toContain('调用工具');
+    expect(el.querySelector('[data-testid="ai-chat-reasoning"]')?.textContent).toContain('先看任务');
+
+    stream.push(0, JSON.stringify({ choices: [{ delta: { content: '结论' } }] }));
+    stream.push(0, '[DONE]');
+    stream.finish(0);
+    await settle();
+    // 思考不落进最终气泡：它不是回答的一部分。
+    expect(el.querySelector('[data-testid="ai-chat-reasoning"]')).toBeNull();
+    expect(el.querySelector('[data-testid="ai-chat-assistant"]')?.textContent).toContain('结论');
+  });
+
   it('纯函数：增量拼接、同名收行（不再出现"配错行"）', () => {
     const started = reduceAssistantLive(undefined, { type: 'tool-started', tool: 'list_tasks', kind: 'read' });
     const text = reduceAssistantLive(

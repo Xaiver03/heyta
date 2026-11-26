@@ -265,6 +265,58 @@ describe('接线：控制器确实把 streamingFetch 传下去', () => {
     expect(routed['fetchImpl']).toBe(injected);
   });
 
+  it('给了 streamingFetch 时，deps 带 onEvent（过程才会逐片出现）', () => {
+    const { deps } = drive();
+    expect(typeof deps['onEvent']).toBe('function');
+  });
+
+  it('流式这一轮 routing-failed ⇒ 自动用非流式重试，最终回答仍落地', async () => {
+    const injected: typeof fetch = async () =>
+      new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } });
+    const failed: AssistantOutcome = {
+      ok: false,
+      reason: 'routing-failed',
+      message: '流式通道失败',
+      cause: undefined,
+      endpointUrl: undefined,
+      serverCode: undefined,
+      outsideFields: undefined,
+      health: {},
+    };
+    const ok: AssistantOutcome = { ok: true, kind: 'answer', text: '降级后的回答', steps: [], appended: [], health: {} };
+    appHostMocks.requestAssistantTurn.mockReset();
+    appHostMocks.captured.length = 0;
+    appHostMocks.requestAssistantTurn.mockResolvedValueOnce(failed).mockResolvedValueOnce(ok);
+
+    const controller = createChatController({
+      account: null,
+      storage: { getItem: () => null, setItem: () => undefined, removeItem: () => undefined },
+    });
+    controller.configure({
+      settings: routableSettings(),
+      host: {} as LocalApiHost,
+      localize: (key: string) => key,
+      secretStore: { get: async () => undefined },
+      managedTransport: async () => undefined,
+      resolveRouting: () => (routableSettings() as { routing: unknown }).routing as never,
+      onHealth: () => undefined,
+      streamingFetch: injected,
+    } as never);
+    controller.setDraft('问一句');
+    controller.send();
+    controller.confirmDisclosure();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(appHostMocks.captured).toHaveLength(2);
+    const retry = appHostMocks.captured[1] as Record<string, unknown>;
+    expect(retry['onEvent']).toBeUndefined();
+    expect(Object.hasOwn(retry['routed'] as object, 'fetchImpl')).toBe(false);
+    expect(
+      controller.getSnapshot().items.some((item) => item.role === 'assistant' && item.text.includes('降级后的回答')),
+    ).toBe(true);
+  });
+
   it('🔴 没给 streamingFetch ⇒ `routed` 里**没有** fetchImpl 这个键（走全局 fetch）', () => {
     /**
      * 条件展开的意义：没接线时那个键**不存在**，而不是 `undefined`。

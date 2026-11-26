@@ -3,6 +3,7 @@ import {
   assistantEgressFields,
   assistantGrants,
   confirmAiToolProposal,
+  reduceAssistantLive,
   requestAssistantTurn,
   resolveAiRoute,
   type AiSettingsState,
@@ -499,7 +500,14 @@ class MobileChatController implements ChatController {
       return;
     }
     try {
-      const outcome = await requestAssistantTurn(
+      /**
+       * 同一轮请求的两种形态：`streaming=true` 走 XHR 增量，`false` 走整份读取。
+       *
+       * 🔴 失败重试只用 `false`：XHR 通道在真机上曾整条失败（2026-11-21），
+       * 而"拿不到逐字"不该等于"拿不到回答"。一次非流式重试是这条的兜底。
+       */
+      const askTurn = (streaming: boolean) =>
+        requestAssistantTurn(
         { text, ...(images.length === 0 ? {} : { images }) },
         {
           routing: runtime.resolveRouting(),
@@ -509,6 +517,14 @@ class MobileChatController implements ChatController {
           localize: runtime.localize,
           executionId: `${this.executionPrefix}:${String(this.executionNumber)}`,
           history,
+          ...(streaming && runtime.streamingFetch !== undefined
+            ? {
+                onEvent: (event: Parameters<typeof reduceAssistantLive>[1]) => {
+                  if (epoch !== this.accountEpoch) return;
+                  this.update({ live: reduceAssistantLive(this.state.live, event) });
+                },
+              }
+            : {}),
           memory: {
             enabled: runtime.settings.memoryEnabled === true,
             items: runtime.memoryItems?.() ?? [],
@@ -557,16 +573,21 @@ class MobileChatController implements ChatController {
              * 时都退回整份读取或抛闸门错误 —— 与接线前的行为一致，
              * 只是没有逐字。见 `streaming-fetch.ts` 文件头。
              */
-            ...(runtime.streamingFetch === undefined
-              ? {}
-              : { fetchImpl: runtime.streamingFetch }),
+            ...(streaming && runtime.streamingFetch !== undefined
+              ? { fetchImpl: runtime.streamingFetch }
+              : {}),
           },
         },
       );
+      const outcome = await askTurn(true);
+      const finalOutcome =
+        !outcome.ok && outcome.reason === 'routing-failed' && runtime.streamingFetch !== undefined
+          ? await askTurn(false)
+          : outcome;
       if (epoch !== this.accountEpoch) return;
-      runtime.onHealth(outcome.health);
+      runtime.onHealth(finalOutcome.health);
       if (usedMemory.length > 0) this.append({ role: 'memory', items: [...usedMemory] });
-      this.appendOutcome(outcome);
+      this.appendOutcome(finalOutcome);
     } catch (error: unknown) {
       if (epoch !== this.accountEpoch) return;
       this.append({
