@@ -618,3 +618,5 @@ node scripts/ticktick-coverage-report.mjs --fix  # 按五档规则回填档列
 > 结论：B 档剩下的不是「没去找」，是**滴答桌面这几屏要么不存在、要么点不进去**；已在 §3 表逐格标靶子状态，不冒充已采。
 
 > **（2026-11-26 续作实测复核）** TickTick 当前为**菜单栏常驻、无窗口**：`CGWindowListCopyWindowInfo` 前台窗口 0 个、`System Events` 对 TickTick 的 `count of windows` = 0、`open -a TickTick` 也不新建窗口（进程在跑、pid 有）。⇒ 桌面靶子要补，**必须先由人打开滴答主窗并切到目标屏**；无窗口状态下工具截不到，也**不会**盲发 ⌘N/⌘1 之类按键去改动用户真实任务数据。这是「补齐桌面一手靶子」唯一的卡点。
+
+> **（2026-11-26 截图去重复核）** `.local/ticktick-teardown/mac/` 39 个 png 按内容 sha 实为 **32 张唯一图**（重复组：`r2-all2`=`r2-assigned`=`r2-summary2`；`r2-healthcheck`=`r2-print`=`r2-viewmenu`；`r2-list`=`r2-list2`；`mac-w3`=`mac-w4`；`mac-settings-pop2`=`mac-settings-popover`）。我逐张核对与 B 档相关的候选：`r2-trash`=#17、`r2-assigned`=#15（本轮据此升级）、`mac-calendar`=#38 全宽月历、`mac-sidebar-scroll2`=#22 详情、`r2-listA`=#20 文件夹；`r2-summary*/r2-print/r2-viewmenu/r2-all` 实为 trash/today/assigned 的重复或误命名。⇒ **现有截图里未发现剩余 B 档（#5/#13/#31/#39/#44/#58/#66/#75）的新靶子**；未逐一复核的少数唯一图（`mac-w1–w5`、`r2-panel102109`、`r2-tasklist`、`r2-viewmenu2`）经抽样属窗口/详情/清单变体。结合上方「桌面无此独立屏」判定，「翻现有截图补 B 档」这条路已基本穷尽。
