@@ -347,7 +347,7 @@ AI 记忆
 | 自动抽取（M9） | ⬜ 未做 | 待拍板（§10 第 2 条） |
 | 助手读写记忆工具（M10） | ⬜ 未做 | 已登记 `AI-COV-10` |
 | 编辑条目的界面 | ⬜ 未做 | action 已支持 `update`，界面只有增/删 |
-| 移动端注入 | ⬜ 未做 | 移动端尚未把 `memory` 传给 `requestAssistantTurn`（fail-closed：不传 = 不注入） |
+| 移动端注入 | ✅ | `ChatRuntime.memoryItems` + `runTurn` 传 `memory`，壳从 `host.getState().userMemories` 取；`memoryEnabled=false` 时仍不注入 |
 
 **已跑的判据**：`domain` 1412+25；`app-host` 的 `user-memory-actions` 12 + `assistant-memory` 6；`web` 的 `user-memory-store` 6（op 落盘 → 物化可见）、`memory-panel` 39、`assistant-history` 19、`ai-assistant-panel` 32、`ai-assistant-disclosure` 11；`check:ui-language`、`check:i18n-vars`、`check:design-token-refs`、`check:theme`、`check:control-semantics`、`check:settings-row-anatomy`、`check:layering`、`check:ai-coverage` 全绿。
 

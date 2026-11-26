@@ -26,6 +26,7 @@ import {
   type AssistantSessionInput,
   type LoadedAssistantSession,
 } from '@heyta/app-host';
+import type { UserMemory } from '@heyta/domain';
 import {
   fromHealthSnapshot,
   IMAGE_BUDGET,
@@ -50,6 +51,13 @@ export interface ChatSessionMeta {
 export interface ChatRuntime {
   readonly settings: AiSettingsState;
   readonly host: LocalApiHost | null;
+  /**
+   * 读取陈述记忆（`USER_MEMORY`）。省略 = 不注入（fail-closed）。
+   *
+   * 宿主提供而不是控制器读 store：控制器在移动端是 UI 层哑组件，
+   * 数据来源由壳注入（与 `settings` / `host` 同一条缝）。
+   */
+  readonly memoryItems?: () => readonly UserMemory[];
   readonly localize: LocalObservationTranslate;
   readonly secretStore: SecretStore;
   /**
@@ -468,6 +476,8 @@ class MobileChatController implements ChatController {
     const host = runtime.host;
     this.sendInFlight = true;
     const epoch = this.accountEpoch;
+    /** 本轮真进了 prompt 的记忆；宿主拼 system 时回调。 */
+    const usedMemory: { id: string; kind: string; text: string }[] = [];
     /**
      * 🔴 开跑就先清空 live：上一轮的残留过程行留在屏上会让用户
      * 以为"这一轮已经在调工具了"，而其实一个字节都还没发。
@@ -499,6 +509,17 @@ class MobileChatController implements ChatController {
           localize: runtime.localize,
           executionId: `${this.executionPrefix}:${String(this.executionNumber)}`,
           history,
+          memory: {
+            enabled: runtime.settings.memoryEnabled === true,
+            items: runtime.memoryItems?.() ?? [],
+          },
+          onMemoryUsed: (items) => {
+            usedMemory.splice(
+              0,
+              usedMemory.length,
+              ...items.map((m) => ({ id: m.id, kind: m.kind, text: m.text })),
+            );
+          },
           now: routeTime,
           /**
            * 🔴 流式事件 → `live`。**给了这个才有流**（`routing.ts:770` 的
@@ -544,6 +565,7 @@ class MobileChatController implements ChatController {
       );
       if (epoch !== this.accountEpoch) return;
       runtime.onHealth(outcome.health);
+      if (usedMemory.length > 0) this.append({ role: 'memory', items: [...usedMemory] });
       this.appendOutcome(outcome);
     } catch (error: unknown) {
       if (epoch !== this.accountEpoch) return;
@@ -791,7 +813,7 @@ function createDisclosureFingerprint(runtime: ChatRuntime, routeTime: number): s
     { health: fromHealthSnapshot(runtime.settings.health, routeTime) },
   );
   return JSON.stringify({
-    fields: assistantEgressFields(),
+    fields: assistantEgressFields({ memory: runtime.settings.memoryEnabled === true }),
     target: route.target,
     routing: runtime.resolveRouting(),
   });
