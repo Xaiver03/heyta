@@ -5306,6 +5306,7 @@ export const en = {
   'common.entity.CALENDAR_EVENT': 'Calendar event',
   'common.entity.SECTION': 'Section',
   'common.entity.FILTER': 'Saved filter',
+  'common.entity.TASK_TEMPLATE': 'Task template',
   'common.entity.GLOBAL_CONFIG': 'Global settings',
   'common.entity.MIGRATION': 'Data migration',
   'common.entity.RECOVERY': 'Disaster recovery',

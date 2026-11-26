@@ -505,6 +505,7 @@ export type EntityLabelKey =
   | 'common.entity.CALENDAR_EVENT'
   | 'common.entity.SECTION'
   | 'common.entity.FILTER'
+  | 'common.entity.TASK_TEMPLATE'
   | 'common.entity.USER_MEMORY'
   | 'common.entity.GLOBAL_CONFIG'
   | 'common.entity.MIGRATION'
@@ -538,6 +539,7 @@ export const ENTITY_LABEL_KEYS: Record<string, EntityLabelKey> = {
   CALENDAR_EVENT: 'common.entity.CALENDAR_EVENT',
   SECTION: 'common.entity.SECTION',
   FILTER: 'common.entity.FILTER',
+  TASK_TEMPLATE: 'common.entity.TASK_TEMPLATE',
   USER_MEMORY: 'common.entity.USER_MEMORY',
   GLOBAL_CONFIG: 'common.entity.GLOBAL_CONFIG',
   MIGRATION: 'common.entity.MIGRATION',

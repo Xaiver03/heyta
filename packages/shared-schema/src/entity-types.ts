@@ -213,6 +213,27 @@ export const ENTITY_TYPES = [
    */
   'SECTION',
 
+  // ── 任务模板（用户自建，ADR-0093） ─────────────────────────
+  /**
+   * 用户保存的**任务模板**（「保存任务为模板 / 从模板建任务」）。
+   *
+   * 🔴 **为什么是独立实体、而不是 `GLOBAL_CONFIG` 里的一个数组**：
+   * `GLOBAL_CONFIG` 在 `packages/op-log/src/state.ts` 的 `UNMODELED_ENTITY_TYPES` 里
+   * 登记为「全局配置，有意落在物化状态之外（不是用户数据）」—— 它**不物化**，所以
+   * 存进去的模板既不会被 reducer 读回来、也不会进导出 / 还原；而数组在 LWW 下是
+   * **覆盖语义**，两台设备各存一个模板会互相吞（`ASSISTANT_TURN` / `FILTER` 逐字同一条
+   * 推理）。模板由用户起名、用户填内容，推不出来 ⇒ **是用户数据**，必须走实体
+   * （ADR-0092 §2.1 已经把这条判死）。
+   *
+   * ⚠️ **可加性变更，不 bump `CURRENT_SCHEMA_VERSION`**（AGENTS §3.3）：老客户端读到
+   * `TASK_TEMPLATE` 的 op 会当未知实体优雅跳过，不会卡住同步。
+   * 🔴 **服务端必须先于客户端上线** —— 老服务端的白名单（从本数组派生）里没有它，
+   * 会把该 op 判成 `INVALID_ENTITY_TYPE` 永久拒绝（ADR-0089 §2.1 的硬顺序）。
+   * ⚠️ 进 `EntityModelMap` 那天 `check:ai-coverage` 分母 +1：本批按
+   * `ENTITY_COVERAGE_DEBT` 登记缺口（模板的 AI 读写工具随后续一刀补）。
+   */
+  'TASK_TEMPLATE',
+
   // ── 系统（同步基础设施，不可删） ───────────────────────────
   'GLOBAL_CONFIG',
   'MIGRATION',

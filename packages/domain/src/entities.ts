@@ -1440,6 +1440,53 @@ export interface Section extends EntityBase {
 }
 
 /**
+ * 用户保存的**任务模板**（「保存任务为模板 / 从模板建任务」，ADR-0093）。
+ *
+ * 🔴 **它是用户数据实体，不是视图、也不是 `GLOBAL_CONFIG` 里的一条配置**：
+ * 模板由「用户起的名字 + 用户填的内容」组成，二者都推不出来 —— 与 `Filter`
+ * （用户命名 + 用户填规则）、`PREFERENCE_CORRECTION`、`Comment` 同一条推理。
+ * `GLOBAL_CONFIG` 不物化（`op-log/src/state.ts` 的 `UNMODELED_ENTITY_TYPES`），
+ * 存进去既读不回来也不进导出/还原；数组又是 LWW 覆盖语义 ⇒ 必须走实体。
+ *
+ * 🔴 **模板只存"建任务时要预填的那几格"，不存一个 `Task` 快照。**
+ * 尤其**不存** `projectId` / `dueDate` / `completedAt` / `parentId` / `repeatRule`
+ * 等"某条具体任务此刻的状态"：那些是创建任务那一步由用户（或模板来源）决定的东西，
+ * 存进模板会让"从模板建任务"凭空继承一个截止日/清单，且这些字段的运行时语义
+ * （时区、重复锚点）在模板里没有对应上下文。
+ *
+ * ⚠️ 内容字段**全部可选 + 运行时默认**（AGENTS §3.3）：这个实体类型以前不存在，
+ * 上线后第一批落库的载荷形状取决于写它的那个构建版本；把 `title` 之类做成必填，
+ * 症状是"某条老模板在 hydration 时炸掉整个模板面板"，而 typecheck 与构建都会绿。
+ * `name`（模板名）是身份的一部分（没有名字就不是一个能挑的模板），必填 ——
+ * 与 `Filter.name` / `Section.name` 同一先例。
+ */
+export interface TaskTemplate extends EntityBase {
+  /** 模板名（"周报""出差打包"）—— 用户挑模板时看到的那个名字。必填。 */
+  name: string;
+  /** 从模板建任务时要预填的标题；缺席 = 用 `name` 兜底（见 `template-task-fields.ts`）。 */
+  title?: string;
+  /** 备注（Markdown）。 */
+  note?: string;
+  /** 优先级（`Priority.None` 也算"显式设为无"，缺席 = 不预填）。 */
+  priority?: Priority;
+  /** 是否标记为重要。 */
+  important?: boolean;
+  /** 预填标签（按 id；建任务时按当前仍存活的标签过滤一遍，见 `template-task-fields.ts`）。 */
+  tagIds?: string[];
+  /**
+   * 预填的清单条目（**只存文本 + 是否勾选**，不存条目 id）。
+   *
+   * 🔴 不存 `TaskChecklistItem.id`：那个 id 是"某条任务里某一条勾选项"的定位键，
+   * 从模板建一条新任务时会重新生成；把旧 id 带过来只会得到一组指向不存在的键。
+   */
+  checklist?: { text: string; done: boolean }[];
+  /** 预填的排期时长（分钟，正整数）。 */
+  durationMinutes?: number;
+  /** 模板列表的排序键；可选 + 运行时默认（`aliveTemplates` 用 `createdAt` 兜底）。 */
+  order?: number;
+}
+
+/**
  * 实体类型 → 领域模型 的映射。
  * 用于 op-log 的 apply 阶段做类型收窄。
  */
@@ -1462,6 +1509,7 @@ export interface EntityModelMap {
   ATTACHMENT: Attachment;
   FILTER: Filter;
   SECTION: Section;
+  TASK_TEMPLATE: TaskTemplate;
 }
 
 export type ModeledEntityType = keyof EntityModelMap;
@@ -1497,6 +1545,7 @@ export const MODELED_ENTITY_TYPES = [
   'ATTACHMENT',
   'FILTER',
   'SECTION',
+  'TASK_TEMPLATE',
 ] as const satisfies readonly ModeledEntityType[];
 
 /** 编译期兜底：清单漏掉 `EntityModelMap` 的任何一个键都会让这里类型错误。 */
