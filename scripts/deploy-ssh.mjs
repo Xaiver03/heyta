@@ -80,7 +80,11 @@ const run = (bin, a, o = {}) => {
   const r = spawnSync(bin, a, { encoding: 'utf8', cwd: REPO, maxBuffer: 64 * 1024 * 1024, ...o });
   return { status: r.status ?? 127, stdout: r.stdout || '', stderr: r.stderr || '' };
 };
-const ssh = (c, o = {}) => run('ssh', ['-o', 'ConnectTimeout=20', '-o', 'BatchMode=yes', HOST, c], o);
+// 🔴 沙箱环境（DSH workspace-write）里 ~/.ssh 不可写：OpenSSH 默认 ControlMaster 会在
+// `~/.ssh/cm-*.sock` 建会话复用 socket，报 `unix_listener: cannot bind ... Operation not permitted`。
+// 这里显式关掉复用（ControlMaster=no / ControlPath=none），行为与逐条直连逐字相同。
+const SSH_OPTS = ['-o', 'ConnectTimeout=20', '-o', 'BatchMode=yes', '-o', 'ControlMaster=no', '-o', 'ControlPath=none'];
+const ssh = (c, o = {}) => run('ssh', [...SSH_OPTS, HOST, c], o);
 const die = (step, detail, extra = '') => {
   console.log(`\n🔴 ${step}\n   ${detail}`);
   if (extra) console.log(extra);
@@ -335,7 +339,7 @@ if (!DRY && SANDBOX) pruneSandboxRuns();
  * ⇒ 先清后建；下面解包之后再补一条**树级**对账（字节对 ≠ 树对）。
  */
 ssh(`rm -rf ${DIR}/src && mkdir -p ${DIR}/src`);
-const sc = run('scp', ['-q', '-o', 'ConnectTimeout=20', tar, `${HOST}:${DIR}/src.tar.gz`]);
+const sc = run('scp', ['-q', '-o', 'ConnectTimeout=20', '-o', 'ControlMaster=no', '-o', 'ControlPath=none', tar, `${HOST}:${DIR}/src.tar.gz`]);
 if (!DRY && sc.status !== 0) die('步骤 3（scp）', `rc=${sc.status}`, sc.stderr.slice(0, 300));
 const rr = ssh(`cd ${DIR} && sha256sum src.tar.gz | cut -d" " -f1`);
 const remoteSha = (rr.stdout || '').trim();
