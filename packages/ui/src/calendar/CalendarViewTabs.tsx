@@ -41,29 +41,38 @@ import type { HeytaNativeTokens } from '@heyta/design-system';
 import { useHeytaText, useHeytaTokens } from '../theme.js';
 import type { CalendarViewKind } from './model.js';
 
-export interface CalendarViewTabsLabels {
+export interface CalendarViewTabsLabels<T extends string = CalendarViewKind> {
   /** 整组的名字（读屏用户先听到"视图"，再听到三个选项）。 */
   group: string;
   /** 档位名。由宿主从 i18n 取 —— 共享层不许 `import '@heyta/i18n'`。 */
-  name: (view: CalendarViewKind) => string;
+  name: (view: T) => string;
 }
 
-export interface CalendarViewTabsProps {
-  view: CalendarViewKind;
+/**
+ * 档位类型 `T` 默认 `CalendarViewKind`，并允许宿主传入**本端自己的一档**（如 Web 的「课程表」）。
+ *
+ * 🔴 为什么不把「课程表」塞进 `CalendarViewKind`：那个联合类型是"两端共用的日历档位",
+ *   往里加一档会波及 `CalendarBoard` / `stepCalendarCursor` / 两个宿主的 Record 映射（移动端
+ *   同样是把它扩在本地 `MobileCalendarView` 里、共享 `CalendarViewKind` 原样不动）。
+ *   分段控件只是"把这几个真能切过去的档画成一排按钮",它本就不该假定档位一定是那四个。
+ *   这里的泛型**不放松任何判据**：`options` 仍只渲染宿主给的那些档，一个都不补。
+ */
+export interface CalendarViewTabsProps<T extends string = CalendarViewKind> {
+  view: T;
   /** 这个宿主**真的能切过去**的档位。顺序就是渲染顺序。 */
-  options: readonly CalendarViewKind[];
-  onViewChange: (view: CalendarViewKind) => void;
-  labels: CalendarViewTabsLabels;
+  options: readonly T[];
+  onViewChange: (view: T) => void;
+  labels: CalendarViewTabsLabels<T>;
   testID?: string;
 }
 
-export function CalendarViewTabs({
+export function CalendarViewTabs<T extends string = CalendarViewKind>({
   view,
   options,
   onViewChange,
   labels,
   testID = 'calendar-view-tabs',
-}: CalendarViewTabsProps): React.JSX.Element | null {
+}: CalendarViewTabsProps<T>): React.JSX.Element | null {
   const tokens = useHeytaTokens();
   const text = useHeytaText();
   const styles = useMemo(() => makeStyles(tokens), [tokens]);

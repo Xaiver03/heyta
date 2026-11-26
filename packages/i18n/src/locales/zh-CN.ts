@@ -3246,6 +3246,15 @@ export const zhCN = {
   'web.capture.placeholderToDay': '添加到 {day}',
   'web.calendar.capture.add': '往选中那天加一条',
   'web.calendar.capture.close': '收起输入框',
+  // 课表视图（日历的一档，像滴答「课表」）：课程名/地点/时段；空态只写事实。
+  'web.calendar.view.timetable': '课程表',
+  'web.calendar.timetable.empty': '本周没有课程',
+  'web.calendar.timetable.period': '第 {n} 节',
+  'web.calendar.timetable.import': '导入课表',
+  'web.calendar.timetable.importEmpty': '没有识别到课程',
+  'web.calendar.timetable.importResult': '已导入 {created} 门课程',
+  'web.calendar.timetable.importResultSkipped': '已导入 {created} 门课程，跳过 {skipped} 行',
+  'web.calendar.timetable.importFailed': '导入失败，请重试',
   // 飞书日程（阶段 A）：外部日程只读；标签是本地唯一可写的一格。
   'web.calendar.hub.title': '飞书日程',
   'web.calendar.hub.baseUrl': 'Hub 地址',

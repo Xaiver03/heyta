@@ -363,6 +363,111 @@
   min-height: 0;
 }
 
+/* ── 课程表（Web 日历的一档，#54）────────────────────────────────────────
+   挂在 `.ht-content` 族下：`check:row-single-source` 的 `ht-*` 顶层族基线只许下降，
+   新视图不许长出新族（与 `.ht-content__calendar-host` 同一条纪律）。
+   颜色/间距/圆角/字号全走 token（`check:design` 拦裸值；`check:design-token-refs` 校验可解析）。 */
+.ht-content__cal-timetable {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.ht-content__cal-timetable-import {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--ht-space-2);
+  padding-block: var(--ht-space-2);
+}
+.ht-content__cal-timetable-import-status {
+  font-size: var(--ht-font-size-xs);
+  color: var(--ht-color-foreground-muted);
+}
+.ht-content__cal-timetable-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.ht-content__cal-timetable-grid {
+  display: grid;
+  grid-template-columns: var(--ht-space-12) repeat(7, minmax(0, 1fr));
+  gap: var(--ht-border-width-thin);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-border-subtle);
+  overflow: hidden;
+}
+/* 每"节"一行用 `display: contents`，让它的 8 个子项直接参与外层网格（表头 + 7 天对齐）。 */
+.ht-content__cal-timetable-row {
+  display: contents;
+}
+.ht-content__cal-timetable-corner {
+  background: var(--ht-color-surface-subtle);
+}
+.ht-content__cal-timetable-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--ht-space-1);
+  padding: var(--ht-space-2) var(--ht-space-1);
+  background: var(--ht-color-surface-subtle);
+}
+.ht-content__cal-timetable-head--today {
+  background: var(--ht-color-primary-subtle);
+}
+.ht-content__cal-timetable-weekday {
+  font-size: var(--ht-font-size-xs);
+  font-weight: var(--ht-font-weight-medium);
+  color: var(--ht-color-foreground-muted);
+}
+.ht-content__cal-timetable-dom {
+  font-size: var(--ht-font-size-sm);
+  color: var(--ht-color-foreground);
+}
+.ht-content__cal-timetable-period {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ht-space-1);
+  padding: var(--ht-space-2) var(--ht-space-1);
+  background: var(--ht-color-surface-subtle);
+}
+.ht-content__cal-timetable-period-num {
+  font-size: var(--ht-font-size-2xs);
+  color: var(--ht-color-foreground-subtle);
+}
+.ht-content__cal-timetable-period-time {
+  font-size: var(--ht-font-size-xs);
+  color: var(--ht-color-foreground-muted);
+}
+.ht-content__cal-timetable-cell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+  min-height: var(--ht-space-12);
+  padding: var(--ht-space-1);
+  background: var(--ht-color-surface);
+}
+.ht-content__cal-timetable-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-0);
+  padding: var(--ht-space-1) var(--ht-space-2);
+  border-radius: var(--ht-radius-sm);
+  background: var(--ht-color-primary-subtle);
+}
+.ht-content__cal-timetable-name {
+  font-size: var(--ht-font-size-xs);
+  font-weight: var(--ht-font-weight-medium);
+  color: var(--ht-color-primary);
+}
+.ht-content__cal-timetable-meta {
+  font-size: var(--ht-font-size-2xs);
+  color: var(--ht-color-foreground-muted);
+}
+
 /* 日历格点击后的快速新建：复用现有 CaptureComposer，浮在月历上方，
    不把六行网格再向下推；锚点日由 composer 的 placeholder 明确告知。 */
 .ht-content__calendar-capture {

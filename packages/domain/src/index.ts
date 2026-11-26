@@ -49,6 +49,7 @@ export * from './trash-rows.js';
 export * from './search.js';
 export * from './habit-streak.js';
 export * from './course-import.js';
+export * from './timetable.js';
 export * from './habit-resilience.js';
 export * from './habit-icons.js';
 export * from './habit-backfill.js';
