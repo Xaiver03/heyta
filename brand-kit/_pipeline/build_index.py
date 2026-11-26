@@ -63,6 +63,7 @@ def add(img,title,sub,href):
     else:
         raise SystemExit(f"索引要引用的图不存在：{img}（改名/删文件后要同步这里）")
 add("02-badges/badge-catalogue.png","成长标识体系图鉴",f"{_N_MS} 里程碑 · {_N_TAGS} 身份标签 · {_N_CAT} 分类色槽","02-badges/badge-catalogue.pdf")
+add("02-badges/badge-catalogue.png","图鉴 · A4 印刷版","A4 竖版 · 交印厂用","02-badges/badge-catalogue-A4.pdf")
 add("00-brand-foundation/_preview/page-01.png","品牌手册 Brand Book",(f"{_BOOK_PAGES} 页 · 标识/色彩/字体/成长" if _BOOK_PAGES else "标识/色彩/字体/成长"),"00-brand-foundation/brand-book.pdf")
 add("01-logo/lockup-horizontal@1x.png","字标 + 图标锁版","「hey.」+「h」","01-logo/lockup-horizontal.svg")
 add("03-icons/icon-sheet.png","图标集 Icon Set",f"线性 {_N_ICONS} 枚","03-icons/icon-sheet.html")

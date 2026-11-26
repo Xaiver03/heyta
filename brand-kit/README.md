@@ -11,11 +11,11 @@
 
 ## 自检判据一览（`python _pipeline/check_artifacts.py`）
 
-耗时：全套 44 组约 **0.4s**（`--quiet` 实测 0.42s），对 `pnpm check` 可忽略。
+耗时：全套 45 组约 **0.4s**（`--quiet` 实测 0.42s），对 `pnpm check` 可忽略。
 
 **失败即给修复命令**：每条失败会按类别打印「修：python .../build_xxx.py」，不用再翻文档。
 
-三种输出：默认人读；`--list` 按「读代码 / 读产物 / 读文档」三组列出 44 组判据，并附 8 处构建期断言；`--quiet` 只在失败时说话并给一行汇总（给 CI 用）；
+三种输出：默认人读；`--list` 按「读代码 / 读产物 / 读文档」三组列出 45 组判据，并附 8 处构建期断言；`--quiet` 只在失败时说话并给一行汇总（给 CI 用）；
 `--json` 输出 `{ok, passed, failed, checks|errors, remedies}`（给流水线解析用，stdout 保证是纯 JSON）。
 
 已挂在 `check` 链上：`pnpm check:brand-kit`（紧跟 `check:brand-assets`）。
@@ -66,6 +66,7 @@
 | 42 | 文档里的 `docs/…​.md §N` 引用文件与章节都在 | 被引文档搬去 archive 后成死链 |
 | 43 | 二维码分支真的产出二维码（有 segno 时） | 分支恒抛异常→恒走文字兜底，页面上没有可扫的码 |
 | 44 | 04-imagery 素材库：登记数=副标题数、总览图在位 | 素材只在盘上、索引里看不见 |
+| 45 | 10 份 PDF 纸型（含图鉴 A4 印刷版） | 交印厂拿到非 A4 页面 |
 
 ⚠️ **PDF 每次重建字节都不同**（Chrome 打印头里带时间戳/文档 ID），PNG 与 SVG 是稳定的。
 所以比对 PDF 时看页数/字体/视觉，不要看 sha256 —— 否则每次都会以为「有改动」。
@@ -94,7 +95,6 @@
 
 | 事项 | 现状 | 需要你定 | 影响面 |
 |---|---|---|---|
-| 图鉴要不要一版 A4 印刷版 | 4:5 数字版（1200×1500），PDF 仅供浏览 | 是否要 A4 印刷版 | 需重排版，约 1 页 |
 | 二维码要不要真码 | 缺 `segno` 库时印官网域名文字 | 是否同意装 `segno` 生成真二维码 | 装库即可，无网络依赖 |
 | 动效「变化才播」是否要录屏 | 只有静态稿与 SVG | 是否要录屏演示 | 需真机/模拟器录制 |
 
@@ -127,7 +127,7 @@
 |---|---|---|
 | `00-brand-foundation/` | `brand-tokens.json/.css` + `brand-book.pdf`（8 页）+ `_preview/page-01..08.png` | ✅ |
 | `01-logo/` | 字标（blue/deep/ink/white）、app-icon、icon-mono/brand、横/竖锁版 + PNG | ✅ |
-| `02-badges/` | ⚠️ **图鉴是 4:5 数字版（1200×1500），PDF 只作浏览、不作印刷件**；其余物料均为 A4/A3 |
+| `02-badges/` | **图鉴两版并存**：`badge-catalogue.pdf` 是 4:5 数字版（1200×1500，屏幕浏览）；`badge-catalogue-A4.pdf` 是 A4 竖版（交印厂）。其余物料均为 A4/A3 |
 | `02-badges/` | **成长标识体系**：17 里程碑（`milestones/`）+ 8 身份标签（`identity/`）+ 8 分类色槽（`category/`）+ 5 状态胶囊（`status/`）+ `badge-catalogue.html/png/pdf` | ✅ |
 | `03-icons/` | 线性图标 26（`*.svg`）+ `icon-sheet.html/png` | ✅ |
 | `04-imagery/` | 本地 MOSS-Image 生成：2 背景 + 2 插画 + 3 周边（含笔记本）+ `contact-sheet.png` | ✅ |

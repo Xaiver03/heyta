@@ -173,6 +173,7 @@ if shutil.which("pdffonts") and shutil.which("pdfinfo"):
     expect_pages = {
         "brand-book.pdf": 8,
         "badge-catalogue.pdf": 1,
+        "badge-catalogue-A4.pdf": 1,
         "01_品牌主视觉.pdf": 1,
         "02_核心能力.pdf": 1,
         "03_成长里程碑.pdf": 1,
@@ -912,7 +913,7 @@ INDEX_HTML = os.path.join(WD, "index.html")
 if os.path.exists(INDEX_HTML):
     idx = open(INDEX_HTML, encoding="utf-8").read()
     REQUIRED_TITLES = [
-        "成长标识体系图鉴", "品牌手册", "字标 + 图标锁版", "图标集", "04 位图素材",
+        "成长标识体系图鉴", "图鉴 · A4 印刷版", "品牌手册", "字标 + 图标锁版", "图标集", "04 位图素材",
         "品牌主视觉海报", "核心能力海报", "成长里程碑海报", "宣传折页", "产品手册",
         "品牌周边", "社交 OG 卡片", "社交方图", "幻灯片模板", "更新日志卡",
         "色彩系统", "活动分类色卡",
@@ -1025,6 +1026,7 @@ SIZE_EXPECT = {
     "08-merch/merch-sheet.pdf": (594.96, 841.92, "A4 竖"),
     # 图鉴是 4:5 **数字版**（1200×1500），PDF 只作浏览、不作印刷件 —— 见 README
     "02-badges/badge-catalogue.pdf": (900.0, 1125.12, "4:5 数字版"),
+    "02-badges/badge-catalogue-A4.pdf": (594.96, 841.92, "A4 竖·印刷版"),
 }
 if _sh.which("pdfinfo"):
     bad_size = []
@@ -1043,7 +1045,7 @@ if _sh.which("pdfinfo"):
     if bad_size:
         fail(f"PDF 纸型不符：{bad_size}")
     else:
-        emit(f"✅ {len(SIZE_EXPECT)} 份 PDF 纸型符合设计（A4×5 / A3×3 / 图鉴 4:5 数字版）")
+        emit(f"✅ {len(SIZE_EXPECT)} 份 PDF 纸型符合设计（A4×6 / A3×3 / 图鉴 4:5 数字版）")
 
 # 38) 手册预览图数量 = 手册页数（_preview 少一页 = 索引里看到的册子缺页）
 PREVIEW_DIR = os.path.join(WD, "00-brand-foundation/_preview")

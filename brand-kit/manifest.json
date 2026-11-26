@@ -1,10 +1,10 @@
 {
   "brand": "heyta",
-  "generated_at": "2026-11-26T10:46:19+08:00",
+  "generated_at": "2026-11-26T12:05:14+08:00",
   "dirs": {
     "00-brand-foundation": 11,
     "01-logo": 22,
-    "02-badges": 70,
+    "02-badges": 71,
     "03-icons": 28,
     "04-imagery": 9,
     "05-posters": 6,
@@ -14,11 +14,11 @@
     "09-social": 3,
     "10-templates": 2
   },
-  "count": 163,
+  "count": 164,
   "files": [
     {
       "path": "index.html",
-      "size": 5109
+      "size": 5120
     },
     {
       "path": "成就与成长体系_产品清单.md",
@@ -26,7 +26,7 @@
     },
     {
       "path": "README.md",
-      "size": 13175
+      "size": 13427
     },
     {
       "path": "manifest.json",
@@ -39,6 +39,10 @@
     {
       "path": "02-badges/badge-catalogue.pdf",
       "size": 790663
+    },
+    {
+      "path": "02-badges/badge-catalogue-A4.pdf",
+      "size": 793333
     },
     {
       "path": "02-badges/README-待重建.md",
