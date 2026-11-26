@@ -105,7 +105,7 @@ export function generateNoiseSamples(
       out[i] = last;
       if (Math.abs(last) > peak) peak = Math.abs(last);
     }
-    for (let i = 0; i < length; i += 1) out[i] = out[i] / peak;
+    for (let i = 0; i < length; i += 1) out[i] = (out[i] ?? 0) / peak;
     return out;
   }
 

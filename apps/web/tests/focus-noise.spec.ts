@@ -39,7 +39,7 @@ function seeded(seed: number): () => number {
 
 function meanAbsDiff(samples: Float32Array): number {
   let sum = 0;
-  for (let i = 1; i < samples.length; i += 1) sum += Math.abs(samples[i] - samples[i - 1]);
+  for (let i = 1; i < samples.length; i += 1) sum += Math.abs((samples[i] ?? 0) - (samples[i - 1] ?? 0));
   return sum / (samples.length - 1);
 }
 

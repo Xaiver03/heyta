@@ -50,7 +50,7 @@ export function useNoisePlayer({ enabled, kind, volume }: NoisePlayerOptions): v
 
     const preset = NOISE_PRESETS[kind];
     const buffer = ctx.createBuffer(1, Math.max(1, Math.floor(ctx.sampleRate * LOOP_SECONDS)), ctx.sampleRate);
-    buffer.copyToChannel(generateNoiseSamples(kind, ctx.sampleRate, LOOP_SECONDS), 0);
+    buffer.copyToChannel(generateNoiseSamples(kind, ctx.sampleRate, LOOP_SECONDS) as Float32Array<ArrayBuffer>, 0);
 
     const source = ctx.createBufferSource();
     source.buffer = buffer;
