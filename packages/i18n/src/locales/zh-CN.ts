@@ -1723,6 +1723,16 @@ export const zhCN = {
   'web.focus.config.locked': '计时进行中不能改时长 —— 先中止本轮，改完再开始。',
   'web.focus.config.a11y.minutes': '{label}时长，单位分钟',
   'web.focus.config.a11y.sessions': '{label}，单位个数',
+  // 白噪音（覆盖图谱 #51）：现场合成，不引音频素材。只有控件本身的词，无说明文字。
+  'web.focus.noise.title': '白噪音',
+  'web.focus.noise.on': '开',
+  'web.focus.noise.off': '关',
+  'web.focus.noise.kindLabel': '噪声种类',
+  'web.focus.noise.kind.rain': '雨声',
+  'web.focus.noise.kind.white': '白噪音',
+  'web.focus.noise.kind.brown': '棕噪音',
+  'web.focus.noise.volume': '音量',
+
   // 工单 W7：专注详情面（四张概览卡 + 专注记录列表）。
   // ⚠️ 卡上的标签**不带数量**，数字单独一格 —— 那样英文不需要为「1 session / 3 sessions」
   // 再开一对兄弟词条，而 `web.focus.completedTodayOne` 那种成对词条的存在理由在这里不成立。

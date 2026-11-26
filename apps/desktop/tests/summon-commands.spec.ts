@@ -20,19 +20,19 @@ import {
   mapTrayActions,
 } from '../src/summon-commands.js';
 
-/** 五个动作各换一个可辨识的假实现：谁被叫到，断言就知道。 */
+/** 六个动作各换一个可辨识的假实现：谁被叫到，断言就知道。 */
 function fakeTargets(): Record<string, () => void> & { calls: string[] } {
   const calls: string[] = [];
-  const names = ['toggleMainWindow', 'openQuickAdd', 'showToday', 'showMainWindow', 'quit'];
+  const names = ['toggleMainWindow', 'openQuickAdd', 'showToday', 'showMainWindow', 'toggleResidentPanel', 'quit'];
   const targets: Record<string, () => void> = {};
   for (const name of names) targets[name] = () => calls.push(name);
   return Object.assign(targets, { calls });
 }
 
-it('四条命令全部在场，文案就是那四个词', () => {
+it('五条命令全部在场，文案就是那五个词', () => {
   const items = buildTrayMenu({ config: DEFAULT_SUMMON_CONFIG, platform: 'darwin', problems: [] });
   const labels = items.filter((item) => 'id' in item).map((item) => item.label);
-  expect(labels).toEqual(['今天', '快速添加', '显示主窗', '退出']);
+  expect(labels).toEqual(['今天', '快速添加', '置顶便签', '显示主窗', '退出']);
   expect(labels).toEqual(TRAY_COMMANDS.map((id) => TRAY_LABELS[id]));
 });
 
@@ -95,7 +95,7 @@ it('两条热键分别接"显示/隐藏"与"快速添加"，不接显示主窗',
 });
 
 it('装配时少给一个动作就当场抛，而不是留一枚点了没反应的项', () => {
-  const incomplete = { openQuickAdd: () => undefined, showToday: () => undefined, showMainWindow: () => undefined };
+  const incomplete = { openQuickAdd: () => undefined, showToday: () => undefined, showMainWindow: () => undefined, toggleResidentPanel: () => undefined };
   expect(() => mapTrayActions(incomplete as never)).toThrow(/退出/);
 });
 

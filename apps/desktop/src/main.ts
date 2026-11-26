@@ -15,7 +15,7 @@ import { isSettingsShortcut } from './settings-shortcut.js';
 import { pathToFileURL } from 'node:url';
 import { join } from 'node:path';
 
-import { app, BrowserWindow, ipcMain, net, protocol } from 'electron';
+import { app, BrowserWindow, ipcMain, net, protocol, screen } from 'electron';
 import { armDesktopUpdateCheck } from './app-update.js';
 
 import type { NodeHost } from '@heyta/node-host';
@@ -224,6 +224,12 @@ let settingsWindow: BrowserWindow | null = null;
  */
 let quickAddWindow: BrowserWindow | null = null;
 
+/**
+ * 菜单栏常驻面板窗（覆盖图谱 #72 / #36）：alwaysOnTop 小窗，承载"快速记录"。
+ * 与快速添加同一条纪律（复用 quick-add 渲染产物 + 同一条 addTask IPC）。
+ */
+let residentPanelWindow: BrowserWindow | null = null;
+
 /** 全局热键与托盘的句柄；`before-quit` 里必须 dispose，否则退出后键位仍被这台机器占着。 */
 let summon: SummonHandle | null = null;
 
@@ -370,6 +376,102 @@ function createQuickAddWindow(): void {
   window.on('closed', () => {
     if (quickAddWindow === window) quickAddWindow = null;
   });
+}
+
+/**
+ * 把常驻面板窗挪到"光标（托盘图标）下方、尽量贴右"的位置。
+ *
+ * 取不到屏幕信息（某些 Linux 无显示服务）时不挪 —— 用系统默认位置，
+ * 绝不让"定位失败"变成"窗口不出现"。
+ */
+function positionResidentPanel(window: BrowserWindow): void {
+  try {
+    const point = screen.getCursorScreenPoint();
+    const display = screen.getDisplayNearestPoint(point);
+    const bounds = window.getBounds();
+    const width = bounds.width;
+    const height = bounds.height;
+    const margin = 8;
+    const maxX = display.workArea.x + display.workArea.width - width - margin;
+    const maxY = display.workArea.y + display.workArea.height - height - margin;
+    const x = Math.min(Math.max(point.x - width + margin, display.workArea.x + margin), maxX);
+    const y = Math.min(point.y + margin, maxY);
+    window.setPosition(Math.round(x), Math.round(y));
+  } catch {
+    // 定位失败就用系统默认位置。
+  }
+}
+
+/**
+ * 建常驻面板窗（覆盖图谱 #72 / #36）。
+ *
+ * 与快速添加面板同一族：**独立 BrowserWindow + 同一条 IPC 契约**（`addTask`），
+ * 不加载 `heyta://` 那份共享 UI（那会开第二个引擎，两套向量时钟各写各的）。
+ * 差别只有一处 —— 它 `alwaysOnTop` 且不随主窗隐藏，所以像"置顶便签"一样常驻。
+ */
+function createResidentPanelWindow(): BrowserWindow {
+  if (residentPanelWindow !== null && !residentPanelWindow.isDestroyed()) return residentPanelWindow;
+
+  const window = new BrowserWindow({
+    width: 360,
+    height: 220,
+    show: false,
+    focusable: !NO_FOCUS,
+    // 无边框 + 不可缩放 + 不进任务栏 + 置顶：菜单栏常驻小窗的惯常形状。
+    frame: false,
+    resizable: false,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    title: 'heyta 面板',
+    webPreferences: {
+      // 与主窗口同一组安全边界，不放宽任何一项（理由见 createWindow）。
+      preload: join(__dirname, 'preload.cjs'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+  });
+
+  window.once('ready-to-show', () => {
+    positionResidentPanel(window);
+    if (NO_FOCUS) window.showInactive();
+    else window.show();
+  });
+
+  guardedLoad(window, '常驻面板', () =>
+    window.loadFile(join(__dirname, '..', 'renderer-dist', 'quick-add.html')),
+  );
+
+  residentPanelWindow = window;
+  window.on('closed', () => {
+    if (residentPanelWindow === window) residentPanelWindow = null;
+  });
+  return window;
+}
+
+/**
+ * 托盘左键的落点（覆盖图谱 #72）：可见就收起，否则落下/唤回。
+ *
+ * 三种现场：
+ *  · 窗口在且可见 ⇒ 收起（与热键的显隐语义一致）；
+ *  · 窗口在但被藏 ⇒ 重新定位并显示；
+ *  · 窗口不在 ⇒ 新建（`ready-to-show` 里定位 + 显示）。
+ */
+function toggleResidentPanel(): void {
+  if (residentPanelWindow !== null && !residentPanelWindow.isDestroyed()) {
+    if (residentPanelWindow.isVisible()) {
+      residentPanelWindow.hide();
+      return;
+    }
+    positionResidentPanel(residentPanelWindow);
+    if (NO_FOCUS) residentPanelWindow.showInactive();
+    else {
+      residentPanelWindow.show();
+      residentPanelWindow.focus();
+    }
+    return;
+  }
+  createResidentPanelWindow();
 }
 
 /**
@@ -660,6 +762,7 @@ if (!app.requestSingleInstanceLock()) {
           openQuickAdd: createQuickAddWindow,
           showToday,
           showMainWindow,
+          toggleResidentPanel,
           quit: () => app.quit(),
         },
         { userDataDir: app.getPath('userData') },
