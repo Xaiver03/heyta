@@ -46,6 +46,7 @@ import { LocaleHost } from './lib/locale-host.js';
 import { ErrorBoundary } from './lib/error-boundary.js';
 import { installFatalErrorHooks } from './lib/fatal-hooks.js';
 import { installPressOrigin } from './lib/press-origin.js';
+import { armPrintShortcut } from './lib/print-shortcut.js';
 import { eraseWebLocalData } from './lib/local-data-destruction.js';
 import { startupMode } from './lib/startup-mode.js';
 import { applyFontScale, loadFontScale } from './lib/font-scale.js';
@@ -128,6 +129,15 @@ bootstrapDesktopChrome();
  * 所以切片页（`?slice=1`）也会装上 —— 那正是它能被 Playwright 验到的原因。
  */
 installPressOrigin();
+
+/**
+ * 打印当前视图的快捷键（覆盖图谱 #70）。
+ *
+ * 与 `installPressOrigin` 同一条位置理由：四条渲染出口共用这一个装配点。
+ * 判断本身在 `lib/print-shortcut.ts`（纯函数、可测），这里只挂副作用 ——
+ * 浏览器自带 ⌘P 在桌面壳（无菜单）里不保证命中，所以显式接一条。
+ */
+armPrintShortcut();
 
 /**
  * 🔴 全局错误钩子必须**先于 createRoot** 装上（崩溃审计 U12 第 2 条 P0）。

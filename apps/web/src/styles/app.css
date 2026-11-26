@@ -52,4 +52,8 @@
    保证全局焦点规则仍在级联最末（check:focus-single-source）。 */
 @import './app/command-palette.css';
 
+/* 打印样式（覆盖图谱 #70）—— 只在 `@media print` 里收掉导航外壳，不碰焦点环；
+   import 顺序仍是 borderless 最后（check:focus-single-source 的硬约束）。 */
+@import './app/print.css';
+
 @import './app/borderless-controls.css';

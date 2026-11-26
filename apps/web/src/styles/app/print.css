@@ -1,0 +1,65 @@
+/**
+ * 打印样式（覆盖图谱 #70）
+ * ========================
+ *
+ * 产品裁决：打印走浏览器原生 `window.print()`，**不做自研 PDF 引擎**。
+ * 这份文件只回答一件事：**打印时这一屏该长什么样**。
+ *
+ * 三条取向：
+ *  1. **收掉外壳**：rail / 侧栏 / 详情列 / 底部导航 / 设置左栏导航都是导航件，
+ *     纸面上没有意义，留在纸上只会把正文挤成一条窄缝。
+ *  2. **正文铺满**：`ht-app` 是 CSS Grid 三层，打印时退化成块，正文吃满页宽。
+ *  3. **别把一行切成两页**：任务行 / 分组头 / 卡片 `break-inside: avoid`。
+ *
+ * ⚠️ 取值纪律：本文件同样受 `check:design` 管。**禁止裸 px / rem**；
+ * 打印尺度用 `pt` / `mm`（印刷单位，不是屏幕设计尺度），颜色一律走 token，
+ * 发丝线允许 `1px`（`MATCH_ALLOW` 里登记的渲染细节）。断点/页边距用 `mm` 不进尺。
+ */
+
+@page {
+  /* 页边距是印刷物理尺寸，用 mm —— 不是屏幕设计尺度，也不受 px/rem 门禁管。 */
+  margin: 12mm;
+}
+
+@media print {
+  /* 1. 收掉导航类外壳。它们只回答"我现在在哪"，纸面上不需要。 */
+  .ht-rail,
+  .ht-sidebar,
+  .ht-app__detail,
+  .ht-app__detail-toggle,
+  .ht-app__detail-resizer,
+  .ht-main__announcement,
+  .ht-settings__nav,
+  .ht-nav {
+    display: none !important;
+  }
+
+  /* 2. 三层 Grid 退化成块，正文吃满页宽。 */
+  .ht-app {
+    display: block !important;
+    block-size: auto !important;
+    overflow: visible !important;
+  }
+  .ht-main,
+  .ht-content {
+    display: block !important;
+    inline-size: auto !important;
+    max-inline-size: none !important;
+    block-size: auto !important;
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+
+  /* 3. 一屏一行，尽量别被切成两页。 */
+  .ht-task-row,
+  .ht-task-group,
+  .ht-settings__group,
+  .ht-app__detail-card {
+    break-inside: avoid;
+  }
+
+  /* 链接打印出来看不出 href —— 用下划线区分"这是可跳转的东西"（不打印地址，避免满页 URL 噪音）。 */
+  a {
+    text-decoration: underline;
+  }
+}
