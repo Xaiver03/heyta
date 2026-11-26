@@ -49,6 +49,8 @@ import {
   start as startFn,
   type FocusConfig,
   type FocusMode,
+  type FocusSeriesBucket,
+  type FocusSeriesPoint,
   type FocusSession,
   type FocusState,
 } from '@heyta/domain';
@@ -56,6 +58,8 @@ import {
   createFocusActions,
   focusLogFailureCode,
   focusOverview,
+  focusSeriesFromState,
+  manualFocusSession,
   type ActionContext,
   type FocusLogFailureCode,
   type FocusOverview,
@@ -342,4 +346,40 @@ export function __resetFocusForTests(): void {
     tick: 0,
     error: undefined,
   });
+}
+
+// ─────────────────────────────────────────────────────────────
+// 专注统计读侧（覆盖图谱 #50）：日/周/月序列 + 手动补录
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * 专注统计序列（#50 图表）。口径全在 `@heyta/app-host#focusSeriesFromState`
+ * → `@heyta/domain#focusSeries`（已单测）；本函数只是"从当前引擎现取"的薄转发，
+ * 一个数都不自己 reduce。
+ *
+ * ⚠️ 组件用 `overview` 做依赖触发重算：引擎一变（写入 / 同步 / 补录），
+ * `overview` 会被 `onEngineChange` 刷新 ⇒ 组件重渲染时这里读到最新记录。
+ */
+export function selectFocusSeries(bucket: FocusSeriesBucket, count: number): FocusSeriesPoint[] {
+  return focusSeriesFromState(currentState(), Date.now(), bucket, count);
+}
+
+/**
+ * 手动补录一段专注（#50）。
+ *
+ * 🔴 写路径必须走 op-log / app-host 动作，**不在 apps/* 里拼 op**：
+ * 会话对象由 `@heyta/app-host#manualFocusSession` 构造（该填哪些字段是产品语义），
+ * 这里只把它交给 `focusActions.log()`（唯一的 FOCUS_SESSION 写入口）。
+ *
+ * 非法时长（≤0 / 非数）会由 `log()` 抛 `FocusLogValidationError` ——
+ * **不在这里 catch**：让界面接住并说清原因，而不是变成"点了没反应"。
+ *
+ * @param durationMinutes 补录时长（分钟）。
+ * @param endedAt         这段专注结束的时刻（epoch ms）—— 归属日由它决定。
+ */
+export async function logManualFocus(durationMinutes: number, endedAt: number): Promise<void> {
+  const durationMs = Math.round(durationMinutes * 60_000);
+  const session = manualFocusSession({ durationMs, endedAt });
+  await focusActions.log(session);
+  useFocusStore.setState({ overview: deriveOverview(), error: undefined });
 }

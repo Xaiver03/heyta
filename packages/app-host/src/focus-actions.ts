@@ -167,3 +167,39 @@ export function createFocusActions(
     },
   };
 }
+
+/**
+ * 手动补录一条专注记录（覆盖图谱 #50 的「手动补录」）。
+ *
+ * 🔴 构造一次**已完成的工作段**——「补录」的语义就是"我确实专注了这么久，
+ * 只是当时没开计时器"，所以 `completed: true`、`plannedMs === actualMs`。
+ * 这里的构造是**产品语义**（该填哪些字段、算在哪一天），因此住在 `packages/`
+ * 而不是某个壳里（AGENTS §3.5）。校验（时长必须为正等）由随后的
+ * `createFocusActions(ctx).log(session)` 负责，本函数只做映射。
+ *
+ * @param input.durationMs 补录时长（ms，必须 > 0；否则 `log()` 会抛）。
+ * @param input.endedAt    这段专注结束的时刻（epoch ms）。归属日由
+ *                         `focusSessionDay`（= `endedAt`）决定，与统计同口径。
+ * @param input.taskId     可选关联任务。
+ */
+export interface ManualFocusInput {
+  readonly durationMs: number;
+  readonly endedAt: number;
+  readonly taskId?: string;
+}
+
+export function manualFocusSession(input: ManualFocusInput): FocusSession {
+  const { durationMs, endedAt } = input;
+  return {
+    id: `manual-${randomId()}`,
+    kind: 'work',
+    plannedMs: durationMs,
+    actualMs: durationMs,
+    completed: true,
+    startedAt: endedAt - durationMs,
+    endedAt,
+    createdAt: endedAt,
+    updatedAt: endedAt,
+    ...(input.taskId === undefined ? {} : { taskId: input.taskId }),
+  };
+}

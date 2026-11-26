@@ -52,6 +52,8 @@ export * from './habit-icons.js';
 export * from './habit-backfill.js';
 export * from './habit-review.js';
 export * from './habit-year.js';
+// 覆盖图谱 #46 / #48：习惯打卡记录清单 + 完成率/连续天数趋势序列（统计怎么算的唯一实现）。
+export * from './habit-stats.js';
 export * from './milestones.js';
 export * from './today-progress.js';
 export * from './weekly-review.js';
@@ -59,6 +61,8 @@ export * from './activity-categories.js';
 export * from './project-settings.js';
 export * from './identity-tags.js';
 export * from './focus.js';
+// 覆盖图谱 #50：专注统计的日/周/月序列（图表数据来源）。
+export * from './focus-series.js';
 export * from './recurrence.js';
 export * from './capture.js';
 // 2026-11-15：任务行「今天」快捷要用它算到期 epoch（与捕获面板同一个换算）。

@@ -41,6 +41,8 @@ import { ColorSlotPicker } from '../categories/ColorSlotPicker.js';
 import { HabitFrequencyEditor } from './HabitFrequencyEditor.js';
 import { HabitGoalEditor } from './HabitGoalEditor.js';
 import { HabitIconPicker } from './HabitIconPicker.js';
+import { HabitRecordList } from './HabitRecordList.js';
+import { HabitStatsChart } from './HabitStatsChart.js';
 import { habitBoardLabels, habitMonthLabels, habitTrendTabs, habitYearLabels, paneEmptyText } from './board-labels.js';
 import { readNow, useHabitStore } from './store.js';
 import { UndoReceipt } from '../../lib/feedback/UndoReceipt.js';
@@ -361,6 +363,14 @@ export function HabitDetailCard({ inset }: { inset: boolean }): React.JSX.Elemen
             busy={busyId === selected.id}
             testID="habit-trend"
           />
+        )}
+
+        {/* #46 打卡记录清单 + #48 统计图表：同为"选中那条习惯"的读侧，与板子同一分母。 */}
+        {selected === undefined ? null : (
+          <>
+            <HabitRecordList habit={selected} logs={store.logs} />
+            <HabitStatsChart habit={selected} logs={store.logs} today={toLocalDate(now)} />
+          </>
         )}
       </HeytaUiProvider>
     </div>
