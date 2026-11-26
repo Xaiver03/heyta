@@ -3411,7 +3411,7 @@ export function App(): React.JSX.Element {
                         />
                         {!collapsedGroups.has(skey) && (
                           <ManualSortWrapper manual={manualSortActive} tasks={group.tasks} onSetOrder={(id, order) => useTaskStore.getState().setOrder(id, order)}>
-                            <TaskList tasks={group.tasks} sort={effectiveTaskSort} {...(manualRowWrapper === undefined ? {} : { renderRowWrapper: manualRowWrapper })} onOpenTask={openTask} activeTaskId={selectedTaskId} selectedTaskIds={bulkSelecting ? selectedTaskIds : undefined} selectionMode={bulkSelecting} onToggleTask={(taskId) => { if (bulkSelecting) { toggleBulkSelection(taskId); } else { void store.toggleComplete(taskId); } }} labels={taskRowLabels} renderMeta={renderTaskMeta} renderTrailing={renderTaskTrailing} {...(rowIconColorOf === undefined ? {} : { iconColorOf: rowIconColorOf })} testID={`task-list-section-${skey}`} />
+                            <TaskList tasks={group.tasks} sort={effectiveTaskSort} density="dense" {...(manualRowWrapper === undefined ? {} : { renderRowWrapper: manualRowWrapper })} onOpenTask={openTask} activeTaskId={selectedTaskId} selectedTaskIds={bulkSelecting ? selectedTaskIds : undefined} selectionMode={bulkSelecting} onToggleTask={(taskId) => { if (bulkSelecting) { toggleBulkSelection(taskId); } else { void store.toggleComplete(taskId); } }} labels={taskRowLabels} renderMeta={renderTaskMeta} renderTrailing={renderTaskTrailing} {...(rowIconColorOf === undefined ? {} : { iconColorOf: rowIconColorOf })} rowDividers testID={`task-list-section-${skey}`} />
                           </ManualSortWrapper>
                         )}
                       </HeytaUiProvider>
@@ -3429,6 +3429,7 @@ export function App(): React.JSX.Element {
               <TaskList
                 tasks={visible}
                 sort={effectiveTaskSort}
+                density="dense"
                 {...(manualRowWrapper === undefined ? {} : { renderRowWrapper: manualRowWrapper })}
                 onOpenTask={openTask}
                 activeTaskId={selectedTaskId}
@@ -3445,6 +3446,7 @@ export function App(): React.JSX.Element {
                 renderMeta={renderTaskMeta}
                 renderTrailing={renderTaskTrailing}
                 {...(rowIconColorOf === undefined ? {} : { iconColorOf: rowIconColorOf })}
+                rowDividers
                 testID="task-list"
               />
               </ManualSortWrapper>
@@ -3508,6 +3510,7 @@ export function App(): React.JSX.Element {
                         <TaskList
                           tasks={group.tasks}
                           sort={effectiveTaskSort}
+                          density="dense"
                           {...(manualRowWrapper === undefined ? {} : { renderRowWrapper: manualRowWrapper })}
                           onOpenTask={openTask}
                           activeTaskId={selectedTaskId}
@@ -3524,6 +3527,7 @@ export function App(): React.JSX.Element {
                           renderMeta={renderTaskMeta}
                           renderTrailing={renderTaskTrailing}
                           {...(rowIconColorOf === undefined ? {} : { iconColorOf: rowIconColorOf })}
+                          rowDividers
                           testID={`task-list-${key}`}
                         />
                         </ManualSortWrapper>
