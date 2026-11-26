@@ -2973,6 +2973,15 @@ export const en = {
   'web.capture.placeholderToDay': 'Add to {day}',
   'web.calendar.capture.add': 'Add to the selected day',
   'web.calendar.capture.close': 'Dismiss the input',
+  // Timetable view (a calendar tab, like TickTick): course name/location/time; empty state states facts only.
+  'web.calendar.view.timetable': 'Timetable',
+  'web.calendar.timetable.empty': 'No courses this week',
+  'web.calendar.timetable.period': 'Period {n}',
+  'web.calendar.timetable.import': 'Import timetable',
+  'web.calendar.timetable.importEmpty': 'No courses found',
+  'web.calendar.timetable.importResult': 'Imported {created} courses',
+  'web.calendar.timetable.importResultSkipped': 'Imported {created} courses, skipped {skipped} rows',
+  'web.calendar.timetable.importFailed': 'Import failed, please retry',
   // Feishu schedule (stage A): mirrored events are read-only; tags are the only local write.
   'web.calendar.hub.title': 'Feishu schedule',
   'web.calendar.hub.baseUrl': 'Hub URL',

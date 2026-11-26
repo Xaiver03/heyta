@@ -38,6 +38,7 @@ import {
 } from '@heyta/app-host';
 import type {
   CategorySlot,
+  CourseRow,
   Habit,
   HabitFrequency,
   HabitGoalType,
@@ -107,6 +108,11 @@ interface HabitState {
     habitId: string,
     goal: { target?: number; unit?: string; goalType?: HabitGoalType },
   ) => Promise<void>;
+  /**
+   * 课表导入：把归一化课程行（`@heyta/domain` 的 `CourseRow[]`）写成习惯。
+   * 稳定 id / 去重 / 守恒律全在 `@heyta/app-host` 的 `importCourses`，这里只转发 + 刷新。
+   */
+  importCourses: (rows: readonly CourseRow[]) => Promise<{ created: string[]; skipped: string[] }>;
 }
 
 /** 与任务 / 专注 / 清单 store 同一个形状。只含两个函数引用，不含任何判断。 */
@@ -191,6 +197,13 @@ export const useHabitStore = create<HabitState>(() => ({
   setHabitColor: async (habitId, slot) => {
     await habitActions.setHabitColor(habitId, slot);
     refresh();
+  },
+
+  importCourses: async (rows) => {
+    // 去重 / 稳定 id / 守恒律在 app-host；这里只转发并刷新到界面。
+    const result = await habitActions.importCourses(rows);
+    refresh();
+    return result;
   },
 }));
 

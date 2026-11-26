@@ -46,6 +46,8 @@ import { resolveCalendarBarAccent } from './calendar-display-pref.js';
 
 import { CalendarCapturePopover } from './CalendarCapturePopover.js';
 import { CalendarDragBar, CalendarDragProvider, CalendarDropDay, CalendarDropHour } from './CalendarDnd.js';
+import { CalendarTimetable } from './CalendarTimetable.js';
+import { CalendarTimetableImport } from './CalendarTimetableImport.js';
 import { useCountdownStore } from '../countdown/store.js';
 import { useTaskStore } from '../tasks/store.js';
 import { useProjectStore } from '../projects/store.js';
@@ -312,6 +314,18 @@ export function CalendarView(): React.JSX.Element {
              也不叫 AI：这条是纯规则解析，零模型、不出境（ADR-0013 的
              `retention-undecided` 仍然挡着 `managed`，而这条根本不需要它）。
         */}
+        {view.extraView === 'timetable' ? (
+          <>
+            <CalendarTimetableImport />
+            <CalendarTimetable
+              cursor={view.cursor}
+              today={today}
+              weekdays={labels.weekdays}
+              habits={Object.values(store.entities.habits)}
+            />
+          </>
+        ) : (
+          <>
         {view.captureOpen ? (
           <CalendarCapturePopover date={view.selected} title={labels.dayTitle(view.selected)} onClose={view.toggleCapture} />
         ) : null}
@@ -378,6 +392,8 @@ export function CalendarView(): React.JSX.Element {
           )}
           testID={BOARD_TEST_ID}
         />
+          </>
+        )}
       </div>
       </CalendarDragProvider>
     </HeytaUiProvider>

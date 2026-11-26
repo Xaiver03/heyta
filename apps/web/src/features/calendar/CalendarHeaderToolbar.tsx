@@ -38,6 +38,7 @@ import { useTaskStore } from '../tasks/store.js';
 import { useProjectStore } from '../projects/store.js';
 import { useCalendarLabels } from './useCalendarLabels.js';
 import { useCalendarViewStore } from './store.js';
+import { CALENDAR_WEB_VIEW_ORDER, type CalendarWebView } from './calendar-views.js';
 import {
   RotateCcw,
   MoreHorizontal,
@@ -79,6 +80,8 @@ export function CalendarHeaderToolbar({
 
   /** 第②层的大标题文字：与共享 `CalendarToolbar` 的 `copyFor` 同一套取值来源（labels）。 */
   const rangeTitle = useMemo(() => {
+    // 课程表按"这一周"读：标题用周范围（与周档同一个措辞来源）。
+    if (view.extraView === 'timetable') return labels.weekTitle?.(view.cursor) ?? labels.monthTitle(view.cursor);
     switch (view.view) {
       case 'week':
         return labels.weekTitle?.(view.cursor) ?? labels.monthTitle(view.cursor);
@@ -89,27 +92,34 @@ export function CalendarHeaderToolbar({
       default:
         return labels.monthTitle(view.cursor);
     }
-  }, [labels, view.cursor, view.view]);
+  }, [labels, view.cursor, view.view, view.extraView]);
 
+  const inTimetable = view.extraView === 'timetable';
   const step = (dir: number): void => {
-    view.setCursor(stepCalendarCursor(view.view, view.cursor, dir));
+    // 课程表翻"一周"（与周档一致），其余按当前共享档。
+    view.setCursor(stepCalendarCursor(inTimetable ? 'week' : view.view, view.cursor, dir));
   };
-  const prevLabel =
-    view.view === 'week'
+  const prevLabel = inTimetable
+    ? labels.prevWeek ?? labels.prevMonth
+    : view.view === 'week'
       ? labels.prevWeek ?? labels.prevMonth
       : view.view === 'day'
         ? labels.prevDay ?? labels.prevMonth
         : view.view === 'year'
           ? labels.prevYear ?? labels.prevMonth
           : labels.prevMonth;
-  const nextLabel =
-    view.view === 'week'
+  const nextLabel = inTimetable
+    ? labels.nextWeek ?? labels.nextMonth
+    : view.view === 'week'
       ? labels.nextWeek ?? labels.nextMonth
       : view.view === 'day'
         ? labels.nextDay ?? labels.nextMonth
         : view.view === 'year'
           ? labels.nextYear ?? labels.nextMonth
           : labels.nextMonth;
+
+  /** 可见分段控件当前指的档：课程表在额外档里，其余是共享档。 */
+  const webView: CalendarWebView = inTimetable ? 'timetable' : view.view;
 
   const hasScope = !isScopeEmpty(view.scope);
   const activeScopeNames = useMemo(() => {
@@ -187,14 +197,19 @@ export function CalendarHeaderToolbar({
       <div className="ht-content__cal-band ht-content__cal-band--tools">
         <div className="ht-content__cal-seg">
           <CalendarViewTabs
-            view={view.view}
-            options={CALENDAR_VIEW_ORDER}
+            view={webView}
+            options={CALENDAR_WEB_VIEW_ORDER}
             onViewChange={(next) => {
+              if (next === 'timetable') {
+                view.setExtraView('timetable');
+                return;
+              }
               view.setView(next);
             }}
             labels={{
               group: t('common.calendar.view.aria'),
-              name: (kind) => t(CALENDAR_VIEW_LABEL_KEYS[kind]),
+              name: (kind) =>
+                kind === 'timetable' ? t('web.calendar.view.timetable') : t(CALENDAR_VIEW_LABEL_KEYS[kind]),
             }}
             testID="calendar-view-tabs"
           />

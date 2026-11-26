@@ -61,6 +61,14 @@ interface CalendarViewState {
    */
   view: CalendarViewKind;
   /**
+   * Web 端本地的额外一档：`'timetable'`（课程表）或 `null`（不在额外档）。
+   *
+   * 🔴 它**不进共享 `CalendarViewKind`**（理由见 `calendar-views.ts` 文件头）：课程表是
+   *   Web 本次补的档，移动端把同类档扩在本地。`view` 仍记录"最后一次共享档位"，
+   *   于是从课程表切回月/周/日/年时，游标与选中不会丢。
+   */
+  extraView: 'timetable' | null;
+  /**
    * 「往选中那天加一条」那行输入框开着没有（R11 批五）。
    *
    * ⚠️ 它和 `view` 一样住在 store 里，因为**开关在页头、输入框在主区** ——
@@ -134,6 +142,12 @@ interface CalendarViewActions {
    */
   setView: (view: CalendarViewKind) => void;
   /**
+   * 切到/退出 Web 本地的额外档（课程表）。
+   *
+   * `setView` 遇到任何共享档会把它清空；这里只负责进入课程表（把游标当成"某一周"）与显式退出。
+   */
+  setExtraView: (view: 'timetable' | null) => void;
+  /**
    * 从年档点进某一个月（R13）。**要改什么由共享层决定**（`calendarMonthDrill`），
    * 这里只负责把它写进状态 —— 包括"选中那天不动"那一条：那个函数返回的对象里
    * 根本没有 `selected`，所以不是"我记得别改"。
@@ -199,6 +213,7 @@ export const useCalendarViewStore = create<CalendarViewState & CalendarViewActio
   selected: toLocalDate(Date.now()),
   scope: FULL_SCOPE,
   view: 'month',
+  extraView: null,
   captureOpen: false,
   calendarSidebarOpen: true,
   // 显示设置三项：**从本机偏好读初始值**（刷新后仍在），读取失败退默认（见 readonly 文件头）。
@@ -212,26 +227,46 @@ export const useCalendarViewStore = create<CalendarViewState & CalendarViewActio
     //   日档里"游标必须带走选中"的理由与它的判据写在那里（`calendarSelectedForCursor`），
     //   症状是**安静地各指一天**：轴翻到 10-05、侧栏还圈着 10-03、新任务写进了 10-03。
     //   判据：`apps/web/tests/calendar-day-view.spec.tsx`（含变异臂 Z）。
-    set((state) => ({
-      cursor: calendarCursorFor(state.view, date),
-      selected: calendarSelectedForCursor(state.view, date, state.selected),
-    }));
+    //   课程表档把游标当成"一周里的任意一天"，行为与周档一致（不归到月首、不带选中）。
+    set((state) => {
+      const kind = state.extraView === 'timetable' ? 'week' : state.view;
+      return {
+        cursor: calendarCursorFor(kind, date),
+        selected: calendarSelectedForCursor(kind, date, state.selected),
+      };
+    });
   },
 
   selectDay: (date) => {
-    set((state) => ({ selected: date, cursor: calendarCursorFor(state.view, date) }));
+    set((state) => ({
+      selected: date,
+      cursor: calendarCursorFor(state.extraView === 'timetable' ? 'week' : state.view, date),
+    }));
   },
 
   goToToday: (today) => {
-    set((state) => ({ selected: today, cursor: calendarCursorFor(state.view, today) }));
+    set((state) => ({
+      selected: today,
+      cursor: calendarCursorFor(state.extraView === 'timetable' ? 'week' : state.view, today),
+    }));
   },
 
   setView: (view) => {
-    set((state) => ({ view, cursor: calendarCursorFor(view, state.selected) }));
+    // 切到任何共享档都退出课程表 —— 分段控件里选中态只能有一个。
+    set((state) => ({ view, extraView: null, cursor: calendarCursorFor(view, state.selected) }));
+  },
+
+  setExtraView: (extraView) => {
+    set((state) =>
+      extraView === 'timetable'
+        ? // 进入课程表：把游标当成"包含选中那天的那一周"（周档的约定：任意一天）。
+          { extraView, cursor: calendarCursorFor('week', state.selected) }
+        : { extraView: null },
+    );
   },
 
   drillIntoMonth: (monthFirstDay) => {
-    set(() => ({ ...calendarMonthDrill(monthFirstDay) }));
+    set(() => ({ ...calendarMonthDrill(monthFirstDay), extraView: null }));
   },
 
   toggleCapture: () => {
