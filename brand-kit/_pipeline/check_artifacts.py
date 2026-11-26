@@ -1208,6 +1208,24 @@ if os.path.exists(IMG_MANIFEST) and os.path.exists(INDEX_HTML):
     else:
         emit(f"✅ 04-imagery 素材库：{len(_rows4)} 张登记、总览图在位、副标题为现量值")
 
+# 45) README 里写的「N 组 / M 项」必须等于脚本实际值（索引必须可校验，不许手写会漂的数字）
+import re as _re46
+_self = open(os.path.abspath(__file__), encoding="utf-8").read()
+_n_groups = len(_re46.findall(r"(?m)^# (\d+)\)", _self))
+_readme_p = os.path.join(WD, "README.md")
+if os.path.exists(_readme_p):
+    _txt46 = open(_readme_p, encoding="utf-8").read()
+    _declared = _re46.findall(r"(\d+) 组 / (\d+) 项", _txt46)
+    _want_items = len(passes) + 1  # 本判据自身也会记一项
+    _bad46 = [f"{g} 组 / {i} 项" for g, i in _declared
+              if (int(g), int(i)) != (_n_groups, _want_items)]
+    if _bad46:
+        fail(f"README 判据数字过时：写了 {_bad46}，实际 {_n_groups} 组 / {_want_items} 项")
+    elif not _declared:
+        fail("README 没有写「N 组 / M 项」，无法核对")
+    else:
+        emit(f"✅ README 判据数字与脚本一致（{_n_groups} 组 / {_want_items} 项）")
+
 if not fails:
     if JSON_OUT:
         import json as _j

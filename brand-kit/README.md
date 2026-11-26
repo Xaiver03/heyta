@@ -58,7 +58,7 @@
 | 34 | 反例名单与激励体系三条红线对得上 | 物料立场与产品红线各说各的 |
 | 35 | 宣传册正面印着官网域名 | 域名取不到时二维码块消失 |
 | 36 | 同一物料的 PNG 与 PDF 版面比例一致 | 两种载体的纸型/比例不一致 |
-| 37 | 9 份 PDF 纸型 = 设计（A4×5 / A3×3 / 图鉴 4:5 数字版） | 未声明 @page 时按浏览器默认纸型出纸并可能溢出 |
+| 37 | 10 份 PDF 纸型 = 设计（A4×6 / A3×3 / 图鉴 4:5 数字版 + A4 印刷版） | 未声明 @page 时按浏览器默认纸型出纸并可能溢出 |
 | 38 | 手册预览图张数 = 手册页数 | 索引里的册子缺页 |
 | 39 | 01-logo 位图档位（1x=760 / 2x=1520 / 图标正方） | 导错档位，文件管理器看不出 |
 | 40 | 03-icons 全部 24×24 网格 | 图标机身大小不齐 |
@@ -83,7 +83,7 @@
 |---|---|---|
 | 受版本控制的物料文件 | 163 | `python brand-kit/_pipeline/build_index.py` 输出的 `index: N files` |
 | 产物目录 | 11（`00-`…`10-`） | `ls -d brand-kit/[0-9][0-9]-*` |
-| 自检判据 | 42 组 / 66 项 | `python brand-kit/_pipeline/check_artifacts.py --quiet` |
+| 自检判据 | 45 组 / 71 项 | `python brand-kit/_pipeline/check_artifacts.py --quiet` |
 | 构建期断言 | 8 处 | `python brand-kit/_pipeline/check_artifacts.py --list` 末段 |
 | 接线对账 | 27 条 | `node scripts/check-brand-assets.mjs` |
 | 生成器幂等 | 两次运行字节一致 | 连跑 5 件生成器后比对非 PDF 产物 sha |
@@ -115,7 +115,7 @@
 | VI → 设计系统 | 新增 `color.milestone-{checkin,focus,tasks,days}`（亮/暗各一份）进 `tokens.css` + `TOKEN_GROUPS` |
 | 设计系统 → 代码 | `packages/ui/src/motivation/MilestoneMap.tsx` 消费四维色（维度圆点 + 已达成档位描边） |
 | 守住不回退 | `packages/design-system/tests/milestone-colors.spec.ts`（对比度 / ΔE / 色盲 / 暗色覆盖） |
-| brand-kit 自检 | `python _pipeline/check_artifacts.py`：**40 组 / 64 项**，覆盖 ①色值必须命中 tokens.css ②数量 17 里程碑 / 8 身份标签 / 5 状态胶囊 / 26 图标 / 10 字标 ③9 份 PDF 字体全嵌入、页数、**纸型** ④产物内本地引用全部可达 ⑤品牌 i18n 词条两语言齐备 ⑥16 个语义色亮/暗成对且不同 ⑦里程碑四维与分类色槽**两两 ΔE**（亮/暗 × 正常/红盲/绿盲，Python 独立重算，与 design-system 的 TS spec 互为对照）⑧门槛与 id 逐项对齐 `packages/domain`，**徽章与图鉴上印的数字也回读核对** ⑨状态胶囊 = 产品真实状态 ⑩反例主张在 `_pipeline/stance.py` 名单内且与激励体系三条红线一致 ⑪分享文本不含账号/设备标识 ⑫手册 FAQ 四条各有实现依据 ⑬索引卡片齐全、副标题为现量值 |
+| brand-kit 自检 | `python _pipeline/check_artifacts.py`：**45 组 / 71 项**，覆盖 ①色值必须命中 tokens.css ②数量 17 里程碑 / 8 身份标签 / 5 状态胶囊 / 26 图标 / 10 字标 ③10 份 PDF 字体全嵌入、页数、**纸型** ④产物内本地引用全部可达 ⑤品牌 i18n 词条两语言齐备 ⑥16 个语义色亮/暗成对且不同 ⑦里程碑四维与分类色槽**两两 ΔE**（亮/暗 × 正常/红盲/绿盲，Python 独立重算，与 design-system 的 TS spec 互为对照）⑧门槛与 id 逐项对齐 `packages/domain`，**徽章与图鉴上印的数字也回读核对** ⑨状态胶囊 = 产品真实状态 ⑩反例主张在 `_pipeline/stance.py` 名单内且与激励体系三条红线一致 ⑪分享文本不含账号/设备标识 ⑫手册 FAQ 四条各有实现依据 ⑬索引卡片齐全、副标题为现量值 |
 | 幂等 | 五件生成器连跑两次，SVG/PNG/JSON/CSS/HTML **字节完全一致**（`generated_at` 取最后一次提交时间，不用墙上时钟）；PDF 因打印头带时间戳不参与 sha 比对，只看页数/字体/纸型 |
 
 实测与判据见 [`成就与成长体系_产品清单.md`](成就与成长体系_产品清单.md) §11。
