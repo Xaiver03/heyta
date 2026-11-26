@@ -30,18 +30,18 @@
 export type AiCapabilityEntityType =
   'TASK' | 'PROJECT' | 'TAG' | 'NOTE' |
     'HABIT' | 'HABIT_LOG' | 'FOCUS_SESSION' | 'AI_FEEDBACK' |
-    'PREFERENCE_CORRECTION' | 'REMINDER' | 'EVENT' | 'CALENDAR_EVENT' |
-    'ASSISTANT_TURN' | 'COMMENT' | 'ATTACHMENT' | 'FILTER' |
-    'SECTION' | 'TASK_REPEAT_CFG' | 'GLOBAL_CONFIG' | 'MIGRATION' |
-    'RECOVERY' | 'ALL';
+    'PREFERENCE_CORRECTION' | 'USER_MEMORY' | 'REMINDER' | 'EVENT' |
+    'CALENDAR_EVENT' | 'ASSISTANT_TURN' | 'COMMENT' | 'ATTACHMENT' |
+    'FILTER' | 'SECTION' | 'TASK_REPEAT_CFG' | 'GLOBAL_CONFIG' |
+    'MIGRATION' | 'RECOVERY' | 'ALL';
 
 /** 真的被 `packages/op-log` 物化了领域模型的实体类型。 */
 export type AiCapabilityModeledEntityType =
   'TASK' | 'PROJECT' | 'TAG' | 'NOTE' |
     'HABIT' | 'HABIT_LOG' | 'FOCUS_SESSION' | 'AI_FEEDBACK' |
-    'PREFERENCE_CORRECTION' | 'REMINDER' | 'EVENT' | 'CALENDAR_EVENT' |
-    'ASSISTANT_TURN' | 'COMMENT' | 'ATTACHMENT' | 'FILTER' |
-    'SECTION';
+    'PREFERENCE_CORRECTION' | 'USER_MEMORY' | 'REMINDER' | 'EVENT' |
+    'CALENDAR_EVENT' | 'ASSISTANT_TURN' | 'COMMENT' | 'ATTACHMENT' |
+    'FILTER' | 'SECTION';
 
 /** 工具的可写性 —— 判定读写只有这两个取值（`@heyta/local-api` 的 `ToolKind`）。 */
 export type AiCapabilityToolKind = 'read' | 'write';
@@ -106,8 +106,8 @@ export const AI_CAPABILITY_MANIFEST =
   },
   'coverage': {
     'covered': 13,
-    'denominator': 14,
-    'ratio': '13/14',
+    'denominator': 15,
+    'ratio': '13/15',
   },
   'userOperableEntityTypes': [
     'TASK',
@@ -117,6 +117,7 @@ export const AI_CAPABILITY_MANIFEST =
     'HABIT',
     'HABIT_LOG',
     'FOCUS_SESSION',
+    'USER_MEMORY',
     'REMINDER',
     'EVENT',
     'CALENDAR_EVENT',
@@ -135,6 +136,7 @@ export const AI_CAPABILITY_MANIFEST =
     'FOCUS_SESSION',
     'AI_FEEDBACK',
     'PREFERENCE_CORRECTION',
+    'USER_MEMORY',
     'REMINDER',
     'EVENT',
     'CALENDAR_EVENT',
@@ -159,6 +161,7 @@ export const AI_CAPABILITY_MANIFEST =
     },
   ],
   'entityTypesWithoutTools': [
+    'USER_MEMORY',
     'CALENDAR_EVENT',
   ],
   'entities': [
@@ -315,6 +318,14 @@ export const AI_CAPABILITY_MANIFEST =
       'entityType': 'PREFERENCE_CORRECTION',
       'materialized': true,
       'countsTowardCoverage': false,
+      'coverage': 'none',
+      'readToolNames': [] as const,
+      'writeToolNames': [] as const,
+    },
+    {
+      'entityType': 'USER_MEMORY',
+      'materialized': true,
+      'countsTowardCoverage': true,
       'coverage': 'none',
       'readToolNames': [] as const,
       'writeToolNames': [] as const,
@@ -2226,7 +2237,7 @@ export const AI_CAPABILITY_MANIFEST =
  */
 export const AI_CAPABILITY_TEXT = [
   'heyta 能力清单（由工具目录与领域实体生成，不是手写的）',
-  '覆盖口径：用户可操作的已物化实体 14 个，其中 13 个**读和写都有**工具（13/14）。',
+  '覆盖口径：用户可操作的已物化实体 15 个，其中 13 个**读和写都有**工具（13/15）。',
   '',
   '🔴 拒绝时两件事必须分开说：我没有这个工具（AI 侧缺工具） ｜ 产品做不到（实体或功能不存在）。',
   '下面标了"没有工具"的实体，在产品里是**真实存在**的：可以说"我没有这个工具"，',
@@ -2346,7 +2357,8 @@ export const AI_CAPABILITY_TEXT = [
   '  · [写] set_task_section（taskId*:string, sectionId:string）',
   '  · [写] delete_section（sectionId*:string）',
   '',
-  '二、产品里有、但我没有任何工具的实体（1 个）—— 实体存在，只是我没配工具',
+  '二、产品里有、但我没有任何工具的实体（2 个）—— 实体存在，只是我没配工具',
+  '- USER_MEMORY：产品支持它，但我没有任何工具 —— 别说产品做不到。',
   '- CALENDAR_EVENT：产品支持它，但我没有任何工具 —— 别说产品做不到。',
   '',
   '三、不计入上面分母的已物化实体（设计如此，不是遗漏）',
