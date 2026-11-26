@@ -438,7 +438,10 @@ export function AssistantScreen({
    * 用户最差拿到一份完整回答，只是没有逐字。
    */
   const liveItems: ChatTranscriptItem[] =
-    snapshot.live !== undefined && snapshot.live.text !== ''
+    snapshot.live !== undefined &&
+    (snapshot.live.text !== '' ||
+      snapshot.live.reasoning !== '' ||
+      snapshot.live.rows.length > 0)
       ? [
           {
             id: 'live',
