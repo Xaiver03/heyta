@@ -3844,6 +3844,8 @@ export const zhCN = {
   'mobile.habits.copyFailed': '复制失败',
   'mobile.habits.identify': '识别',
   'mobile.habits.webImport': '教务识别',
+  'mobile.habits.webUrlLabel': '网址',
+  'mobile.habits.webUrlPlaceholder': '请输入网址',
   'mobile.calendar.view.3day': '3日',
   'mobile.calendar.view.timetable': '课表',
   'mobile.calendar.today': '今天',

@@ -3518,6 +3518,8 @@ export const en = {
   'mobile.habits.copyFailed': 'Copy failed',
   'mobile.habits.identify': 'Recognize',
   'mobile.habits.webImport': 'Recognize timetable',
+  'mobile.habits.webUrlLabel': 'URL',
+  'mobile.habits.webUrlPlaceholder': 'https://',
   'mobile.calendar.view.3day': '3-Day',
   'mobile.calendar.view.timetable': 'Timetable',
   'mobile.calendar.today': 'Today',

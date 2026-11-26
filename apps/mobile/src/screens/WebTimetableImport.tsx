@@ -77,9 +77,9 @@ export function WebTimetableImport({
         <View style={{ flexDirection: 'row', gap: tk['space.2'], paddingHorizontal: tk['space.3'], alignItems: 'flex-end' }}>
           <View style={{ flex: 1 }}>
             <TextField
-              label="URL"
+              label={t('mobile.habits.webUrlLabel')}
               value={entry}
-              placeholder="https://"
+              placeholder={t('mobile.habits.webUrlPlaceholder')}
               autoCapitalize="none"
               keyboard="url"
               onChangeText={(v) => {
