@@ -153,6 +153,9 @@ export function CalendarHeaderToolbar({
     void setDueDate(task.id, dueDateToEpoch(view.selected), view.selected);
   };
 
+  /** 剪贴板不可用时的兜底文本：就地给一份可手动复制的原文，不弹系统框。 */
+  const [copyFallback, setCopyFallback] = useState<string | null>(null);
+
   const copySelectedDay = (): void => {
     const title = labels.dayTitle(view.selected);
     const lines =
@@ -166,7 +169,7 @@ export function CalendarHeaderToolbar({
         window.setTimeout(() => { setCopied(false); }, 2500);
       })
       .catch(() => {
-        window.alert(text);
+        setCopyFallback(text);
       });
   };
 
@@ -234,6 +237,23 @@ export function CalendarHeaderToolbar({
             {t('web.calendar.more.copied')}
           </span>
         ) : null}
+
+        {copyFallback === null ? null : (
+          <div className="ht-header__calendar-scope" role="status" data-testid="calendar-copy-fallback">
+            {/* 剪贴板不可用（权限/非安全上下文）时，把原文就地给出来手动复制 —— 不弹系统框。 */}
+            <textarea
+              className="ht-input"
+              readOnly
+              rows={3}
+              value={copyFallback}
+              aria-label={t('web.calendar.more.share')}
+              onFocus={(e) => e.currentTarget.select()}
+            />
+            <Button tone="ghost" onClick={() => { setCopyFallback(null); }}>
+              {t('web.filter.cancel')}
+            </Button>
+          </div>
+        )}
 
         {/* 可访问的视图回退：视觉隐藏，但键盘/读屏/按 value 切档的判据都仍成立。 */}
         <label className="ht-header__view ht-content__cal-sr-only" data-testid="calendar-view-switch">

@@ -39,6 +39,10 @@ const SKIP_DIRS = new Set([
   // 半成品文档"能把主检出卡住，而这正是并行开工要消除的相互等待。
   // 修在扫描面这一侧（而不是靠每个人"注意别留半成品"），因为前者是机器保证的。
   '.worktrees',
+  // 本机工作笔记（`.local/`，不入库）。它们是**本机的**，干净检出里根本不存在；
+  // 把它们算进来会让"我本机随手记的一页"把仓库的文档门禁卡红，而 CI 上永远是绿的 ——
+  // 那种红无法复现，也没有人该去修。与 `.worktrees` 同一条：修在扫描面这一侧。
+  '.local',
   // 各条并行线 agent 的 scratch 目录（`.gitignore` 的 `tmp/`）。
   //
   // 🔴 与 `.worktrees` 同一族的问题：**不属于本检出的内容**，却能把主检出的
@@ -85,6 +89,7 @@ const SKIP_PATHS = ['research/upstream', 'research/standalone', 'research/parts'
  */
 const UNTRACKED_LINK_OK = new Map([
   ['docs/operations/icp-app-filing.values.local.md', '真实填报值含证件号与手机号，刻意不进仓库（.gitignore 的 *.local.md）'],
+  ['.local/profile-center-evidence-20261118/', 'iPad 模拟器实拍证据（含设备截图），刻意只留本机；计划里保留可点的本机路径便于复核'],
   ['.agents/skills/tencent-cloud-icp-app-filing/', '指向仓库外（另一个项目）的本机 skill 软链，.gitignore 逐条拦在库外；提交进去对所有克隆者都是死链'],
   /*
    * 🔴 2026-11-09 起，**证据目录整体不入库**（`e760da75`）：六个 evidence 目录

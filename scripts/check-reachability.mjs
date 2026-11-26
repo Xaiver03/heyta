@@ -286,6 +286,8 @@ const ACTION_FAMILIES = [
    * 反过来会让判据 C 去查一个不存在的东西，静默通过。
    */
   { entity: 'USER_MEMORY', family: 'createUserMemoryActions' },
+  { entity: 'FILTER', family: 'createFilterActions' },
+  { entity: 'SECTION', family: 'createSectionActions' },
   /**
    * M3/W3 B1-1（`app-host/src/reminder-actions.ts`）。
    * 🔴 **补这一行是合法的登记，不是"只补表不写 action"那种假修法** ——
@@ -693,6 +695,51 @@ if (LIST_ONLY) {
   process.exit(0);
 }
 
+/**
+ * 🔴 **声明式例外**（2026-11-26）：有些实体**按设计**不该有宿主 UI 入口。
+ *
+ * 没有这张表时，门禁只有两种结局：要么把只读实体硬塞一条假写路径（那是造假），
+ * 要么永远红着（那会让下一个人把整条判据删掉）。这张表是第三条路：
+ * **显式声明 + 可被反向检查**。
+ *
+ * 每条必须写清 kind 与理由，且由断言 E 逐条验：
+ *   · `read-only`  —— 实体本身没有"用户可写"的语义（镜像/派生），零写路径是**对的**；
+ *   · `tool-first` —— 写路径已存在、但入口是 AI/MCP 工具，宿主 UI 尚未接；
+ *     这是一笔**有工单的债**，不是"决定不做"。
+ *
+ * ⚠️ 什么时候删：一旦宿主接上真实入口，断言 E 会因为"声明过期"而红，
+ * 逼着把这一行删掉 —— 与 AI 覆盖面那本账同一条纪律。
+ */
+const DECLARED_NON_UI = new Map([
+  [
+    'CALENDAR_EVENT',
+    {
+      kind: 'read-only',
+      reason:
+        'ADR-0089：外部日历是**只读镜像**（飞书侧归一化后按窗口取快照），本仓不产生写操作；' +
+        '唯一可写的"本地标签"尚未落地，落地时删掉这条声明并从 app-host 补一族 action。',
+    },
+  ],
+  [
+    'FILTER',
+    {
+      kind: 'tool-first',
+      reason:
+        'ADR-0092：保存筛选的写路径与 AI 工具已同批落地，但 Web 的"已存视图"仍走 localStorage（D1 裁决，v1 不同步）——' +
+        '两条后端并存是已知债。工单：把 FilterPanel 切到 FILTER op-log 后删掉这条声明。',
+    },
+  ],
+  [
+    'SECTION',
+    {
+      kind: 'tool-first',
+      reason:
+        'ADR-0091：清单内分组的读写工具已落地，宿主 UI 尚无"新建/重命名分组"的入口；' +
+        '工单：在清单页接上分组编辑后删掉这条声明。',
+    },
+  ],
+]);
+
 /* ========================================================================
  * 断言 B：已建模实体必须有写路径
  * ====================================================================== */
@@ -704,6 +751,11 @@ const zeroWrite = [];
 for (const entity of judged) {
   const hits = writes.get(entity);
   if (hits.length === 0) {
+    const declared = DECLARED_NON_UI.get(entity);
+    if (declared?.kind === 'read-only') {
+      console.log(`   ⚪ ${entity.padEnd(24)} 0 处写路径（已声明只读：${declared.reason.slice(0, 24)}…）`);
+      continue;
+    }
     zeroWrite.push(entity);
     console.log(`   🔴 ${entity.padEnd(24)} 0 处写路径`);
   } else {
@@ -776,6 +828,11 @@ console.log('             （测试与共享层定义不算 —— 理由见文�
 const cErrors = [];
 const cChecked = judged.filter((e) => (writes.get(e) ?? []).length > 0);
 for (const entity of cChecked) {
+  const declared = DECLARED_NON_UI.get(entity);
+  if (declared?.kind === 'tool-first') {
+    console.log(`   ⚪ ${entity.padEnd(24)} 已声明 tool-first（宿主 UI 未接，见断言 E）`);
+    continue;
+  }
   const mapping = ACTION_FAMILIES.find((f) => f.entity === entity);
   if (mapping === undefined) {
     cErrors.push(
@@ -810,6 +867,39 @@ if (cErrors.length > 0) {
   ]);
 } else {
   console.log('\n   ✅ 断言 C 通过：有写路径的实体全部有宿主调用点。');
+}
+
+/* ========================================================================
+ * 断言 E：声明式例外必须仍然成立
+ * ====================================================================== */
+
+console.log('\n【断言 E】声明式例外（只读 / tool-first）必须仍然成立');
+
+const eErrors = [];
+for (const [entity, declared] of DECLARED_NON_UI) {
+  if (!judged.includes(entity)) {
+    eErrors.push(`   · ${entity} 不在已建模实体清单里 —— 声明过期，删掉这一行。`);
+    continue;
+  }
+  if (declared.reason.trim().length < 20) {
+    eErrors.push(`   · ${entity} 的理由太短（要写清为什么现在不接 UI）。`);
+  }
+  const sites = (hostCallSites.get(ACTION_FAMILIES.find((f) => f.entity === entity)?.family) ?? []);
+  if (declared.kind === 'read-only' && (writes.get(entity) ?? []).length > 0) {
+    eErrors.push(`   · ${entity} 声明只读，但 app-host 已有写路径 —— 声明过期。`);
+  }
+  if (declared.kind === 'tool-first' && sites.length > 0) {
+    eErrors.push(`   · ${entity} 声明 tool-first，但宿主已有调用点 —— 声明过期，删掉这一行。`);
+  }
+}
+if (eErrors.length > 0) {
+  fail(`断言 E 不通过：${String(eErrors.length)} 项`, [
+    ...eErrors,
+    '',
+    '   ⇒ 声明不是豁免，是**带到期日的声明**：条件变了就必须删。',
+  ]);
+} else {
+  console.log(`\n   ✅ 断言 E 通过：${String(DECLARED_NON_UI.size)} 条声明都仍然成立。`);
 }
 
 /* ========================================================================
@@ -888,7 +978,7 @@ if (failed) {
 }
 console.log('✅ 「已建模 ≠ 可达」：四条断言都通过。');
 console.log(
-  `   已建模 ${String(judged.length)} 个实体，每个都有写路径与宿主调用点；` +
-    `未建模清单 ${String(unmodeled?.length ?? 0)} 项都已结清。`,
+  `   已建模 ${String(judged.length)} 个实体；其中 ${String(DECLARED_NON_UI.size)} 条按断言 E 声明为例外（只读 / tool-first），` +
+    `其余都有写路径与宿主调用点；未建模清单 ${String(unmodeled?.length ?? 0)} 项都已结清。`,
 );
 console.log('');

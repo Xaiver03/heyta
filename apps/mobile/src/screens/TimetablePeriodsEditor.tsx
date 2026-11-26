@@ -5,8 +5,8 @@
  * 保存时解析校验；非法行丢弃（不乱写）。文案全部复用既有词条，不新增说明文字。
  */
 
-import React, { useState } from 'react';
-import { Modal, ScrollView, View } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { Modal, ScrollView, StyleSheet, View } from 'react-native';
 
 import { useI18n } from '@heyta/i18n';
 
@@ -29,6 +29,28 @@ export function TimetablePeriodsEditor({
   const tk = useTokens();
   const [rows, setRows] = useState<string[]>(() => periods.map((p) => `${p.start}-${p.end}`));
 
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        scrim: { flex: 1, backgroundColor: tk['material.scrim'], justifyContent: 'center' },
+        card: {
+          marginHorizontal: tk['space.4'],
+          padding: tk['space.4'],
+          borderRadius: tk['radius.md'],
+          backgroundColor: tk['color.surface'],
+          maxHeight: '80%',
+        },
+        scroll: { flexShrink: 1 },
+        scrollContent: { gap: tk['space.2'] },
+        actions: {
+          flexDirection: 'row',
+          gap: tk['space.2'],
+          marginTop: tk['space.4'],
+        },
+      }),
+    [tk],
+  );
+
   const parseRows = (): Period[] => {
     const out: Period[] = [];
     for (const row of rows) {
@@ -40,17 +62,9 @@ export function TimetablePeriodsEditor({
 
   return (
     <Modal transparent animationType="fade" visible onRequestClose={onClose}>
-      <View style={{ flex: 1, backgroundColor: tk['material.scrim'], justifyContent: 'center' }}>
-        <View
-          style={{
-            marginHorizontal: tk['space.4'],
-            padding: tk['space.4'],
-            borderRadius: tk['radius.md'],
-            backgroundColor: tk['color.surface'],
-            maxHeight: '80%',
-          }}
-        >
-          <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={{ gap: tk['space.2'] }}>
+      <View style={styles.scrim}>
+        <View style={styles.card}>
+          <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
             {rows.map((row, i) => (
               <TextField
                 key={`p-${i}`}
@@ -61,7 +75,7 @@ export function TimetablePeriodsEditor({
               />
             ))}
           </ScrollView>
-          <View style={{ flexDirection: 'row', gap: tk['space.2'], marginTop: tk['space.4'] }}>
+          <View style={styles.actions}>
             <Button label={t('mobile.common.add')} onPress={() => setRows((r) => [...r, ''])} />
             <Button label={t('mobile.common.cancel')} onPress={onClose} />
             <Button label={t('web.passkeys.save')} tone="primary" onPress={() => onSave(parseRows())} />

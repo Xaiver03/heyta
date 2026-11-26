@@ -233,6 +233,18 @@ export interface AssistantStep {
  * ⚠️ `tool-started` 只有工具名与读/写，**不含参数**：参数里是用户数据，
  * 而"屏幕上有这一行"不需要它；需要看具体内容时看执行结果与提案卡。
  */
+/**
+ * 这一轮到底有没有**写入**（决定界面能不能说「已执行（可撤销）」）。
+ *
+ * 🔴 只看 `kind === 'write'` 且成功的步骤：读工具成功不是"已执行"，
+ * 把 `list_tasks` 的成功说成"已执行（可撤销）"，是界面在编一件没发生的事。
+ */
+export function hasAppliedWrite(
+  steps: readonly { readonly kind?: 'read' | 'write'; readonly ok: boolean }[],
+): boolean {
+  return steps.some((step) => step.kind === 'write' && step.ok);
+}
+
 export type AssistantTurnEvent =
   | { readonly type: 'text'; readonly delta: string }
   | { readonly type: 'reasoning'; readonly delta: string }

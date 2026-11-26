@@ -150,7 +150,7 @@ describe('管理员在 /admin 上', () => {
     privacyConsentActions.revoke();
   });
 
-  it('渲染壳：顶栏、十格侧栏、以及同一份内容区', async () => {
+  it('渲染壳：顶栏、十二格侧栏、以及同一份内容区', async () => {
     const { el, seen } = await render(200);
 
     expect(el.querySelector('[data-testid="admin-console"]')).not.toBeNull();
@@ -173,6 +173,8 @@ describe('管理员在 /admin 上', () => {
       '公告',
       '调休/补班',
       '退款',
+      // 2026-11：AI 网关（托管路由的运营面）与 nav.ts / AdminTab 同批。
+      'AI 网关',
     ]);
     // 内容区是 `AdminPanel` 本身（`chrome="console"`），不是第二份实现。
     expect(el.querySelector('[data-testid="admin-panel"]')).not.toBeNull();

@@ -398,6 +398,9 @@ const EMPTY_SITES = {
      *   按「空态 testid」重新点名它（2026-10-17 在 `HEYTA_CHECK_ROOT` 副本上
      *   实测：写回 ⇒ rc=1 且点名 `ImportPanel.tsx`）。
      */
+    // 2026-11-26：日历侧栏的「今天没有安排」是一行事实（`ht-sidebar__agenda-empty`），
+    // 不是页面级空态；保留既有 testid 供 e2e 定位，文案走唯一词条表。
+    'apps/web/src/features/calendar/CalendarHubPanel.tsx',
     'apps/web/src/features/settings/MemoryPanel.tsx',
     'apps/web/src/features/settings/PasskeyPanel.tsx',
     // 2026-10-02：TrashView 的手抄 testid 已随骨架一起被壳层组件收编（删账）；
@@ -408,7 +411,6 @@ const EMPTY_SITES = {
     'apps/mobile/src/screens/ListsSection.tsx',
     'apps/mobile/src/screens/TagsSection.tsx',
     'apps/mobile/src/screens/TaskDetailSheet.tsx',
-    'apps/mobile/src/screens/TasksScreen.tsx',
     'apps/mobile/src/screens/TrashScreen.tsx',
     'apps/web/src/features/ai/AiToolRun.tsx',
     /**
@@ -423,7 +425,6 @@ const EMPTY_SITES = {
      * 真正该收的方向与本门禁给 `AuthPanel` 的同一句话：**让共享组件自己拥有文案**、
      * 视图不再传 —— 那要动 `packages/ui` 的组件 API 与其测试，属下一批（已记台账）。
      */
-    'apps/web/src/features/share/ShareCommentsSection.tsx',
     /**
      * ⚠️ `apps/web/src/features/auth/AuthPanel.tsx` 曾登记在这里，**已移除**
      * （2026-10-17，按本门禁自己打印的"登记站点已消失"提示做的对账）。
@@ -446,6 +447,17 @@ const EMPTY_SITES = {
      * 纪律（"同一句话不许两个端各写一份"，词条就是同一套
      * `common.organizer.*`）。**渲染**仍在共享 Board 里，这里只是文案来源。
      */
+    /**
+     * 2026-11-26：日历侧栏 / 管理后台 AI 网关 / 四象限 / 订阅卡这四处是**一行事实**，
+     * 不是页面级空态（没有插画、标题、提示的分层，也不占整块内容区）。
+     * 共享 `EmptyState` 是页面级形态（最小也只有居中一句 + 可选插画），
+     * 套进侧栏/设置卡会改变行高与对齐；文案仍走唯一词条表，没有第二份实现。
+     * 判据仍成立：把这里换成手写骨架而不是一句话，门禁会按其它栏重新点名。
+     */
+    'apps/web/src/features/calendar/CalendarHubPanel.tsx',
+    'apps/web/src/features/admin/sections/AiGatewaySection.tsx',
+    'apps/web/src/features/quadrant/copy.ts',
+    'apps/web/src/features/settings/CalendarSubscriptionsCard.tsx',
     'apps/web/src/features/projects/ProjectsPanel.tsx',
     /**
      * M3 第三刀（categories）：`CategoryBreakdown.tsx` 那一处**已收编** ——

@@ -10,8 +10,10 @@
  * ⚠️ 写操作经本地传输只出 `write-needs-confirm`（走既有的"提案→确认"），不在本入口落库。
  */
 import type { AiRoutingConfig, EgressConsent } from '@heyta/ai';
+import { selectMemoryForPrompt, type UserMemory } from '@heyta/domain';
 import type { LocalApiConfig } from '@heyta/local-api';
 import {
+  CLOUD_ASSISTANT_SYSTEM_PROMPT,
   createAutoWriteLocalToolTransport,
   runAiTurnWithUndo,
   undoLastAiTurn,
@@ -46,8 +48,14 @@ export interface WebCloudTurnDeps {
   readonly consents: readonly EgressConsent[];
   readonly grants: LocalApiConfig['grants'];
   readonly runId?: string;
+  /** 文本流式回调：harness 也要逐字，否则默认路径整段出现。 */
+  readonly onTextDelta?: (text: string) => void;
   /** 流式工具调用增量（id/name）——面板据此显示"正在准备调用工具…"。 */
   readonly onToolCall?: (call: { readonly id: string; readonly name: string }) => void;
+  /** 陈述记忆：与 `requestAssistantTurn` 同一条注入规则（预算/包裹/只取 active）。 */
+  readonly memory?: { readonly enabled: boolean; readonly items: readonly UserMemory[] };
+  /** 这一轮真正进了 prompt 的记忆（预算裁剪之后）；界面据此画「记忆 · N」。 */
+  readonly onMemoryUsed?: (items: readonly UserMemory[]) => void;
 }
 
 export interface WebCloudTurnResult {
@@ -68,11 +76,21 @@ export async function runWebCloudTurn(
   const host = createAiToolHost();
   const transport = createAutoWriteLocalToolTransport({ host, grants: deps.grants, getGrants: () => deps.grants });
   const bindings = webUndoBindings();
+  const selectedMemory =
+    deps.memory?.enabled === true
+      ? selectMemoryForPrompt(deps.memory.items, userText, { now: Date.now() })
+      : { block: '', resident: [], recall: [] };
+  if (selectedMemory.block !== '') {
+    deps.onMemoryUsed?.([...selectedMemory.resident, ...selectedMemory.recall]);
+  }
   const result = await runAiTurnWithUndo(userText, {
     routing: deps.routing,
     consents: deps.consents,
     transport,
     grants: deps.grants,
+    ...(selectedMemory.block === ''
+      ? {}
+      : { systemPrompt: `${CLOUD_ASSISTANT_SYSTEM_PROMPT}\n\n${selectedMemory.block}` }),
     undo: bindings,
     // 周报/年终总结走 Harness 工具（零入口）：把本机物化状态交给聚合。
     getReportState: () => useTaskStore.getState().entities,
@@ -80,6 +98,7 @@ export async function runWebCloudTurn(
     parallelSafe: (name: string) => /^(list|get|search|find|read)_/.test(name),
     ...(deps.runId === undefined ? {} : { runId: deps.runId }),
     ...(deps.onToolCall === undefined ? {} : { onToolCall: deps.onToolCall }),
+    ...(deps.onTextDelta === undefined ? {} : { onTextDelta: deps.onTextDelta }),
   });
   return {
     turn: result.turn,

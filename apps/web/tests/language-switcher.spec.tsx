@@ -297,15 +297,12 @@ describe('🔴 点一下：界面上的可见文案真的变（不是只改 stat
     // 「帮助」在 tablist **外面**（它是动作）—— 单独断言，正好钉住这一点。
     expect(el.querySelector('[data-testid="rail-help"]')?.textContent).toContain('Help');
     /*
-      ⚠️ 2026-11-16：空态文案换了对象。空收集箱现在显示的是**首次引导**
-      （`Inbox` + `Get it out of your head` + 三条示例 + `I’ll write my own`），
-      而不是 `web.shell.empty.all.title`（'Your inbox is empty'）——
-      后者只在引导不出现的场合才轮到，实测这个夹具里根本没轮到。
-
-      所以断言改用引导自己的出口按钮：它在英文界面里是 `I’ll write my own`，
-      在中文里是「我自己写」。意图不变：**空状态那一块**也跟着翻语言。
+      ⚠️ 2026-11-26：首启引导已按 AGENTS §0.2 整段删除（空态只写事实）。
+      空收集箱现在就是一句 `web.shell.empty.all.title` —— 断言回到词条本身，
+      而不是引导里的出口按钮（那个按钮已经不存在，继续断言它就是让测试
+      替一个被产品删掉的组件背书）。
     */
-    expect(el.textContent).toContain("I’ll write my own");
+    expect(el.textContent).toContain('Your inbox is empty');
 
     expect(el.textContent).not.toContain('收集箱');
     expect(el.textContent).not.toContain('回收站');

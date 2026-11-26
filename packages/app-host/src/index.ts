@@ -717,6 +717,7 @@ export {
   declaredFieldNames,
   observedFieldNames,
   planAssistantEgress,
+  hasAppliedWrite,
   requestAssistantTurn,
   type AssistantEgressPlan,
   type AssistantFailureReason,

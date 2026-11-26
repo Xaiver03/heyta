@@ -132,16 +132,14 @@ describe('空态词条是 `common.organizer.*`，两个宿主都接了线', () =
   const REPO = resolve(HERE, '../../..');
   const read = (rel: string): string => readFileSync(resolve(REPO, rel), 'utf8');
 
-  it('web 侧栏（`ProjectsPanel`）传了同一套 empty/emptyHint', () => {
+  it('web 侧栏（`ProjectsPanel`）传了同一套 empty（只写事实，不传 hint）', () => {
     const panel = read('apps/web/src/features/projects/ProjectsPanel.tsx');
-    for (const key of [
-      'common.organizer.lists.empty',
-      'common.organizer.lists.empty.hint',
-      'common.organizer.tags.empty',
-      'common.organizer.tags.empty.hint',
-    ]) {
+    for (const key of ['common.organizer.lists.empty', 'common.organizer.tags.empty']) {
       expect(panel, `web 侧栏没有接线词条 ${key}`).toContain(`t('${key}'`);
     }
+    // 🔴 2026-11-25 产品裁决（AGENTS §0.2）：空态只写事实、不写引导。
+    // 这两段下面就是输入框，不需要再用一句话教用户"输入名称就能新建"。
+    expect(panel, '空态又带上了引导句').not.toContain('empty.hint');
   });
 
   it('旧的 `mobile.lists.empty*` / `mobile.tags.empty*` 已经改名，没有留下第二套', () => {
@@ -155,14 +153,13 @@ describe('空态词条是 `common.organizer.*`，两个宿主都接了线', () =
       ]) {
         expect(table, `${locale}.ts 里 ${gone} 还在 —— 改名只做了一半`).not.toContain(gone);
       }
-      for (const key of [
-        "'common.organizer.lists.empty'",
-        "'common.organizer.lists.empty.hint'",
-        "'common.organizer.tags.empty'",
-        "'common.organizer.tags.empty.hint'",
-      ]) {
+      for (const key of ["'common.organizer.lists.empty'", "'common.organizer.tags.empty'"]) {
         expect(table, `${locale}.ts 缺词条 ${key}`).toContain(key);
       }
+      // 引导句已按 §0.2 删除；留一条反向判据，防止它被"顺手补回来"。
+      expect(table, `${locale}.ts 又出现 organizer 空态引导句`).not.toContain(
+        'common.organizer.lists.empty.hint',
+      );
     }
   });
 });

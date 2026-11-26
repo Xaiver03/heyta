@@ -135,6 +135,8 @@ export interface CloudToolDescriptor {
   readonly name: string;
   readonly description: string;
   readonly parameters: Readonly<Record<string, unknown>>;
+  /** 读/写：云端 harness 的回执要靠它区分「读到了」与「改过了」。 */
+  readonly kind?: 'read' | 'write';
   /**
    * 该工具的**观测结果里可能回送模型的字段**（`实体.字段`），用于出境披露。
    * 云端模型路径会把工具结果回灌给模型 —— 那是出境，字段必须进披露集（审计 P0-1）。
@@ -201,7 +203,13 @@ export function toCloudToolDescriptors(
   const egress = egressByName();
   return listAuthorizedTools(grants)
     .filter((t) => keep.has(t.name))
-    .map((t) => ({ name: t.name, description: t.description, parameters: t.inputSchema, egressFields: egress.get(t.name) ?? [] }));
+    .map((t) => ({
+      name: t.name,
+      description: t.description,
+      parameters: t.inputSchema,
+      kind: LOCAL_API_TOOLS.find((x) => x.name === t.name)?.kind,
+      egressFields: egress.get(t.name) ?? [],
+    }));
 }
 
 /**

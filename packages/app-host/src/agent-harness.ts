@@ -60,6 +60,8 @@ export interface HarnessModelReply {
 export interface HarnessStep {
   readonly tool: string;
   readonly ok: boolean;
+  /** 读还是写：界面据此决定能不能说「已执行（可撤销）」。 */
+  readonly kind?: 'read' | 'write';
   readonly error?: string;
 }
 
@@ -213,7 +215,12 @@ export async function runCloudAgentTurn(
       const ok = outcome.ok;
       const errorText = outcome.errorText;
       const content = outcome.content;
-      steps.push(ok ? { tool: call.name, ok } : { tool: call.name, ok, error: errorText });
+      const stepKind = options.tools.find((t) => t.name === call.name)?.kind;
+      steps.push(
+        ok
+          ? { tool: call.name, ok, ...(stepKind === undefined ? {} : { kind: stepKind }) }
+          : { tool: call.name, ok, error: errorText, ...(stepKind === undefined ? {} : { kind: stepKind }) },
+      );
       options.onEvent?.(ok ? { type: 'tool-finished', tool: call.name, ok } : { type: 'tool-finished', tool: call.name, ok, error: errorText });
       messages.push({ role: 'tool', content, toolCallId: call.id });
     }

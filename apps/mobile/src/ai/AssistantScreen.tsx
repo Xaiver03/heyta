@@ -17,6 +17,7 @@ import {
   type ChatItem,
   type AppHost,
   assistantGrants,
+  hasAppliedWrite,
   createManagedTransport,
 } from '@heyta/app-host';
 import {
@@ -247,7 +248,7 @@ export function AssistantScreen({
                 setHarnessUndoSeq(res.seqBefore);
                 return { text: `出错：${res.error}` };
               }
-              const wrote = res.turn.steps.some((step) => step.ok);
+              const wrote = hasAppliedWrite(res.turn.steps);
               setHarnessUndoSeq(wrote ? res.seqBefore : null);
               return { text: wrote ? `${res.turn.text}\n\n${t('web.ai.chat.harnessApplied' as MessageKey)}` : res.turn.text };
             },

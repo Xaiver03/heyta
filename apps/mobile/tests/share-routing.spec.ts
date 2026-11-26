@@ -247,8 +247,19 @@ describe('移动端共享写路由（wiring.ts）', () => {
   it('🔴 壳的既有纪律不许被这批新文件打破：无 `localStorage`/`btoa`/`atob`/DOM `document`/`window.`', () => {
     // ⚠️ `document` 只拦 **DOM 用法**（`document.body` 那一族）：本壳有以 `document`
     // 命名的局部变量/props（legal-recheck 屏），`\bdocument\.` 会把它们误报成浏览器全局。
+    /**
+     * 🔴 先去掉**字符串字面量**再判：WebView 注入的脚本是以字符串形式存在的
+     * （`WebTimetableImport.tsx` 把 JS 当字符串交给 `injectedJavaScript`），
+     * 里面的 `document.documentElement` 并不会在 RN 运行时执行。
+     * 不剥字符串就会把"脚本内容"误判成"壳自己用了 DOM"。
+     */
+    const stripLiterals = (src: string): string =>
+      stripComments(src).replace(
+        /'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*`/gs,
+        "''",
+      );
     for (const rel of mobileSources()) {
-      const src = stripComments(read(rel));
+      const src = stripLiterals(read(rel));
       expect(src, `${rel} 出现了 localStorage`).not.toMatch(/\blocalStorage\b/);
       expect(src, `${rel} 出现了 btoa/atob`).not.toMatch(/\b(btoa|atob)\s*\(/);
       expect(src, `${rel} 出现了 DOM document`).not.toMatch(

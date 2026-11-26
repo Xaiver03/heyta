@@ -1979,13 +1979,13 @@ export const en = {
   'web.repeat.error.invalid': 'That is not a valid RRULE (it needs FREQ=…).',
 
   // ── Web · quadrants ───────────────────────────────────────
-  'web.quadrant.do': 'Important and urgent',
+  'web.quadrant.do': 'Do now',
   'web.quadrant.q1': 'Important and urgent',
-  'web.quadrant.plan': 'Important, not urgent',
+  'web.quadrant.plan': 'Schedule',
   'web.quadrant.q2': 'Important, not urgent',
-  'web.quadrant.delegate': 'Urgent, not important',
+  'web.quadrant.delegate': 'Delegate',
   'web.quadrant.q3': 'Urgent, not important',
-  'web.quadrant.drop': 'Neither important nor urgent',
+  'web.quadrant.drop': 'Drop',
   'web.quadrant.q4': 'Neither important nor urgent',
   'web.quadrant.a11y.cell': 'Quadrant: {title}',
   'web.quadrant.empty': 'No tasks',
@@ -4069,8 +4069,8 @@ export const en = {
 
   // ── Mobile · sync status ──────────────────────────────────
   'mobile.sync.idle': 'Not synced yet',
-  'mobile.sync.downloading': 'Downloading…',
-  'mobile.sync.uploading': 'Uploading…',
+  'mobile.sync.downloading': 'Downloading...',
+  'mobile.sync.uploading': 'Uploading...',
   'mobile.sync.synced': 'Up to date',
   'mobile.sync.offline': 'Offline',
   'mobile.sync.conflict': 'You have {count} conflicts to resolve',
@@ -5239,6 +5239,9 @@ export const en = {
   'common.entity.ASSISTANT_TURN': 'Assistant message',
   'common.entity.COMMENT': 'Comment',
   'common.entity.ATTACHMENT': 'Attachment',
+  'common.entity.CALENDAR_EVENT': 'Calendar event',
+  'common.entity.SECTION': 'Section',
+  'common.entity.FILTER': 'Saved filter',
   'common.entity.GLOBAL_CONFIG': 'Global settings',
   'common.entity.MIGRATION': 'Data migration',
   'common.entity.RECOVERY': 'Disaster recovery',

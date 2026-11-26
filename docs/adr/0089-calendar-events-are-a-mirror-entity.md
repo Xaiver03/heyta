@@ -2,7 +2,7 @@
 
 > 状态：**待确认**
 > 日期：2026-11-24
-> 取舍来源：Hub 仓（`飞书日历聚合`）的 `docs/heyta-integration.md` §2 / §8 / §9（设计稿，同月同日）。它不在本仓内，故不写成相对链接。
+> 取舍来源：Hub 仓（`飞书日历聚合`）的《heyta-integration》文档 §2 / §8 / §9（设计稿，同月同日）。它不在本仓内，故不写成相对链接。
 > 相关：[ADR-0044](0044-countdown-anniversary-entity-calendar-data-and-image-tiers.md)（倒数日是日历的第二个源）、[ADR-0052](0052-public-facts-are-deployer-supplied.md)（外部公共事实的通道形态）、[ADR-0081](0081-encryption-is-opt-in-not-default.md)（默认 `readable`，不是端到端加密）、[ADR-0085](0085-appearance-is-device-local-and-never-an-op.md)（什么东西不该进 op-log）。
 
 ## 1. 背景与约束

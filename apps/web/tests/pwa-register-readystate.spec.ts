@@ -34,7 +34,9 @@ beforeEach(() => {
   // 所以这一支必须把 PROD 打开才测得到真正的路径。
   vi.stubEnv('PROD', true);
   Object.defineProperty(navigator, 'serviceWorker', {
-    value: { register },
+    // `controllerchange` 监听是 2026-11 新增的（新 SW 接管后提示刷新）；
+    // 夹具要跟着真实 ServiceWorkerContainer 的形状走。
+    value: { register, addEventListener: vi.fn() },
     configurable: true,
   });
   window.history.replaceState({}, '', '/');

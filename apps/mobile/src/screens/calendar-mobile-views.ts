@@ -10,7 +10,7 @@
  * 词条走 `mobile.calendar.view.*`；图标沿用 `calendar.*` 字形。
  */
 
-import type { CalendarViewKind } from '@heyta/ui';
+import { CALENDAR_VIEW_LABEL_KEYS, type CalendarViewKind } from '@heyta/ui';
 
 import type { IconName } from '../ui/icons';
 
@@ -34,7 +34,8 @@ export const MOBILE_VIEW_LABEL_KEY: Record<MobileCalendarView, string> = {
   day: 'mobile.calendar.view.day',
   '3day': 'mobile.calendar.view.3day',
   timetable: 'mobile.calendar.view.timetable',
-  year: 'common.calendar.view.year',
+  // 从共享表取，不写字面量：写回来时 R17 的反抄件判据会红（两端只许一份档位键）。
+  year: CALENDAR_VIEW_LABEL_KEYS.year,
 };
 
 export const MOBILE_VIEW_ICON: Record<MobileCalendarView, IconName> = {

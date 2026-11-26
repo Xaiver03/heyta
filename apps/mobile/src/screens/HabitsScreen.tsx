@@ -69,7 +69,6 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Alert } from 'react-native';
 import { keepLocalCopy, pick } from '@react-native-documents/picker';
 import type { AppHost, HabitActions } from '@heyta/app-host';
 import { createHabitActions, habitGrowth } from '@heyta/app-host';
@@ -121,6 +120,8 @@ export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
   // adapter（崩溃审计 §H.4 第 2 层）。
   const { host } = useTaskHost({ onError: (message) => setError(message) });
   const [error, setError] = useState<string | null>(null);
+  /** 课表导入的**结果**（成功/为空）。它不是加载错误，不占整屏错误态。 */
+  const [importNotice, setImportNotice] = useState<string | null>(null);
   /**
    * 🔴 「新建失败」曾经写进上面那个 `error` —— 于是**一次建不成会把整屏换成错误页**，
    * 连已经建好的习惯列都看不见了。它属于**字段**：说清楚"这一次没建成"就够了。
@@ -216,13 +217,12 @@ export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
         }
         const plan = planCourseImport(rawRows);
         if (plan.rows.length === 0) {
-          Alert.alert('', t('mobile.habits.importEmpty'));
+          setImportNotice(t('mobile.habits.importEmpty'));
           return;
         }
         const res = await actions.importCourses(plan.rows);
         refresh();
-        Alert.alert(
-          '',
+        setImportNotice(
           plan.report.skipped > 0
             ? t('mobile.habits.importResultSkipped', { created: res.created.length, skipped: plan.report.skipped })
             : t('mobile.habits.importResult', { created: res.created.length }),
@@ -636,6 +636,11 @@ export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
         连"还没有习惯"那句话也不在这层：空态由共享清单自己渲染（`labels.empty`），
         因为"空态只有一个实现"是门禁判据（`check:empty-state` 断言 B）。
       */}
+      {importNotice === null ? null : (
+        <Text variant="caption" tone="subtle" testID="habits-import-notice">
+          {importNotice}
+        </Text>
+      )}
       <HabitProgressList
         habits={habits}
         logs={logs}

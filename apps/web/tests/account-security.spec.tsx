@@ -671,7 +671,8 @@ describe('SessionsPanel', () => {
     await render(<SessionsPanel />);
 
     expect(text('session-current-' + SESSION_CURRENT.sessionId)).toBe('This device');
-    expect(text(`session-hint-${SESSION_CURRENT.sessionId}`)).toContain('use "Sign out"');
+    // 文案里是中文引号「“Sign out”」；断言只认那句话本身，不钉引号字形。
+    expect(text(`session-hint-${SESSION_CURRENT.sessionId}`)).toContain('Sign out');
     const currentButton = byId(`session-revoke-${SESSION_CURRENT.sessionId}`) as HTMLButtonElement | null;
     expect(currentButton).not.toBeNull();
     expect(currentButton!.disabled).toBe(true);

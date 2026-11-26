@@ -502,6 +502,10 @@ export type EntityLabelKey =
   | 'common.entity.ASSISTANT_TURN'
   | 'common.entity.COMMENT'
   | 'common.entity.ATTACHMENT'
+  | 'common.entity.CALENDAR_EVENT'
+  | 'common.entity.SECTION'
+  | 'common.entity.FILTER'
+  | 'common.entity.USER_MEMORY'
   | 'common.entity.GLOBAL_CONFIG'
   | 'common.entity.MIGRATION'
   | 'common.entity.RECOVERY'
@@ -531,6 +535,10 @@ export const ENTITY_LABEL_KEYS: Record<string, EntityLabelKey> = {
   // 同一个附件的文件名），所以冲突面板必须叫得出它是谁 —— 显示 `ATTACHMENT`
   // 这种代号，用户就没法在"保哪一边"上做决定。字节本身不在同步里，见契约文件。
   ATTACHMENT: 'common.entity.ATTACHMENT',
+  CALENDAR_EVENT: 'common.entity.CALENDAR_EVENT',
+  SECTION: 'common.entity.SECTION',
+  FILTER: 'common.entity.FILTER',
+  USER_MEMORY: 'common.entity.USER_MEMORY',
   GLOBAL_CONFIG: 'common.entity.GLOBAL_CONFIG',
   MIGRATION: 'common.entity.MIGRATION',
   RECOVERY: 'common.entity.RECOVERY',

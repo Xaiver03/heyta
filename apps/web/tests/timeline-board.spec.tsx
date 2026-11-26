@@ -22,6 +22,7 @@
  */
 
 import { parseLocalDate, type LocalDate } from '@heyta/domain';
+import { translate } from '@heyta/i18n';
 import { type TimelineTaskLike } from '@heyta/app-host';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -90,8 +91,10 @@ describe('空态与锚点', () => {
     expect(el.querySelector('[data-testid="timeline-view"]')).toBeTruthy();
     const empty = el.querySelector('[data-testid="timeline-view-empty"]');
     expect(empty).toBeTruthy();
-    expect((empty?.textContent ?? '').length).toBeGreaterThan(10);
-    expect(empty?.textContent).toContain('收集箱');
+    // 🔴 2026-11-25 产品裁决（AGENTS §0.2）：空态只写事实、不写引导。
+    // 原先这里断言"至少 10 个字且提到收集箱"，那是旧引导文案的形状；
+    // 现在只要求那句话本身在（词条唯一来源），长度与内容都不许再暗示"下一步点哪里"。
+    expect(empty?.textContent).toBe(translate('zh-CN', 'web.timeline.empty'));
   });
 });
 

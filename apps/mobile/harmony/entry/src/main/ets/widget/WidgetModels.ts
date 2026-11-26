@@ -51,7 +51,7 @@ export const QUADRANT_LABELS_EN: Record<string, string> = {
   '1': 'Important and urgent',
   '2': 'Important, not urgent',
   '3': 'Urgent, not important',
-  '4': 'Not important, not urgent',
+  '4': 'Neither important nor urgent',
 };
 
 /** 与 `WidgetStrings.pick` 同一个开关：卡片侧只有一个"是不是中文"的判定。 */

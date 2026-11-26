@@ -83,6 +83,19 @@ export function NotificationsScreen({
   const styles = useMemo(
     () =>
       StyleSheet.create({
+        unreadDot: {
+          width: tokens['space.3'],
+          height: tokens['space.3'],
+          borderRadius: tokens['radius.full'],
+          backgroundColor: tokens['color.primary'],
+        },
+        inviteBox: {
+          backgroundColor: tokens['color.surface-sunken'],
+          borderRadius: tokens['radius.md'],
+          padding: tokens['space.3'],
+        },
+        inviteCode: { alignSelf: 'flex-start' },
+        chips: { flexWrap: 'wrap' },
         flex1: { flex: 1 },
       }),
     [tokens],
@@ -274,14 +287,7 @@ export function NotificationsScreen({
             <Card key={item.id}>
               <HStack align="center">
                 {item.readAt === null ? (
-                  <View
-                    style={{
-                      width: tokens['space.3'],
-                      height: tokens['space.3'],
-                      borderRadius: tokens['radius.full'],
-                      backgroundColor: tokens['color.primary'],
-                    }}
-                  />
+                  <View style={styles.unreadDot} />
                 ) : null}
                 <Text variant="row-title" tone="default" style={styles.flex1}>
                   {t('mobile.inbox.notification.referral.title')}
@@ -362,7 +368,7 @@ export function NotificationsScreen({
                   setShareFailed(true);
                 });
             }}
-            style={{ alignSelf: 'flex-start' }}
+            style={styles.inviteCode}
           >
             <Text variant="row-title" tone="default">
               {invite.inviteCode}
@@ -471,7 +477,7 @@ export function NotificationsScreen({
       actions={[{ icon: 'action.back', label: t('mobile.inbox.back'), onPress: onBack }]}
     >
       {/* 三枚 chip 在窄屏（英文 375pt）会放不下 —— 允许换行，不许挤成一枚看不见的。 */}
-      <HStack style={{ flexWrap: 'wrap' }}>
+      <HStack style={styles.chips}>
         <Chip
           testID="inbox-tab-notifications"
           label={t('mobile.inbox.tab.notifications')}

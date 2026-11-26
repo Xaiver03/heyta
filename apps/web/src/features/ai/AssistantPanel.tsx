@@ -101,6 +101,7 @@ import {
   confirmAiToolProposal,
   planAssistantEgress,
   reduceAssistantLive,
+  hasAppliedWrite,
   requestAssistantTurn,
   type AssistantFailureReason,
   type AssistantMessage,
@@ -566,28 +567,46 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
     setPhase('running');
     if (props.useCloudHarness === true) {
       setHarnessPreparing(false);
+      ephemeral.write(session.account, { live: EMPTY_LIVE });
       try {
         const res = await runWebCloudTurn(text, {
           routing: props.routing,
           consents: props.consents,
           grants: assistantGrants(),
           onToolCall: () => { if (ephemeral.isCurrent() && epoch === controls.epoch) setHarnessPreparing(true); },
+          onTextDelta: (delta) => {
+            if (!ephemeral.isCurrent() || epoch !== controls.epoch) return;
+            ephemeral.write(session.account, {
+              live: reduceAssistantLive(ephemeral.value.live, { type: 'text', delta }),
+            });
+          },
+          memory: { enabled: props.memoryEnabled === true, items: memoryItems },
+          onMemoryUsed: (items) => {
+            usedMemory.splice(
+              0,
+              usedMemory.length,
+              ...items.map((m) => ({ id: m.id, kind: m.kind, text: m.text })),
+            );
+          },
         });
         if (!ephemeral.isCurrent() || epoch !== controls.epoch || currentAccount() !== session.account) return;
         setPhase('idle');
         setHarnessPreparing(false);
+        ephemeral.write(session.account, { live: undefined });
         if (res.error !== undefined) {
           setHarnessUndo(res.undo ?? null);
           append({ role: 'assistant', text: `出错：${res.error}`, steps: [], stoppedAt: undefined });
           return;
         }
-        const wrote = res.turn.steps.some((step) => step.ok);
+        const wrote = hasAppliedWrite(res.turn.steps);
         setHarnessUndo(wrote ? (res.undo ?? null) : null);
+        if (usedMemory.length > 0) append({ role: 'memory', items: [...usedMemory] });
         append({ role: 'assistant', text: wrote ? `${res.turn.text}\n\n${t('web.ai.chat.harnessApplied')}` : res.turn.text, steps: [], stoppedAt: undefined });
       } catch (error: unknown) {
         if (!ephemeral.isCurrent() || epoch !== controls.epoch) return;
         setPhase('idle');
         setHarnessPreparing(false);
+        ephemeral.write(session.account, { live: undefined });
         append({ role: 'assistant', text: `出错：${error instanceof Error ? error.message : '云端 Agent 失败。'}`, steps: [], stoppedAt: undefined });
       }
       return;

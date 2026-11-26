@@ -422,7 +422,7 @@ describe('PasskeyPanel — 添加一条', () => {
     expect(byId('passkeys-added')).toBeNull();
     const failure = byId('passkeys-add-failed');
     expect(failure).not.toBeNull();
-    expect(failure!.textContent).toContain('cancelled');
+    expect(failure!.textContent).toContain('canceled');
     // 列表没变。
     expect(byId('passkey-row-pk_row_1')).not.toBeNull();
   });

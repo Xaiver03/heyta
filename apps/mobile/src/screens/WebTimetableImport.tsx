@@ -7,15 +7,15 @@
  * ICS/CSV 同一条导入管线（稳定去重、守恒律）。解析结果为空则如实提示，不瞎填。
  */
 
-import React, { useRef, useState } from 'react';
-import { Alert, Modal, View } from 'react-native';
+import React, { useMemo, useRef, useState } from 'react';
+import { Modal, StyleSheet, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 
 import type { HabitActions } from '@heyta/app-host';
 import { parseCourseHTML, planCourseImport } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
 
-import { Button, TextField } from '../ui/kit';
+import { Button, Text, TextField } from '../ui/kit';
 import { useTokens } from '../theme';
 
 export function WebTimetableImport({
@@ -34,6 +34,26 @@ export function WebTimetableImport({
   const [entry, setEntry] = useState('');
   const [url, setUrl] = useState('');
   const [busy, setBusy] = useState(false);
+  /** 识别结果（成功/为空）—— 就地一行，不弹系统框。 */
+  const [notice, setNotice] = useState<string | null>(null);
+
+  // 样式集中在 StyleSheet（L4 门禁：视图里不写内联样式字面量）。
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        root: { flex: 1, backgroundColor: tk['color.surface'], paddingTop: tk['space.6'] },
+        header: {
+          flexDirection: 'row',
+          gap: tk['space.2'],
+          paddingHorizontal: tk['space.3'],
+          alignItems: 'flex-end',
+        },
+        headerText: { flex: 1 },
+        notice: { paddingHorizontal: tk['space.3'], paddingTop: tk['space.2'] },
+        web: { flex: 1, marginTop: tk['space.2'] },
+      }),
+    [tk],
+  );
 
   const runIdentify = (): void => {
     if (busy) return;
@@ -54,13 +74,12 @@ export function WebTimetableImport({
         const rows = parseCourseHTML(data);
         const plan = planCourseImport(rows);
         if (plan.rows.length === 0) {
-          Alert.alert('', t('mobile.habits.importEmpty'));
+          setNotice(t('mobile.habits.importEmpty'));
           return;
         }
         const res = await actions.importCourses(plan.rows);
         onImported();
-        Alert.alert(
-          '',
+        setNotice(
           plan.report.skipped > 0
             ? t('mobile.habits.importResultSkipped', { created: res.created.length, skipped: plan.report.skipped })
             : t('mobile.habits.importResult', { created: res.created.length }),
@@ -73,9 +92,9 @@ export function WebTimetableImport({
 
   return (
     <Modal animationType="slide" visible onRequestClose={onClose}>
-      <View style={{ flex: 1, backgroundColor: tk['color.surface'], paddingTop: tk['space.6'] }}>
-        <View style={{ flexDirection: 'row', gap: tk['space.2'], paddingHorizontal: tk['space.3'], alignItems: 'flex-end' }}>
-          <View style={{ flex: 1 }}>
+      <View style={styles.root}>
+        <View style={styles.header}>
+          <View style={styles.headerText}>
             <TextField
               label={t('mobile.habits.webUrlLabel')}
               value={entry}
@@ -90,7 +109,14 @@ export function WebTimetableImport({
           </View>
           <Button label={t('mobile.habits.identify')} tone="primary" onPress={runIdentify} />
         </View>
-        <View style={{ flex: 1, marginTop: tk['space.2'] }}>
+        {notice === null ? null : (
+          <View style={styles.notice}>
+            <Text variant="caption" tone="subtle" testID="web-timetable-notice">
+              {notice}
+            </Text>
+          </View>
+        )}
+        <View style={styles.web}>
           {url !== '' ? (
             <WebView
               ref={webRef}

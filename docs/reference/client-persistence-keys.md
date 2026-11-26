@@ -78,6 +78,7 @@ grep -rnoE "'heyta\.[A-Za-z0-9._]+'" apps/web/src apps/mobile/src packages/*/src
 | `heyta.shell.modules` | `apps/web/src/features/shell/modules.ts:131` | 功能模块开关 | **功能开关**（行为），不是外观 —— 别放进 A 档 |
 | `heyta.announcements.dismissed` | `apps/web/src/features/announcements/store.ts:25` | 公告 | 已读状态 |
 | `heyta.ai.assistant.history` | `packages/app-host/src/assistant-local-history.ts:60` | 助手本地历史 | 用户数据，**本机** |
+| `heyta.ai.assistant.sessions` | `packages/app-host/src/assistant-sessions.ts` | 助手多会话列表 | 用户数据，**本机**（与单条历史同一档） |
 | `heyta.vault.root.v1` | `apps/web/src/lib/vault-root-cache.ts:21` | vault 根缓存 | 敏感；见 vault 那一份 |
 | `heyta.vault.keyPlacement.v1` | `apps/web/src/lib/vault-root-preference.ts:18` | 密钥存放位置偏好 | 敏感 |
 
@@ -90,6 +91,8 @@ grep -rnoE "'heyta\.[A-Za-z0-9._]+'" apps/web/src apps/mobile/src packages/*/src
 | `heyta.fieldVersions` | `packages/op-log/src/state.ts:179` | op-log 派生状态 |
 | `heyta.auth.remembered.v1` | `apps/web/src/features/auth/remembered-credentials.ts:17` | 凭据（加密后） |
 | `heyta.sync.credentials` | `apps/web/src/features/sync/credential-storage.ts:32` | 同步凭据 |
+| `heyta.update.deviceId` | `apps/web/src/features/app-update/detect.ts` | 更新检查的设备标识（随机、非用户数据） |
+| `heyta.update.lastPromptedVersion` | `apps/web/src/features/app-update/detect.ts` | 上次已提示过的版本（避免重复弹更新） |
 | `heyta.gtk.css` | `packages/design-system/src/generate-cli.ts:48` | 生成产物名 |
 | `heyta.waytofuture.cn` | `packages/ai/src/managed-endpoints.ts:90` | 托管端点常量（不是存储键，但同前缀，登记以免下次被当成漏登记） |
 

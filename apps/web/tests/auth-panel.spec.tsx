@@ -142,6 +142,8 @@ interface FetchCall {
 }
 
 let calls: FetchCall[];
+/** 只看登录端点：面板挂载时会匿名查一次飞书入口状态（`/api/auth/feishu/status`），它不是登录请求。 */
+const loginCalls = (): FetchCall[] => calls.filter((call) => call.url.includes('/api/login/'));
 
 /** 让 fetch 回一个指定响应，并记录调用。 */
 function stubFetch(
@@ -568,11 +570,11 @@ describe('发登录链接（降级到二级链，但仍是一条真的路）', (
     await toCredential(el);
     await tap(el, 'auth-form-magic-link');
 
-    expect(calls).toHaveLength(1);
-    expect(calls[0]!.url).toBe(`${BASE_URL}/api/login/magic-link`);
-    expect(calls[0]!.init?.method).toBe('POST');
+    expect(loginCalls()).toHaveLength(1);
+    expect(loginCalls()[0]!.url).toBe(`${BASE_URL}/api/login/magic-link`);
+    expect(loginCalls()[0]!.init?.method).toBe('POST');
     // 发信请求带上当前界面语言（邮件按收件人当前语言渲染）；逐字 toEqual 拦住多余字段。
-    expect(calls[0]!.body).toEqual({ email: EMAIL, locale: 'zh-CN' });
+    expect(loginCalls()[0]!.body).toEqual({ email: EMAIL, locale: 'zh-CN' });
 
     const text = el.textContent ?? '';
     expect(text).toContain(translate('zh-CN', 'web.auth.sent.login'));
@@ -619,7 +621,7 @@ describe('🔴 拿到令牌之后必须真的接上同步配置', () => {
     await typeById(el, 'auth-form-paste', 'https://sync.example.com/magic-login?token=tok-123');
     await tap(el, 'auth-form-verify');
 
-    expect(calls[0]!.url).toBe(`${BASE_URL}/api/login/magic-link/verify`);
+    expect(loginCalls()[0]!.url).toBe(`${BASE_URL}/api/login/magic-link/verify`);
     expect(useSyncStore.getState().token).toBe('jwt-abc');
   });
 
@@ -681,7 +683,7 @@ describe('🔴 失败绝不能被当成成功', () => {
       await Promise.resolve();
     });
 
-    expect(calls).toHaveLength(0);
+    expect(loginCalls()).toHaveLength(0);
     expect(useAuthStore.getState().status).toEqual({ kind: 'failed', reason: 'unconfigured' });
   });
 
@@ -695,7 +697,7 @@ describe('🔴 失败绝不能被当成成功', () => {
       await Promise.resolve();
     });
 
-    expect(calls).toHaveLength(0);
+    expect(loginCalls()).toHaveLength(0);
     expect(useAuthStore.getState().status).toEqual({ kind: 'failed', reason: 'invalid-input' });
     expect(el.textContent ?? '').toContain(translate('zh-CN', 'common.auth.error.invalidInput'));
   });
