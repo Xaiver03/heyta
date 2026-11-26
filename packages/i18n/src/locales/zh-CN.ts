@@ -928,6 +928,11 @@ export const zhCN = {
   'web.tasks.detail.section.time': '时间',
   'web.tasks.detail.section.organize': '组织',
   'web.tasks.detail.section.automation': '自动化',
+  // 指派（#15 委派 UI）：共享清单内把任务指派给某个成员。个人清单不出现这一格。
+  'web.tasks.detail.assign.label': '指派',
+  'web.tasks.detail.assign.unassigned': '未指派',
+  'web.tasks.detail.assign.me': '我',
+  'web.tasks.detail.assign.member': '成员 {id}',
   // 重复面板里收起自定义 RRULE 的那枚 summary（审计 §4.6：先展示自然语言选项，
   // 原始 RRULE 收进「高级」）。与登录面板「高级」指的是同一档交互，成对词条。
   'web.tasks.detail.advanced': '高级',
