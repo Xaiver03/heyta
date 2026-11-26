@@ -89,7 +89,6 @@ import {
   type TaskActions,
   type TaskActivityOpSource,
   type TaskActivityRead,
-  type PrioritizeDecision,
 } from '@heyta/app-host';
 import {
   BottomSheet,
@@ -132,9 +131,7 @@ import { datePickerLabels, datePickerTimeLabels } from '../lib/date-picker-label
 import { quickDatePicks } from '../lib/quick-dates';
 import { Icon } from '../ui/icons';
 import { Button, Chip, ChoiceRows, HStack, IconButton, Stack, Text, TextField } from '../ui/kit';
-import { AiToolboxScreen } from '../ai/AiToolboxScreen';
 import { ChecklistSection } from '../ui/ChecklistSection';
-import { persistToolboxHealth, useToolboxDeps } from '../ai/toolbox-shared';
 
 /**
  * 重复预设 → 词条 key。
@@ -897,31 +894,6 @@ export function TaskDetailSheet({
     };
   }, [taskId]);
 
-  /*
-    AI 工具面板（拆解 / 排序 / 估时）的开关与依赖。
-    🔴 这三个 hook 必须在下面 `if (task === undefined) return null` 之上（理由同
-    `customDraft` 那一段：提前返回之后新增 hook 会让"面板打开"那次渲染多出 hook，
-    release 包表现为应用凭空消失）。
-  */
-  const [aiToolsOpen, setAiToolsOpen] = useState(false);
-  const aiDeps = useToolboxDeps();
-  /** 把 AI 生成的新备注写回这条任务（走 op-log 唯一写入口，与手动编辑同一条 `setNote`）。 */
-  const aiApplyNote = useCallback(
-    (nextNote: string): void => {
-      setNote(nextNote);
-      if (task === undefined) return;
-      run(actions.setNote(task.id, nextNote === '' ? undefined : nextNote));
-    },
-    [actions, run, task],
-  );
-  /** 排序建议确认后逐条写回优先级。 */
-  const aiApplyPriorities = useCallback(
-    (decisions: readonly PrioritizeDecision[]): void => {
-      for (const decision of decisions) run(actions.setPriority(decision.id, decision.priority));
-    },
-    [actions, run],
-  );
-
   if (task === undefined) return null;
 
   /**
@@ -1440,31 +1412,6 @@ export function TaskDetailSheet({
       )}
 
       <ChecklistSection task={task} actions={actions} />
-
-      {/* ── AI 工具（拆解 / 排序 / 估时）────────────────────────────────
-          入口常驻、面板按需展开：AI 是"处理这条任务"的工作动作，读成内容层的一格，
-          与备注并列，而不是塞进折叠层（§1 的内容 / 折叠分工）。 */}
-      <Stack gap="tight">
-        <Button
-          label={t('mobile.ai.toolbox.entry')}
-          tone="secondary"
-          onPress={() => setAiToolsOpen((open) => !open)}
-          testID="task-detail-ai-tools"
-        />
-        {aiToolsOpen ? (
-          <AiToolboxScreen
-            task={task}
-            tasks={tasks}
-            routing={aiDeps.routing}
-            consents={aiDeps.consents}
-            secrets={aiDeps.secrets}
-            healthSnapshot={aiDeps.healthSnapshot}
-            onApplyNote={aiApplyNote}
-            onApplyPriorities={aiApplyPriorities}
-            onHealth={persistToolboxHealth}
-          />
-        ) : null}
-      </Stack>
 
       {/* ── 子任务（内容层，常驻不折叠）─────────────────────────────────
           它是**工作内容**（这条任务由哪几件小事组成），不是"这条记录的某一列"，

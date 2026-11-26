@@ -24,7 +24,7 @@
  * 现在 `Text` 直接消费 `useText()` 的语义样式，本文件不再自己推导排版。
  */
 
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -1287,7 +1287,7 @@ export function EmptyState({
   icon?: IconName;
   illustration?: StateIllustrationVariant;
   title: string;
-  hint: string;
+  hint?: string;
   /**
    * 空态里的**行动入口**（2026-11-16）。
    *
@@ -1483,6 +1483,7 @@ export function TextField({
 }: TextFieldProps): React.JSX.Element {
   const t = useTokens();
   const text = useText();
+  const [focused, setFocused] = useState(false);
   // 🔴 三件判断（错误优先 / 说明让位 / 必填星号）住在 `@heyta/ui#resolveFieldChrome`，
   //    与 web 的 `FormField` 共用同一个函数。这里只负责把它摆到 RN 原语上。
   const chrome = resolveFieldChrome({ hint, error }, 'stacked');
@@ -1511,7 +1512,11 @@ export function TextField({
         aria-describedby={hint === undefined && error === undefined ? undefined : `${testID ?? 'field'}-message`}
         testID={testID}
         onSubmitEditing={onSubmitEditing}
-        onBlur={onBlur}
+        onFocus={() => setFocused(true)}
+        onBlur={() => {
+          setFocused(false);
+          onBlur?.();
+        }}
         // 只有声明了提交通道才改键盘形状（现有调用点保持 RN 默认）。
         returnKeyType={onSubmitEditing === undefined ? undefined : 'done'}
         // cursorColor 是 TextInput 的 **prop**，不是 style —— 放进 style 会被静默忽略。
@@ -1532,12 +1537,14 @@ export function TextField({
               ? { paddingTop: t['space.2'], textAlignVertical: 'top' as const }
               : {}),
             borderRadius: t['radius.md'],
-            // 2026-11-17 产品裁决：输入面 = 白底 + 一圈极细的边作承载（与 AuthForm / Web `.ht-input` 同一条规则，多端统一）。
-            // 细边只用最细一档与语义 border 色，不要重描边 / 彩色描边 / 框中框。
             backgroundColor: t['color.surface'],
             color: t['color.foreground'],
             borderWidth: t['border-width.thin'],
-            borderColor: t['color.border'],
+            borderColor: chrome.invalid
+              ? t['color.danger']
+              : focused
+                ? t['color.ring']
+                : t['color.border'],
             opacity: editable ? 1 : t['state.disabled-opacity'],
           },
         ]}

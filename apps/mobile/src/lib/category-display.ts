@@ -85,7 +85,6 @@ export function categoryReportLabels(t: I18nValue['t']): CategoryReportLabels {
     note: t('mobile.categories.note'),
     empty: t('mobile.categories.empty'),
     emptyTitle: t('mobile.categories.empty'),
-    emptyHint: t('mobile.categories.empty.hint'),
     range: (start, end) => t('mobile.categories.range', { start, end }),
     unassigned: (duration) => t('mobile.categories.unassigned', { duration }),
     hintUnset: t('mobile.categories.hint.unset'),

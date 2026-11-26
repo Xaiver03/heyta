@@ -110,7 +110,6 @@ export function AbandonedScreen({ onBack }: { onBack: () => void }): React.JSX.E
           <EmptyState
             icon="task.abandon"
             title={t('mobile.abandoned.empty')}
-            hint={t('mobile.abandoned.emptyHint')}
             testID="abandoned-empty"
           />
         ) : (

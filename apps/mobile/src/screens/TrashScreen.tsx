@@ -248,7 +248,6 @@ export function TrashScreen({ onBack }: { onBack: () => void }): React.JSX.Eleme
   const labels: TrashBoardLabels = {
     intro: t('mobile.trash.intro'),
     emptyTitle: t('mobile.trash.empty.title'),
-    emptyHint: t('mobile.trash.empty.hint'),
     kindLabel: (kind) => entityLabelOf(kind, t),
     deletedAt: (item: TrashItem) => deletedAtText(item, t),
     restore: (item: TrashItem) => restoreA11y(item, t),
