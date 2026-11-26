@@ -36,6 +36,9 @@
 @import './app/danger-confirm.css';
 @import './app/admin.css';
 @import './app/habits.css';
+/* 统计 / 总结布局（覆盖图谱 #16 / #46 / #48 / #50）。放在 habits.css 之后，
+   因为它补的是习惯详情 / 专注详情里的两块新内容。 */
+@import './app/stats.css';
 @import './app/projects-settings.css';
 @import './app/narrow.css';
 

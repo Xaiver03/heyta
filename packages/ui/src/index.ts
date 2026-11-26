@@ -1675,3 +1675,12 @@ export {
   projectGestureOffset,
   rubberBandOffset,
 } from './motion/gesture.js';
+
+// 手写 SVG 图表原语（覆盖图谱 #48 / #50）：无第三方图表库，颜色/线宽全走 token。
+export {
+  BarChart,
+  LineChart,
+  type BarChartProps,
+  type LineChartProps,
+  type ChartDatum,
+} from './stats/charts.js';
