@@ -469,6 +469,17 @@
   font-weight: var(--ht-font-weight-semibold);
 }
 
+/* `/admin` 侧栏的分组标题（控制台 / 用户 / 收入与订阅 / 内容 / 系统）。纯 token。 */
+.ht-settings__console-navGroup {
+  margin: var(--ht-space-3) 0 var(--ht-space-1);
+  padding-inline: var(--ht-space-3);
+  color: var(--ht-color-foreground-subtle);
+  font-family: var(--ht-font-sans);
+  font-size: var(--ht-font-size-2xs);
+  font-weight: var(--ht-font-weight-semibold);
+  text-transform: uppercase;
+}
+
 .ht-settings__console-content {
   flex: 1 1 auto;
   min-inline-size: 0;
