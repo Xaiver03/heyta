@@ -43,7 +43,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, KeyboardAvoidingView, Modal, PanResponder, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { Animated, KeyboardAvoidingView, Modal, PanResponder, Platform, Pressable, ScrollView, View } from 'react-native';
 
 import {
   addDays,
@@ -98,7 +98,7 @@ import { createProjectActions } from '@heyta/app-host';
 import { useTaskHost } from '../db/use-task-host';
 import { QUADRANT_TITLE_KEYS } from '../lib/quadrant-display';
 import { useMobileSync } from '../sync/store';
-import { Button, IconButton, Screen, Text } from '../ui/kit';
+import { Button, IconButton, Screen, Text, TextField } from '../ui/kit';
 import { CalendarScopeSheet, SCOPE_INBOX, SCOPE_QUADRANT_PREFIX, type ScopeProject } from './CalendarScopeSheet';
 import { TopBarMenu } from '../ui/top-bar-menu';
 import { CalendarViewMenu } from './CalendarViewMenu';
@@ -1239,26 +1239,16 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
           }}
         >
           <Text variant="section-title">{`${addSlot?.date ?? ''} ${addTimeLabel}`}</Text>
-          <TextInput
+          <TextField
+            label={t('mobile.capture.addLabel')}
             value={addTitle}
             onChangeText={setAddTitle}
             placeholder={t('mobile.tasks.composer.placeholder')}
-            placeholderTextColor={tokens['color.foreground-subtle']}
             autoFocus
+            error={addError ?? undefined}
             onSubmitEditing={() => { void submitAdd(); }}
-            style={{
-              minHeight: tokens['touch-target.min'],
-              borderRadius: tokens['radius.md'],
-              borderWidth: tokens['border-width.thin'],
-              borderColor: tokens['color.border-subtle'],
-              paddingHorizontal: tokens['space.3'],
-              color: tokens['color.foreground'],
-            }}
             testID="calendar-add-title"
           />
-          {addError === null ? null : (
-            <Text variant="row-meta" tone="danger">{addError}</Text>
-          )}
           <View style={{ flexDirection: 'row', gap: tokens['space.3'], justifyContent: 'flex-end' }}>
             <Button label={t('mobile.common.cancel')} tone="ghost" onPress={() => { setAddSlot(null); }} />
             <Button

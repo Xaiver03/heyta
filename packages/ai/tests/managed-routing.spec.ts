@@ -95,18 +95,13 @@ describe('withManagedEndpoint', () => {
     expect(candidates.map((c) => c.endpointConfig.id)).toEqual([MANAGED_ENDPOINT_ID]);
   });
 
-  it('🔴 `tool-calling` 在托管档上**被排除**：托管端点不声明 `tool_calling`（这一档不提供助手）', () => {
+  it('✅ `tool-calling` 在托管档上**提供**：托管端点声明 `tool_calling`（2026-11-21 起这一档提供对话式助手）', () => {
     const out = withManagedEndpoint(managed(), `https://${SELF_HOST}`);
 
-    const { candidates, excluded } = resolveRoute(out, 'tool-calling', { now: 0 });
+    const { candidates } = resolveRoute(out, 'tool-calling', { now: 0 });
 
-    // 判据是"排除 + 原因码"，不是"没有候选"就算过：别的原因（端点缺失、熔断、
-    // 远程未允许）也会让候选为空，而那几种失败说的不是同一件事。
-    expect(candidates).toEqual([]);
-    expect(excluded.map((e) => e.reason)).toContain('capability-missing');
-
-    // 失败必须响亮：`resolveRoute` 给出的那句解释要能读成"这个功能没有路"，
-    // 而不是"网络/端点坏了" —— 后者会把用户支去排查一个没坏的东西。
+    // 托管档现在声明 tool_calling ⇒ 它是候选，路由表也指向它。
+    expect(candidates.map((c) => c.endpointConfig.id)).toEqual([MANAGED_ENDPOINT_ID]);
     expect(out.routes['tool-calling']).toEqual([{ endpointId: MANAGED_ENDPOINT_ID }]);
   });
 

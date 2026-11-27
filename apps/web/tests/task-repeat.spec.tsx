@@ -274,10 +274,19 @@ describe('🔴 接线：重复控件的入口真的接进了整棵树', () => {
       container!.querySelector<HTMLElement>(`[data-testid="task-row-${taskId}"]`)?.click();
     });
 
-    // 面单里那一支是 `RepeatField`（裸编辑本体，没有浮层外壳），它的单选组按
+    // 2026-11 详情面改造：重复编辑器收进了顶部属性条的「重复」触发器背后的浮层
+    // （`task-detail-repeat-trigger` → `activePanel === 'repeat'` 时才渲染 `RepeatField`，
+    // 见 `task-detail-groups.spec.tsx` 的「RRULE 收进「高级」」那一族）。
+    // 所以先按真实用户路径点开这一层，再钉"输入真的在那里" —— **判据内容不变**，
+    // 变的只是从"详情面直接渲染"到"点开触发器后渲染"的这段导航。
+    await act(async () => {
+      document.body.querySelector<HTMLElement>(`[data-testid="task-detail-repeat-trigger"]`)?.click();
+    });
+
+    // 浮层里那一支是 `RepeatField`（裸编辑本体），它的单选组按
     // `name="repeat-<id>"` 锚定（不带 id 会把整页所有任务合成同一组，见该文件注释）。
     expect(
-      container.querySelector(`[data-testid="task-pane"] input[name="repeat-${taskId}"]`),
+      document.body.querySelector(`[data-testid="task-pane"] input[name="repeat-${taskId}"]`),
       '详情面里缺少重复入口 —— B2-3 的 Web 入口没有调用点',
     ).not.toBeNull();
     /*

@@ -23,7 +23,23 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { registerWidgetServiceWorker, serviceWorkerUrl } from '../src/pwa/register.js';
 
-const register = vi.fn(() => Promise.resolve(undefined));
+/**
+ * 🔴 真实的 `ServiceWorkerContainer.register()` **总是** resolve 一个
+ * `ServiceWorkerRegistration`（浏览器不会 resolve `undefined`），而容器在
+ * 首装时 `controller` 是 `null`。夹具必须按这个形状造 —— 只给 `{ register }`
+ * 会让 `register.ts` 里的 `registration.waiting` 读到 `undefined` 的属性并抛
+ * `TypeError`，再被 `.catch` 吞成一条**误导性的**「service worker 注册失败」日志。
+ * 那不是产品缺陷（真浏览器里 registration 一定存在），而是夹具缺字段。
+ */
+const registration = {
+  waiting: null,
+  installing: null,
+  active: null,
+  addEventListener: vi.fn(),
+  removeEventListener: vi.fn(),
+};
+
+const register = vi.fn(() => Promise.resolve(registration));
 
 function setReadyState(value: DocumentReadyState): void {
   Object.defineProperty(document, 'readyState', { value, configurable: true });
@@ -36,7 +52,14 @@ beforeEach(() => {
   Object.defineProperty(navigator, 'serviceWorker', {
     // `controllerchange` 监听是 2026-11 新增的（新 SW 接管后提示刷新）；
     // 夹具要跟着真实 ServiceWorkerContainer 的形状走。
-    value: { register, addEventListener: vi.fn() },
+    value: {
+      register,
+      // 首装（无旧 SW 接管）时 `controller` 为 `null` —— 与真实容器一致。
+      controller: null,
+      ready: Promise.resolve(registration),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    },
     configurable: true,
   });
   window.history.replaceState({}, '', '/');

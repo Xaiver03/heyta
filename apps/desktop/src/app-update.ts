@@ -13,7 +13,7 @@
 
 import { app, dialog, shell } from 'electron';
 
-import { APP_UPDATE_INTERVAL_MS, APP_UPDATE_START_DELAY_MS } from '@heyta/app-host';
+import { APP_UPDATE_INTERVAL_MS, APP_UPDATE_START_DELAY_MS } from '@heyta/node-host';
 
 import {
   type DesktopUpdateOutcome,

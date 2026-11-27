@@ -83,7 +83,7 @@ describe('真实端点形状：两步工具调用不 400', () => {
     });
 
     expect(result.text).toBe('你有 2 个任务：写周报、开会。');
-    expect(result.steps).toEqual([{ tool: 'list_tasks', ok: true }]);
+    expect(result.steps).toEqual([{ tool: 'list_tasks', kind: 'read', ok: true }]);
     // 第二步请求确含 assistant.tool_calls 与 tool 帧（否则模拟端点会回 400，result 不会成功）
     const second = seen[1]!;
     expect(second.messages?.some((m) => m.role === 'assistant' && Array.isArray(m.tool_calls))).toBe(true);

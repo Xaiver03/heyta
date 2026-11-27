@@ -57,7 +57,6 @@ import {
   SHELL_PANEL_SECTIONS,
   SHELL_PRIMARY_NAV,
   SHELL_QUADRANT_NAV,
-  SHELL_QUADRANT_SECTION_KEY,
   SHELL_SIDEBAR_TOOLS,
   SHELL_VIEW_TABS,
 } from '../src/mockup/app-shell-shape.js';
@@ -289,38 +288,42 @@ describe('#1 主导航：登记处 ⟷ 真应用 `PRIMARY_NAV`', () => {
     expect(appKeys).toEqual([
       'web.shell.nav.today',
       'web.shell.nav.next7Days',
-      'web.shell.nav.completed',
+      'web.shell.nav.inbox',
     ]);
     expect(SHELL_PRIMARY_NAV.map((item) => item.labelKey)).toEqual(appKeys);
   });
 
-  it('渲染出的侧栏主导航含「已完成」，且登记的每一项都在', () => {
+  it('渲染出的侧栏主导航对齐智能清单三项，且「已完成」归底部工具段', () => {
     const view = renderMockup();
     // 只取第一组 `.mk-nav`（主导航）—— 第二组是四象限。
     const navItems = [...view.querySelectorAll('.mk-sidebar .mk-nav')][0]?.querySelectorAll(
       '.mk-nav__item',
     );
     const labels = [...(navItems ?? [])].map((el) => el.textContent?.trim() ?? '');
-    // 数量从登记处推导，不写死 —— 写死的数字就是下一次加导航项时的第三个漂移点。
-    // "登记本身对不对"由上面那条与 `App.tsx` 逐字对账负责，这里只管"画全了没有"。
     expect(labels).toHaveLength(SHELL_PRIMARY_NAV.length);
     for (const item of SHELL_PRIMARY_NAV) {
       expect(labels.some((label) => label.startsWith(zhCN[item.labelKey]))).toBe(true);
     }
+    expect(view.querySelector('.mk-sidebar__tools')?.textContent ?? '').toContain(
+      zhCN['web.shell.nav.completed'],
+    );
   });
 });
 
 describe('#2 四象限计数：登记值 ⟷ 领域层 `bucketByQuadrant` 实算', () => {
-  it('真应用**确实显示**计数，且是算出来的（不是"产品没有这个位"）', () => {
+  it('真应用的计数是**算出来的**（`navCounts` 走 `filterTasks`，不是写死的字面量）', () => {
     const app = appSource();
     const store = taskStoreSource();
-    // 计数从 store 的 selector 来，而那个 selector 调的就是 `bucketByQuadrant`。
-    expect(store).toContain('export function selectQuadrantCounts');
+    // 2026-11（滴答式组合筛选）：侧栏不再渲染每个象限的快捷筛选行与计数，
+    // 象限条件改由 `FilterPanel` 的组合筛选提供。侧栏的计数改挂在智能清单那一组
+    // （今天 / 明天 / 最近 7 天 / 已完成），由共享的 `filterTasks` 对当前任务实算。
+    // 这里钉住"计数是算出来的、不是写死的一串数字"这一事实。
     expect(store).toContain('bucketByQuadrant(');
-    expect(app).toContain('selectQuadrantCounts');
-    expect(app).toContain('counts[entry.filter.quadrant]');
+    expect(app).toContain('navCounts');
+    expect(app).toContain('filterTasks(');
+    // 计数值不许写成字面量（`count={3}` 这种形态）。
+    expect(app).not.toMatch(/count=\{\s*\d/);
     // `NavButton` 只在 > 0 时渲染计数位 —— 空账号的截图里因此一个数字都没有。
-    //（2026-10-02 起它在 features/shell/NavButton.tsx，对账跟着读那份文件。）
     const navButton = navButtonSource();
     expect(navButton).toContain('count > 0');
     expect(navButton).toContain('ht-nav__count');
@@ -338,7 +341,7 @@ describe('#2 四象限计数：登记值 ⟷ 领域层 `bucketByQuadrant` 实算
     }
   });
 
-  it('侧栏计数 = 领域层对同一批任务的实算，且已完成任务不计入', () => {
+  it('样例象限计数 = 领域层对同一批任务的实算，且已完成任务不计入', () => {
     const buckets = bucketByQuadrant(SHOWCASE_TASKS.map(toDomainTask), { now: SHOWCASE_NOW });
     const expected = {
       q1: buckets[1].length,
@@ -354,22 +357,25 @@ describe('#2 四象限计数：登记值 ⟷ 领域层 `bucketByQuadrant` 实算
     expect(active).toBeLessThan(SHOWCASE_TASKS.length);
   });
 
-  it('渲染出的计数 = 派生值（> 0 才渲染，与真应用 `count > 0` 同一条）', () => {
-    const view = renderMockup();
-    const counts = showcaseQuadrantCounts();
-    const rendered = [...view.querySelectorAll('.mk-sidebar .mk-nav__count')].map(
-      (el) => el.textContent?.trim() ?? '',
-    );
-    const expected = SHELL_QUADRANT_NAV.map((q) => counts[q.quadrant]).filter((n) => n > 0);
-    expect(rendered).toEqual(expected.map(String));
+  it('渲染出的四象限看板 = 领域层分桶（每格卡数 = 实算，已完成不计入）', () => {
+    const view = renderMockup('quadrant');
+    const buckets = bucketByQuadrant(SHOWCASE_TASKS.map(toDomainTask), { now: SHOWCASE_NOW });
+    const counts = {
+      q1: buckets[1].length,
+      q2: buckets[2].length,
+      q3: buckets[3].length,
+      q4: buckets[4].length,
+    };
+    const sections = [...view.querySelectorAll('.mk-quadrant__grid .mk-quad')];
+    expect(sections).toHaveLength(SHELL_QUADRANT_NAV.length);
+    const rendered = sections.map((el) => el.querySelectorAll('.mk-quad__card').length);
+    expect(rendered).toEqual(SHELL_QUADRANT_NAV.map((q) => counts[q.quadrant]));
   });
 
-  it('`AppWindow.tsx` 的计数是**派生**的，没有写死的数字', () => {
-    const source = readFileSync(join(HERE, '../src/mockup/AppWindow.tsx'), 'utf8');
-    expect(source).toContain('showcaseQuadrantCounts');
-    expect(source).toContain('count={counts[item.quadrant]}');
-    // 复刻曾经写死 3 / 5 / 2 / 1。`count={3}` 这种形态不许回来。
-    expect(source).not.toMatch(/count=\{\s*\d/);
+  it('`QuadrantGrid.tsx` 的卡是**派生**的，不是手写的一张张名字', () => {
+    const source = readFileSync(join(HERE, '../src/mockup/QuadrantGrid.tsx'), 'utf8');
+    expect(source).toContain('showcaseTasksByQuadrant');
+    expect(source).toContain('SHOWCASE_TASKS');
   });
 });
 
@@ -493,15 +499,17 @@ describe('#5 视图 tab：登记处 ⟷ 真应用 `VIEW_TABS`', () => {
     );
   });
 
-  it('侧栏四象限分区的标题用的是 `quadrantSection`，不是 `quadrant`', () => {
+  it('侧栏不再有「四象限」快捷筛选段 —— 象限条件已并入 FilterPanel；四象限**视图**仍从 rail 可达', () => {
     const app = appSource();
-    expect(app).toContain("t('web.shell.nav.quadrantSection')");
-    expect(SHELL_QUADRANT_SECTION_KEY).toBe('web.shell.nav.quadrantSection');
-    // 两个 key 的中文逐字相同 —— 这正是它容易被抄错、且抄错看不出来的原因。
-    expect(zhCN['web.shell.nav.quadrantSection']).toBe(zhCN['web.shell.nav.quadrant']);
+    // 2026-11（滴答式组合筛选 `1a8dbf94`）：侧栏那一段「四象限」
+    // （分区标题 + 四个象限筛选行）已撤掉，象限条件改由 `FilterPanel`
+    // 的组合筛选提供。复刻随之撤掉，避免展厅画产品已经没有的入口。
+    expect(app).not.toContain("t('web.shell.nav.quadrantSection')");
     const source = readFileSync(join(HERE, '../src/mockup/AppWindow.tsx'), 'utf8');
-    expect(source).toContain('t(SHELL_QUADRANT_SECTION_KEY)');
-    expect(source).not.toContain("t('web.shell.nav.quadrant')}");
+    expect(source).not.toContain('SHELL_QUADRANT_SECTION_KEY');
+    expect(source).not.toContain('SHELL_QUADRANT_NAV');
+    // 四象限**视图**（2×2 看板）仍在：它登记在 `VIEW_TABS`，rail 上可达。
+    expect(SHELL_VIEW_TABS.map((tab) => tab.key)).toContain('quadrant');
   });
 });
 
@@ -510,11 +518,11 @@ describe('外壳结构只从登记处派生', () => {
     const source = readFileSync(join(HERE, '../src/mockup/AppWindow.tsx'), 'utf8');
     for (const symbol of [
       'SHELL_PRIMARY_NAV',
-      'SHELL_QUADRANT_NAV',
-      'SHELL_QUADRANT_SECTION_KEY',
       'SHELL_VIEW_TABS',
       'SHELL_PANEL_SECTIONS',
       'SHELL_HEADER_ACTIONS',
+      'SHELL_SIDEBAR_TOOLS',
+      'SHELL_COMPLETED_NAV',
     ]) {
       expect(source, `AppWindow.tsx 没有从登记处取 ${symbol}`).toContain(symbol);
     }

@@ -245,6 +245,11 @@ export function AppBar({
   const t = useTokens();
   const insets = useSafeAreaInsets();
 
+  const backAction =
+    titleLeading === undefined ? actions?.find((a) => a.icon === 'action.back') : undefined;
+  const trailingActions =
+    backAction === undefined ? actions : actions?.filter((a) => a !== backAction);
+
   return (
     <View
       style={{
@@ -253,7 +258,19 @@ export function AppBar({
       }}
     >
       <TopBar
-        leading={titleLeading}
+        leading={
+          backAction === undefined ? (
+            titleLeading
+          ) : (
+            <IconButton
+              icon={backAction.icon}
+              label={backAction.label}
+              testID={backAction.testID}
+              onPress={backAction.onPress}
+              disabled={backAction.disabled}
+            />
+          )
+        }
         title={title}
         {...(onTitlePress === undefined ? {} : { onTitlePress })}
         {...(onTitlePress === undefined
@@ -263,7 +280,7 @@ export function AppBar({
                 <Icon name="action.disclose-down" size="sm" color={t['color.foreground-subtle']} />
               ),
             })}
-        actions={actions?.map((a) => (
+        actions={trailingActions?.map((a) => (
           <IconButton
             key={a.label}
             icon={a.icon}
@@ -1411,6 +1428,8 @@ export interface TextFieldProps {
   keyboard?: 'default' | 'url' | 'email-address' | 'number-pad';
   autoCapitalize?: 'none' | 'sentences';
   editable?: boolean;
+  /** 挂载即抢焦点（弹层里的"极简标题"那种一打开就该打字的地方用）。 */
+  autoFocus?: boolean;
   /** 字段下方的说明。传了就会占位，所以只在真有时才传。 */
   hint?: string;
   hintTone?: 'subtle' | 'danger';
@@ -1472,6 +1491,7 @@ export function TextField({
   keyboard = 'default',
   autoCapitalize = 'none',
   editable = true,
+  autoFocus = false,
   hint,
   hintTone = 'subtle',
   error,
@@ -1503,6 +1523,7 @@ export function TextField({
         autoCapitalize={autoCapitalize}
         autoCorrect={false}
         editable={editable}
+        autoFocus={autoFocus}
         multiline={multiline}
         // 只给多行时传：给单行传 numberOfLines 在 Android 上会把它变成多行。
         numberOfLines={multiline ? lines : undefined}

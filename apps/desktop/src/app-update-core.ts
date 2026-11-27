@@ -7,7 +7,7 @@
  * 提示判定就去拉起 electron。
  */
 
-import { checkAppUpdate, decideAppUpdatePrompt } from '@heyta/app-host';
+import { checkAppUpdate, decideAppUpdatePrompt } from '@heyta/node-host';
 
 /** 更新检查要问的发布服务器（env 配置）。空串 = 不查。 */
 export function resolveUpdateBaseUrl(env: NodeJS.ProcessEnv = process.env): string {

@@ -59,7 +59,7 @@ describe('createLocalToolTransport 对真实宿主', () => {
       callModel: async () => scripted.shift()!,
     });
 
-    expect(result.steps).toEqual([{ tool: 'list_tasks', ok: true }]);
+    expect(result.steps).toEqual([{ tool: 'list_tasks', kind: 'read', ok: true }]);
     const toolMsg = result.messages.find((m) => m.role === 'tool');
     expect(toolMsg?.content).toContain('写周报');
     expect(toolMsg?.content).toContain('开会');

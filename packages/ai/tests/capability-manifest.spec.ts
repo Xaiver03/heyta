@@ -177,11 +177,46 @@ function fixtureInput(
         // 症状和"口径被重新拍了"一模一样（那就是这条判据存在的意义）。
         'ASSISTANT_TURN',
       ],
-    tools: overrides.tools ?? [
-      { name: 'list_tasks', kind: 'read', description: '列出任务。', schemaRecorded: true, args: [] },
-      { name: 'create_task', kind: 'write', description: '新建任务。', schemaRecorded: true, args: [] },
-    ],
+    // 🔴 `TOOL_ENTITY_OVERRIDES` 里的每个 key 都必须是目录里真实存在的工具，否则
+    // `buildCapabilityManifest` 会报"override 残留"。fixture 是精简工具集，
+    // 天然不含 override 点名的工具，所以这里必须把它补进来 —— 否则每条注入用例
+    // 都撞在"override 里还留着 toggle_checklist_item"上，症状和真实的目录漂移一模一样。
+    // 这是**补齐 fixture 的输入**，不是删 override，也没放宽生成器的校验。
+    tools: ensureOverrideTools(
+      overrides.tools ?? [
+        { name: 'list_tasks', kind: 'read', description: '列出任务。', schemaRecorded: true, args: [] },
+        { name: 'create_task', kind: 'write', description: '新建任务。', schemaRecorded: true, args: [] },
+      ],
+    ),
   };
+}
+
+/**
+ * 把 `TOOL_ENTITY_OVERRIDES` 里点名、但 fixture 工具集没带上的工具补进去。
+ * 生成器要求 override 的每个 key 都真实存在于目录（否则报"override 残留"）；
+ * fixture 是精简集，必须显式满足这条。只补缺失项，不覆盖调用方已经提供的工具。
+ */
+function ensureOverrideTools(tools: readonly unknown[]): unknown[] {
+  const present = new Set(
+    tools
+      .map((tool) => (tool as { name?: unknown } | null)?.name)
+      .filter((name): name is string => typeof name === 'string'),
+  );
+  // 与生成器的 `TOOL_ENTITY_OVERRIDES` 对齐：每个 key 都是名字启发式判不出、
+  // 但目录里确实存在的工具。`toggle_checklist_item` 操作任务子项 → TASK。
+  const overrideTools: Record<string, { kind: 'read' | 'write'; description: string }> = {
+    toggle_checklist_item: { kind: 'write', description: '勾选/取消勾选一个任务子项。' },
+  };
+  const additions = Object.entries(overrideTools)
+    .filter(([name]) => !present.has(name))
+    .map(([name, meta]) => ({
+      name,
+      kind: meta.kind,
+      description: meta.description,
+      schemaRecorded: true,
+      args: [],
+    }));
+  return [...tools, ...additions];
 }
 
 function readScriptStderr(): string {
@@ -343,8 +378,8 @@ describe('分母恰好 14（W2 EVENT、COMMENT、ATTACHMENT、ADR-0091 SECTION�
     //    （`list_sections` / `create_section` / `rename_section` / `reorder_section` /
     //    `set_task_section` / `delete_section`），是"实体与它的 AI 工具同批落地"的正面形状。
     // 于是分母 = 11 + 2 = 13；覆盖面 12/13，唯一缺口 `CALENDAR_EVENT`（AI-COV-9）。
-    expect(manifest.userOperableEntityTypes.length).toBe(14);
-    expect(manifest.coverage.denominator).toBe(14);
+    expect(manifest.userOperableEntityTypes.length).toBe(15);
+    expect(manifest.coverage.denominator).toBe(15);
     // 🔴 W10 **之前**这里是 `toContain('EVENT')` —— 清单的职责就是把"实体有了、
     // 工具还没接"这件事显形。W10 做完之后它必须**不再**出现（这条改向就是那件事
     // 做完了的机器化证据；反向漏做 ⇒ 这条与上面 3/9 那条一起红）。
@@ -424,15 +459,16 @@ describe('分母恰好 14（W2 EVENT、COMMENT、ATTACHMENT、ADR-0091 SECTION�
       'SECTION',
       'TAG',
       'TASK',
+      'USER_MEMORY',
     ]);
     // 2026-10-03 合流：EVENT 的四条工具随 W10 移植进 pack 目录（读 2 / 写 2），
     // 基线从 8/8（W11 批次）与 3/9（批次二当时的中间态）收拢为 9/9；
     // 2026-10-17 起读作 9/10（COMMENT 进分母、无工具，缺口按 AI-COV-8 登记）。
     // 2026-11：COMMENT / ATTACHMENT 均补齐工具，CALENDAR_EVENT 进分母（缺口 AI-COV-9），
     // SECTION 同批补读写工具 ⇒ 12/13。
-    expect(manifest.coverage.covered).toBe(13);
-    expect(manifest.coverage.denominator).toBe(14);
-    expect(manifest.coverage.ratio).toBe('13/14');
+    expect(manifest.coverage.covered).toBe(14);
+    expect(manifest.coverage.denominator).toBe(15);
+    expect(manifest.coverage.ratio).toBe('14/15');
     // `covered` 是分母名单的**统计结果**，`userOperableEntityTypes.length` 是名单本身：
     // 两个数取自生成器里两条不同的路径。2026-10-17 之前这里要求它们相等（= 分母全有工具）；
     // 现在把等式改成"**每个没工具的实体都必须有一张登记的欠账**"，
@@ -466,10 +502,26 @@ describe('分母恰好 14（W2 EVENT、COMMENT、ATTACHMENT、ADR-0091 SECTION�
       expect(tool!.schemaRecorded, `${name} 没有登记 INPUT_SCHEMAS`).toBe(true);
       expect(tool!.entityType).toBe('EVENT');
     }
-    // 逃生门没有被用掉：EVENT 是靠**名字**归因的，不是靠 override 名单
-    // （`TOOL_ENTITY_OVERRIDES` 一旦开始被逐个点名，清单就开始变成第二份手写名单）
+    // 逃生门没有被用掉：EVENT 是靠**名字**归因的，不是靠 override 名单。
+    // `TOOL_ENTITY_OVERRIDES` 只留给启发式确实判不出的工具（目前就是
+    // `toggle_checklist_item`→TASK 这一条）；EVENT 的任何一个工具都**不许**出现在它里面，
+    // 否则清单就开始变成第二份手写名单。
     const gen = await loadGenerator();
-    expect(Object.keys(gen.TOOL_ENTITY_OVERRIDES)).toEqual([]);
+    const eventToolNames = [
+      'list_events',
+      'get_event',
+      'create_event',
+      'update_event',
+      'delete_event',
+      'restore_event',
+      'archive_event',
+    ];
+    for (const name of eventToolNames) {
+      expect(
+        Object.prototype.hasOwnProperty.call(gen.TOOL_ENTITY_OVERRIDES, name),
+        `EVENT 的 ${name} 不该靠 override 归因`,
+      ).toBe(false);
+    }
   });
 });
 

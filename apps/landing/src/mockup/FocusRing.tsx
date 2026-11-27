@@ -21,8 +21,15 @@ import { Coffee, Play, Square } from 'lucide-react';
 
 import { useI18n } from '@heyta/i18n/provider';
 
-/** SVG 用户单位，**不是 px** —— 实际尺寸由 width/height 的 rem 值决定。 */
-const VIEWBOX = 180;
+/**
+ * SVG 用户单位，**不是 px** —— 实际尺寸由 width/height 的 rem 值决定。
+ *
+ * ⚠️ 但要与 `--ht-size-focus-ring` 的人读 px **同值**（当前 256px）：
+ * 这样 `strokeWidth`（用户单位）落到屏幕上才恰好等于 `--ht-size-focus-ring-stroke`
+ * 的 px 值。token 在 `bacc306a` 把环从 180px 放大到 256px（容纳 5xl 大数字）时，
+ * 这里没跟 ⇒ 描边会被整体放大到 14.2px。判据见 `mockup-focus-ring.spec.tsx` #1。
+ */
+const VIEWBOX = 256;
 const STROKE = 10;
 
 const TOTAL_SECONDS = 25 * 60;

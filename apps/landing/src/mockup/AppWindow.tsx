@@ -67,11 +67,10 @@ import { useI18n, type MessageKey } from '@heyta/i18n/provider';
 import './mockup.css';
 
 import {
+  SHELL_COMPLETED_NAV,
   SHELL_HEADER_ACTIONS,
   SHELL_PANEL_SECTIONS,
   SHELL_PRIMARY_NAV,
-  SHELL_QUADRANT_NAV,
-  SHELL_QUADRANT_SECTION_KEY,
   SHELL_SIDEBAR_TOOLS,
   SHELL_VIEW_TABS,
   MOCKUP_PREVIEW_TABS,
@@ -84,7 +83,7 @@ import {
   MOCK_CAPTURE_CLASS,
   MOCK_CAPTURE_KEYS,
 } from './capture-shape.js';
-import { SHOWCASE_TASKS, showcaseQuadrantCounts } from './showcase-data.js';
+import { SHOWCASE_TASKS } from './showcase-data.js';
 import { TaskList } from './TaskList.js';
 import { QuadrantGrid } from './QuadrantGrid.js';
 import { HabitHeatmap } from './HabitHeatmap.js';
@@ -295,23 +294,6 @@ export function AppWindow({
     };
   }, [t]);
 
-  /**
-   * 侧栏四象限的计数。
-   *
-   * 🔴 数值**从样例任务派生**（`showcase-data.ts` 的唯一一份），与四象限看板上的
-   * 卡片数结构上一致。复刻原来在这里写死了 3 / 5 / 2 / 1，与真应用算出来的不一致
-   * （§2 #2）。已完成任务不计入 —— 与 `bucketByQuadrant()` 同一条语义。
-   */
-  const counts = useMemo(
-    () =>
-      showcaseQuadrantCounts(
-        SHOWCASE_TASKS.map((task) =>
-          ({ ...task, done: completedIds.has(task.id) }),
-        ),
-      ),
-    [completedIds],
-  );
-
   // The real Web shell is rail → scope sidebar → main → detail.  The rail
   // keeps four high-frequency destinations on the surface and moves the rest
   // behind “More”; an active overflow view is promoted so its location remains
@@ -434,31 +416,19 @@ export function AppWindow({
                     key={item.labelKey}
                     icon={<ItemIcon size={ICON_SIZE.sm} />}
                     label={t(item.labelKey)}
-                    active={false}
+                    active={item.labelKey === 'web.shell.nav.inbox'}
                     onClick={interactive ? () => navigate('tasks') : undefined}
                   />
                 );
               })}
             </div>
 
-            {/* ⚠️ 分区标题用 `web.shell.nav.quadrantSection`，不是 `web.shell.nav.quadrant`
-                （两者中文都是「四象限」，所以抄错不会有视觉差异）。 */}
-            <div className="mk-nav__section">{t(SHELL_QUADRANT_SECTION_KEY)}</div>
             {/*
-              🔴 四象限导航从 `SHELL_QUADRANT_NAV` 派生，且 `count` 由样例任务算出。
-              真应用的 `NavEntry` 本身**没有 count 字段** —— 计数是单独算出来传进去的。
+              2026-11（滴答式组合筛选）：真应用侧栏的「四象限」快捷筛选段
+              （分区标题 + 四行象限）已经撤掉，象限条件改由 `FilterPanel`
+              的组合筛选提供。复刻随之撤掉，避免展厅展示产品已经没有的入口。
+              四象限**视图**仍从 rail 可达（登记在 `SHELL_VIEW_TABS`）。
             */}
-            <div className="mk-nav">
-              {SHELL_QUADRANT_NAV.map((item) => (
-                <NavItem
-                  key={item.labelKey}
-                  swatch={`mk-swatch--${item.swatch}`}
-                  label={t(item.labelKey)}
-                  count={counts[item.quadrant]}
-                  onClick={interactive ? () => navigate('quadrant') : undefined}
-                />
-              ))}
-            </div>
 
             {/*
               清单与标签。真实 Web 是「分区标题 + OrganizerList 行 + 标题级创建按钮」；
@@ -492,6 +462,17 @@ export function AppWindow({
               2026-11-04 滴答对齐 D2：它从 rail 下段搬到这里，展厅跟着搬。
             */}
             <div className="mk-nav mk-sidebar__tools">
+              {(() => {
+                const CompletedIcon = SHELL_ICONS[SHELL_COMPLETED_NAV.icon];
+                return (
+                  <NavItem
+                    icon={<CompletedIcon size={ICON_SIZE.sm} />}
+                    label={t(SHELL_COMPLETED_NAV.labelKey)}
+                    active={false}
+                    onClick={interactive ? () => navigate('tasks') : undefined}
+                  />
+                );
+              })()}
               {SHELL_SIDEBAR_TOOLS.map((tool) => {
                 const ToolIcon = SHELL_ICONS[tool.icon];
                 const viewKey = isMockView(tool.key) ? tool.key : null;

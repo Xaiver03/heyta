@@ -642,6 +642,9 @@ describe('ValidationService', () => {
       // 这正是它存在的意义：加实体必须是有意识的决定，不能被顺手带过去。
       'AI_FEEDBACK',
       'PREFERENCE_CORRECTION',
+      // 用户说过/被确认过的一条陈述记忆（AI 记忆实体的第三个，见 entity-types.ts）。
+      // 同样派生自 `ENTITY_TYPES`，漏一个"精确数量"断言就红。
+      'USER_MEMORY',
       'GLOBAL_CONFIG',
       'MIGRATION',
       'RECOVERY',
@@ -661,6 +664,15 @@ describe('ValidationService', () => {
       // 🔴 又一条"服务端必须先于客户端上线"：附件上传的 op 走同一张白名单，
       // 生产库里没有它，带 `ATTACHMENT` 的 op 会被判 `INVALID_ENTITY_TYPE` 永久拒绝。
       'ATTACHMENT',
+      // 外部日历镜像（只读，ADR-0089）。实体清单见 entity-types.ts。
+      'CALENDAR_EVENT',
+      // 自定义保存筛选 / 智能清单（ADR-0092）。
+      'FILTER',
+      // 清单内分组（ADR-0091）。**heyta 自己的实体**，不是 SP 专属 ——
+      // 上游 SP 没有分组实体，所以它曾在本文件的 SP 专属清单里被误列，
+      // 现已按产品真相移出（EntityModelMap / MODELED_ENTITY_TYPES /
+      // local-api/tools/section.ts 均已建模，读侧、写工具都齐）。
+      'SECTION',
     ];
 
     it('should include all heyta entity types', () => {
@@ -685,7 +697,6 @@ describe('ValidationService', () => {
         'MENU_TREE',
         'METRIC',
         'BOARD',
-        'SECTION',
         'PLUGIN_USER_DATA',
         'PLUGIN_METADATA',
       ];

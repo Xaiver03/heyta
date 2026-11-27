@@ -36,7 +36,7 @@ describe('requestCloudAssistantTurn（整机生产函数）', () => {
       invoke: async () => scripted.shift()!,
     });
     expect(result.text).toBe('你有 2 个任务：写周报、开会。');
-    expect(result.steps).toEqual([{ tool: 'list_tasks', ok: true }]);
+    expect(result.steps).toEqual([{ tool: 'list_tasks', kind: 'read', ok: true }]);
   });
 });
 
