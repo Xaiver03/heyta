@@ -193,6 +193,29 @@ struct SettingsWindowView: View {
 /// 设 `HEYTA_NO_FOCUS=1`（与 Electron 壳的 `HEYTA_DESKTOP_NO_FOCUS` 同名同义）
 /// 就**只建窗口、不激活** —— 取证/冒烟的脚本启动一律带上它。
 final class ActivationDelegate: NSObject, NSApplicationDelegate {
+    /// 🔴 单实例守卫（2026-11-27，根治「无法初始化本地存储」）。
+    ///
+    /// 根因：同 bundle 的第二个 HeytaMac 进程会各自打开**同一份**本地库
+    /// （`~/Library/Application Support/heyta/heyta.sqlite`），第二个 WKWebView 的
+    /// `initOpLog` / 迁移拿不到独占资源 ⇒ 直接落到「Could not initialize local storage」。
+    /// 实测：正常 `open` 一份能完整渲染；`open -n` 起第二个实例立刻报这个错。
+    ///
+    /// 处置：已有实例在跑时，**激活它、自己退出**（标准 macOS 单实例行为）。
+    /// 逃生门 `HEYTA_ALLOW_SECOND_INSTANCE=1`：打包/安装自检需要**再起一份进程**，
+    /// 但它用 `HEYTA_SHELL_DB_DIR` 指向隔离库、不碰真库 —— 那两处启动必须带这个开关。
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        if ProcessInfo.processInfo.environment["HEYTA_ALLOW_SECOND_INSTANCE"] == "1" { return }
+        let me = ProcessInfo.processInfo.processIdentifier
+        if let bid = Bundle.main.bundleIdentifier,
+           let other = NSRunningApplication.runningApplications(withBundleIdentifier: bid)
+               .first(where: { $0.processIdentifier != me }) {
+            FileHandle.standardError.write(
+                "SINGLE_INSTANCE=activate-existing pid=\(other.processIdentifier)\n".data(using: .utf8)!)
+            other.activate(options: [.activateAllWindows, .activateIgnoringOtherApps])
+            exit(0)
+        }
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
         /**

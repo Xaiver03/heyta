@@ -553,7 +553,12 @@ if printf '%s' "$WANT" | grep -q "mac"; then
       MAC_SELFIE="$RT/heyta-reinstall-mac-installed.png"
       MAC_SELFIE_WV="$MAC_SELFIE.webview.png"
       rm -f "$MAC_SELFIE" "$MAC_SELFIE_WV"
-      HEYTA_NO_FOCUS=1 HEYTA_SELF_CAPTURE="$MAC_SELFIE" \
+      # 🔴 安装自检用**隔离库**跑第二份进程：既避开与用户正在运行的实例抢同一份真库
+      #    （那是「无法初始化本地存储」的根源），也不碰用户的真数据。
+      #    HEYTA_ALLOW_SECOND_INSTANCE 是给单实例守卫的显式逃生门（见 HeytaMacApp.swift）。
+      MAC_INSTALLED_DB="$(mktemp -d "${TMPDIR:-/tmp}/heyta-reinstall-smoke.XXXXXX")"
+      HEYTA_ALLOW_SECOND_INSTANCE=1 HEYTA_SHELL_DB_DIR="$MAC_INSTALLED_DB" \
+        HEYTA_NO_FOCUS=1 HEYTA_SELF_CAPTURE="$MAC_SELFIE" \
         "$INSTALLED_APP/Contents/MacOS/HeytaMac" >/dev/null 2>&1 || true
       if [ "$MAC_DIST_OK" = 1 ] && [ -f "$MAC_SELFIE" ] && shot_ok_logged "$MAC_SELFIE" "$MAC_SELFIE_WV"; then
         echo "  截图证据：${MAC_SELFIE}（窗口）+ ${MAC_SELFIE_WV}（共享 UI）"

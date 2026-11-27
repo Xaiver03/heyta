@@ -145,3 +145,25 @@ SQLite 3.50 的 `pauseVfs` 协作移交，成本与风险远大于本目标。
    匿名 ⇒ 有「登录」按钮；点开 ⇒ `AuthPanel` 出现；403 ⇒ 没有登录按钮。
 3. `e2e/tests/admin-console.spec.ts`：主应用标签页占着本地库时，`/admin`
    仍渲染后台壳、不落崩溃屏 —— 删掉 `console` 启动分支必须红。
+
+---
+
+## 5. 追记（2026-11-27）：桌面壳用「单实例」根治第二个 WKWebView 抢同一份本地库
+
+D5「多标签并发不做」针对**浏览器**多标签仍不变；但桌面壳（`apps/desktop-macos`）上
+「再起一个实例」是必须挡住的一类：第二个进程会用同一个
+`~/Library/Application Support/heyta/heyta.sqlite` 再起一个 WKWebView，第二个
+`initOpLog` 拿不到独占资源，直接落到「无法初始化本地存储」（错误屏）。
+
+实测：正常 `open` 一份能完整渲染；`open -n` 起第二个实例立刻就是这个错误屏。
+
+处置（本节是 D1–D5 结论的延伸，不改其结论）：
+
+- 壳的 `ActivationDelegate.applicationWillFinishLaunching` 先查同 bundle 是否已有实例在跑，
+  有则**激活它、退出自己**（stderr 打 `SINGLE_INSTANCE=activate-existing`）。
+- 打包产物的 `Info.plist` 加 `LSMultipleInstancesProhibited=true`（`package-app.sh`）。
+- 自检要跑「第二份进程」时走显式逃生门 `HEYTA_ALLOW_SECOND_INSTANCE=1`，并配
+  `HEYTA_SHELL_DB_DIR` 指向隔离库（`package-app.sh` 的打包自检、`reinstall-all.sh` 的安装自检
+  都已改）。于是自检既不撞用户正在跑的实例、也不碰用户真库。
+- 判据：`open -n` 之后 `pgrep HeytaMac` 恒为 1；`reinstall-all.sh --only mac` 的安装自检能取到
+  「主蓝命中」的共享 UI 截图。
