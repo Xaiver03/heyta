@@ -40,6 +40,10 @@ import {
 
 type ScopeKind = 'project' | 'tag';
 
+export type CalendarExtendedView = 'none' | 'agenda' | 'multiDay' | 'multiWeek';
+export type CalendarColorMode = 'project' | 'quadrant';
+export type CalendarDisplayStyle = 'classic' | 'modern';
+
 interface CalendarViewState {
   /** 正在显示的月份（用该月里任意一天表示，与共享板同一个约定）。 */
   cursor: LocalDate;
@@ -80,6 +84,21 @@ interface CalendarViewState {
    * 默认 `true`（滴答默认开启，也是 web 接上倒数日之后的既有行为）。
    */
   showCountdown: boolean;
+  /** 扩展视图档位（日程 / 5天多日 / 2周多周）；`'none'` 时使用基础 `view`。 */
+  extendedView: CalendarExtendedView;
+  /** 日历着色方式：按清单或按四象限。 */
+  colorMode: CalendarColorMode;
+  /** 日历事件条视觉样式：经典或现代（左侧强调竖条）。 */
+  displayStyle: CalendarDisplayStyle;
+  /** 显示设置：是否显示检查事项、所有重复周期、习惯、专注记录、课程、辅助时区。 */
+  showChecklist: boolean;
+  showAllRepeats: boolean;
+  showHabits: boolean;
+  showFocus: boolean;
+  showCourses: boolean;
+  secondaryTimezone: boolean;
+  /** 分层卡片式「显示设置」弹窗开关。 */
+  displaySettingsOpen: boolean;
   /**
    * 公共事实（调休 / 补班）覆盖表的**变更计数**（W4b）。
    *
@@ -131,6 +150,16 @@ interface CalendarViewActions {
   /** 「显示设置」两个开关（阅读偏好，见 `showCompleted` / `showCountdown`）。 */
   setShowCompleted: (value: boolean) => void;
   setShowCountdown: (value: boolean) => void;
+  setExtendedView: (value: CalendarExtendedView) => void;
+  setColorMode: (value: CalendarColorMode) => void;
+  setDisplayStyle: (value: CalendarDisplayStyle) => void;
+  setShowChecklist: (value: boolean) => void;
+  setShowAllRepeats: (value: boolean) => void;
+  setShowHabits: (value: boolean) => void;
+  setShowFocus: (value: boolean) => void;
+  setShowCourses: (value: boolean) => void;
+  setSecondaryTimezone: (value: boolean) => void;
+  setDisplaySettingsOpen: (open: boolean) => void;
   /** 勾/去掉一条清单或一个标签。 */
   toggleScopeItem: (kind: ScopeKind, id: string) => void;
   /**
@@ -169,6 +198,16 @@ export const useCalendarViewStore = create<CalendarViewState & CalendarViewActio
   calendarSidebarOpen: true,
   showCompleted: true,
   showCountdown: true,
+  extendedView: 'none',
+  colorMode: 'project',
+  displayStyle: 'classic',
+  showChecklist: false,
+  showAllRepeats: true,
+  showHabits: true,
+  showFocus: true,
+  showCourses: true,
+  secondaryTimezone: false,
+  displaySettingsOpen: false,
   publicFactsEpoch: 0,
 
   setCursor: (date) => {
@@ -191,7 +230,47 @@ export const useCalendarViewStore = create<CalendarViewState & CalendarViewActio
   },
 
   setView: (view) => {
-    set((state) => ({ view, cursor: calendarCursorFor(view, state.selected) }));
+    set((state) => ({ view, extendedView: 'none', cursor: calendarCursorFor(view, state.selected) }));
+  },
+
+  setExtendedView: (extendedView) => {
+    set({ extendedView });
+  },
+
+  setColorMode: (colorMode) => {
+    set({ colorMode });
+  },
+
+  setDisplayStyle: (displayStyle) => {
+    set({ displayStyle });
+  },
+
+  setShowChecklist: (showChecklist) => {
+    set({ showChecklist });
+  },
+
+  setShowAllRepeats: (showAllRepeats) => {
+    set({ showAllRepeats });
+  },
+
+  setShowHabits: (showHabits) => {
+    set({ showHabits });
+  },
+
+  setShowFocus: (showFocus) => {
+    set({ showFocus });
+  },
+
+  setShowCourses: (showCourses) => {
+    set({ showCourses });
+  },
+
+  setSecondaryTimezone: (secondaryTimezone) => {
+    set({ secondaryTimezone });
+  },
+
+  setDisplaySettingsOpen: (displaySettingsOpen) => {
+    set({ displaySettingsOpen });
   },
 
   drillIntoMonth: (monthFirstDay) => {
