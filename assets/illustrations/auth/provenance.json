@@ -1,0 +1,13 @@
+{
+  "what": "电脑端（Web）登录对话框左栏的横向纸感插画（AuthPanel → AuthPlanScene）",
+  "why": "2026-11-27 产品负责人：电脑端登录界面也要插画形式；且'画显示不完整'——之前把 9:16 竖版首启漫画塞进横栏，cover 必然裁掉下半截。改为给桌面端专门画一张横版图。",
+  "generator": "本地 MOSS 文生图（ComfyUI，moss_image_sft_int8_convrot.safetensors）",
+  "route": "本地 ComfyUI http://127.0.0.1:8188，工作流 /Volumes/RocaSSD/comfyui/workflows/moss_api_test.json；skill: ~/.dsh/skills/moss-image",
+  "generatedAt": "2026-11-27",
+  "size": "1280x960（4:3 横版）→ JPEG q82",
+  "prompt": "Hand-drawn Japanese-style comic illustration on warm off-white paper (#FAF7F1), thin ink linework, flat soft color fills, light paper grain; a young adult with short dark hair, white tee, dark trousers sitting at a simple wooden desk holding a phone; abstract rounded task cards and a small calendar grid float around, one indigo card glows with a bent check; warm orange accent; generous calm negative space on the right; no text/letters/numbers/logos/watermark/realistic UI.",
+  "constraints": "无文字/字母/数字/logo/水印/真实 UI 截图；app 面画成抽象圆角卡。⚠️ 首版出图日历表头有极小字母，缩到面板尺寸基本不可见；如需彻底去除可就地重生成。",
+  "palette": "纸 #FAF7F1 · 墨 #1F2937 · 靛蓝 #2563EB · 暖橙 #E8833A · 雾灰蓝 #94A3B8 · 暖砂 #E4D8C3",
+  "license": "本机以自有模型生成，随本仓库 MIT 分发；不含第三方素材。",
+  "consumers": ["apps/web/src/features/auth/AuthPlanScene.tsx"]
+}

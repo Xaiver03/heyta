@@ -24,10 +24,9 @@ body:has(.ht-sheet__auth) .ht-compact-rail {
 
 .ht-sheet__auth-dialog {
   display: grid;
-  /* 🔴 左六右四（2026-10-24 产品口径，参照千问登录页的分栏比例）。
-     此前是 `minmax(15rem, 0.72fr) minmax(0, 1fr)` —— 实测左 41.9% / 右 58.1%，
-     品牌视觉那一栏太窄、撑不住画面，读起来像"表单旁边贴了条色块"。
-     表单栏给 `minmax(18rem, 4fr)`：窄容器里先保住表单能用的宽度，再谈比例。 */
+  /* 🔴 2026-11-27（晚）：左栏恢复成**横向**（约 60%）。左栏现在是一张**桌面专用横版插画**
+     （1280×960，本地 MOSS 现画），横栏 + `contain` 能把它整张铺满、不裁。
+     表单栏 `minmax(18rem, 4fr)` 保住可用宽度。 */
   grid-template-columns: minmax(0, 6fr) minmax(18rem, 4fr);
   inline-size: min(100%, calc(var(--ht-layout-modal-max) + var(--ht-layout-detail-width) + var(--ht-space-8)));
   max-block-size: calc(100dvh - var(--ht-space-8));
@@ -51,15 +50,15 @@ body:has(.ht-sheet__auth) .ht-compact-rail {
 
 /*
  * 2026-11-27：左侧从"抽象计划示意 + 文案"改成**整块插画**（与移动端首启页同一套漫画）。
- * 不再摆任何文字：画面自己说明这是什么（界面只用排版与画面表达，不加说明文字）。
- * 底色留 primary-subtle 仅作图片加载前的兜底，图片 cover 铺满后完全盖住。
+ * 竖版窄栏（见 `.ht-sheet__auth-dialog` 的 17rem）+ `contain`（见下）：整张竖版漫画完整显示、不裁切。
+ * 面板底用 surface 兜住留白（浅色白 / 深色墨），与右侧表单同一面。
  */
 .ht-sheet__auth-plan {
   grid-row: 1 / span 2;
   display: block;
   min-block-size: 100%;
   padding: 0;
-  background: var(--ht-color-primary-subtle);
+  background: var(--ht-color-surface);
   position: relative;
   isolation: isolate;
   overflow: hidden;
@@ -72,8 +71,8 @@ body:has(.ht-sheet__auth) .ht-compact-rail {
   display: block;
   inline-size: 100%;
   block-size: 100%;
-  object-fit: cover;
-  /* 漫画是竖版三格（主角在最上一格），偏向顶部才露出人物，而不是只看到中间那格表格。 */
+  /* contain：整张画都进框（不裁）；竖版窄栏已贴合比例，几乎铺满、只剩极窄留白。 */
+  object-fit: contain;
   object-position: center top;
   pointer-events: none;
   user-select: none;
