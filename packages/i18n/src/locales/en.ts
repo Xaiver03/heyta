@@ -3263,6 +3263,7 @@ export const en = {
   'web.calendar.more.displaySection': 'Display',
   'web.calendar.more.showCompleted': 'Show completed',
   'web.calendar.more.showCountdown': 'Show countdowns',
+  'web.calendar.more.openDisplaySettings': 'Display settings…',
   'web.calendar.more.scopeSection': 'Display range',
   'web.calendar.more.editScope': 'Edit display range…',
   'web.calendar.more.arrangeSection': 'Schedule tasks',

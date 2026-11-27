@@ -3554,6 +3554,7 @@ export const zhCN = {
   'web.calendar.more.displaySection': '显示设置',
   'web.calendar.more.showCompleted': '显示已完成',
   'web.calendar.more.showCountdown': '显示倒数纪念日',
+  'web.calendar.more.openDisplaySettings': '显示设置…',
   'web.calendar.more.scopeSection': '显示范围',
   'web.calendar.more.editScope': '编辑显示范围…',
   'web.calendar.more.arrangeSection': '安排任务',
