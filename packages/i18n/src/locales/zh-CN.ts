@@ -3515,6 +3515,13 @@ export const zhCN = {
   'web.calendar.title': '日历',
   'web.calendar.prevMonth': '上个月',
   'web.calendar.nextMonth': '下个月',
+  // 高级视图下拉。月/周/日/年那几条在 `common.calendar.view.*`（两端共用），
+  // 这里只放 web 独有的档位与它的数量模板 —— 别再抄一份公用的。
+  'web.calendar.view.agenda': '日程',
+  'web.calendar.view.multiDay': '多日',
+  'web.calendar.view.multiWeek': '多周',
+  'web.calendar.view.multiDayValue': '{n}天',
+  'web.calendar.view.multiWeekValue': '{n}周',
   // 🔴 轴整列空白时必须说这一句：不说，"这天没定到具体时刻"与"日视图没接上数据"
   //    在界面上长得一模一样（后者本仓为它记过一整页账）。
   'web.calendar.weekShort': '{n}周',
@@ -3557,6 +3564,24 @@ export const zhCN = {
   'web.calendar.more.subscribeSection': '日历订阅',
   'web.calendar.more.subscribeHint': '需要服务端拉取 iCal / 第三方日历，暂未接入',
   'web.calendar.more.noTasksToday': '当天没有任务',
+  // 显示设置分层卡片：颜色 / 样式 / 开关 / 辅助时区，最后是卡片自己的返回与关闭。
+  'web.calendar.display.title': '显示设置',
+  'web.calendar.display.color': '颜色',
+  'web.calendar.display.colorByProject': '按清单',
+  'web.calendar.display.colorByQuadrant': '按象限',
+  'web.calendar.display.style': '样式',
+  'web.calendar.display.styleClassic': '经典',
+  'web.calendar.display.styleModern': '现代',
+  'web.calendar.display.showChecklist': '显示检查事项',
+  'web.calendar.display.showAllRepeats': '显示所有重复周期',
+  'web.calendar.display.showHabits': '显示习惯',
+  'web.calendar.display.showFocus': '显示专注记录',
+  'web.calendar.display.showFocusTip': '在日历中展示番茄专注时长记录',
+  'web.calendar.display.showCourses': '显示课程',
+  'web.calendar.display.secondaryTimezone': '辅助时区',
+  'web.calendar.display.secondaryTimezoneTip': '在日/周时间轴左侧增加第二时区刻度',
+  'web.calendar.display.back': '返回',
+  'web.calendar.display.close': '关闭',
 
   'mobile.weekday.mon': '一',
   'mobile.weekday.tue': '二',
@@ -3875,6 +3900,9 @@ export const zhCN = {
   'mobile.calendar.a11y.moreTasks': '还有 {count} 项',
   'mobile.calendar.a11y.markDone': '标记完成：{title}',
   'mobile.calendar.a11y.unmarkDone': '取消完成：{title}',
+  // 拖拽改期：前一条是拖拽入口的说明/无障碍名，后一条是落下后的播报（`{date}` 已本地化）。
+  'mobile.calendar.dragReschedule': '拖动任务到日期格即可改期',
+  'mobile.calendar.rescheduledTo': '已改期至 {date}',
 
   // ── 移动端 · 日期选择器 ───────────────────────────────────
   'mobile.datePicker.clear': '清除',
