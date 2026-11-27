@@ -325,6 +325,17 @@ const TOOLS: readonly LocalApiTool[] = [
     defaultEnabled: false,
   },
   {
+    name: 'set_checklist_item_reminder',
+    egressFields: [],
+    description:
+      '给任务里某一条结构化子项（检查项）单独设 / 清一个提醒时刻。按文本唯一匹配该子项；' +
+      '设置用 date（YYYY-MM-DD）+ time（HH:MM）给绝对时刻，清除用 clear=true（二者二选一）。' +
+      '这是**检查项级**提醒，与整条任务的提醒（create_reminder）是两回事。',
+    kind: 'write',
+    risk: 'write',
+    defaultEnabled: false,
+  },
+  {
     name: 'set_task_assignee',
     egressFields: [],
     description:
@@ -695,6 +706,27 @@ const SCHEMAS: Readonly<Record<string, McpToolDefinition['inputSchema']>> = {
       done: { type: 'boolean', description: 'true=勾选，false=取消。' },
     },
     required: ['taskId', 'itemText', 'done'],
+    additionalProperties: false,
+  },
+  set_checklist_item_reminder: {
+    type: 'object',
+    properties: {
+      taskId: { type: 'string', description: '任务 id。' },
+      itemText: { type: 'string', description: '要设/清提醒的检查项文本（需唯一）。' },
+      date: {
+        type: 'string',
+        description: '提醒的哪一天：YYYY-MM-DD（本地日历日）。必须和 time 一起给，与 clear 互斥。',
+      },
+      time: {
+        type: 'string',
+        description: '提醒的几点：HH:MM，24 小时制且补零。必须和 date 一起给。',
+      },
+      clear: {
+        type: 'boolean',
+        description: 'true = 清除这条检查项的提醒（与 date / time 互斥）。',
+      },
+    },
+    required: ['taskId', 'itemText'],
     additionalProperties: false,
   },
   set_task_assignee: {
@@ -1411,6 +1443,60 @@ function toIntent(name: string, a: Record<string, unknown>): ToolWriteIntentOutc
           taskId: a['taskId'].trim(),
           itemText: a['itemText'],
           done: a['done'],
+        },
+      };
+    }
+
+    case 'set_checklist_item_reminder': {
+      const unknown = Object.keys(a).filter(
+        (key) => key !== 'taskId' && key !== 'itemText' && key !== 'date' && key !== 'time' && key !== 'clear',
+      );
+      if (unknown.length > 0) {
+        return { ok: false, message: `set_checklist_item_reminder 不支持这些参数：${unknown.join('、')}。` };
+      }
+      if (typeof a['taskId'] !== 'string' || a['taskId'].trim() === '') {
+        return { ok: false, message: 'set_checklist_item_reminder 需要 taskId。' };
+      }
+      if (typeof a['itemText'] !== 'string' || a['itemText'].trim() === '') {
+        return { ok: false, message: 'set_checklist_item_reminder 需要 itemText（非空）。' };
+      }
+      const taskId = a['taskId'].trim();
+      const itemText = a['itemText'];
+      const hasDate = a['date'] !== undefined;
+      const hasTime = a['time'] !== undefined;
+      const wantsClear = a['clear'] === true;
+      if (a['clear'] !== undefined && typeof a['clear'] !== 'boolean') {
+        return { ok: false, message: 'set_checklist_item_reminder 的 clear 必须是布尔值。' };
+      }
+      if (wantsClear && (hasDate || hasTime)) {
+        return { ok: false, message: 'clear=true（清除）与 date / time（设置）只能二选一。' };
+      }
+      if (wantsClear) {
+        return { ok: true, intent: { action: 'set-checklist-item-reminder', taskId, itemText, clear: true } };
+      }
+      if (!hasDate && !hasTime) {
+        return {
+          ok: false,
+          message: 'set_checklist_item_reminder 要说清做什么：给 date + time 设提醒，或 clear=true 清除。',
+        };
+      }
+      if (hasDate && typeof a['date'] !== 'string') {
+        return { ok: false, message: 'date 应为 YYYY-MM-DD 字符串。' };
+      }
+      if (hasTime && typeof a['time'] !== 'string') {
+        return { ok: false, message: 'time 应为 HH:MM 字符串。' };
+      }
+      if (!hasDate || !hasTime) {
+        return { ok: false, message: 'date 与 time 必须一起给 —— 只给一个就定不下一刻。' };
+      }
+      return {
+        ok: true,
+        intent: {
+          action: 'set-checklist-item-reminder',
+          taskId,
+          itemText,
+          date: a['date'] as string,
+          time: a['time'] as string,
         },
       };
     }

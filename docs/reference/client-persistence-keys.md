@@ -58,6 +58,7 @@ grep -rnoE "'heyta\.[A-Za-z0-9._]+'" apps/web/src apps/mobile/src packages/*/src
 | `heyta.detailPane` | `apps/web/src/features/shell/detail-pane-pref.ts:24` | 详情栏开合 | 布局状态 |
 | `heyta.fontScale` | `apps/web/src/lib/font-scale.ts:13` | 全站字号 | 三档字号比例（`compact` / `standard` / `comfortable`）。默认 `compact`（基准 ×0.88）。**零 op**：改它只写本机 |
 | `heyta.shell.rail` | `apps/web/src/features/shell/rail-pref.ts:16` | `splitRailTabs` 的主段/更多 | rail 编排 |
+| `heyta.accent` | `apps/web/src/lib/accent.ts:23` | `App.tsx` 的 `<html>` inline `--ht-color-primary*` | 强调色（`default` / `emerald` / `sky` / `amber`）。`default` = **清空覆盖**、回到基准蓝白。**零 op**：改它只写本机 |
 
 ### B · 视图状态（零 op）
 
@@ -81,6 +82,8 @@ grep -rnoE "'heyta\.[A-Za-z0-9._]+'" apps/web/src apps/mobile/src packages/*/src
 | `heyta.ai.assistant.sessions` | `packages/app-host/src/assistant-sessions.ts` | 助手多会话列表 | 用户数据，**本机**（与单条历史同一档） |
 | `heyta.vault.root.v1` | `apps/web/src/lib/vault-root-cache.ts:21` | vault 根缓存 | 敏感；见 vault 那一份 |
 | `heyta.vault.keyPlacement.v1` | `apps/web/src/lib/vault-root-preference.ts:18` | 密钥存放位置偏好 | 敏感 |
+| `heyta.totp.local` | `apps/web/src/features/settings/totp-local.ts:22` | 两步验证面板（TOTP） | **本机验证性实现**：只存本机绑定，服务端接入后应删除本地副本。含 base32 密钥，属敏感；见 TotpPanel 文件头 |
+| `heyta.onboarded` | `apps/web/src/features/onboarding/first-run.ts:19` | Web 首启导览（`WelcomeTour`） | 这台设备是否已看过首启导览。**零 op**：写本机 |
 
 ### D · 基础设施（不是偏好）
 

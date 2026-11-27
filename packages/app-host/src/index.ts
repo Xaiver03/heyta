@@ -48,6 +48,8 @@ export {
   createFocusActions,
   FOCUS_LOG_FAILURE_CODES,
   focusLogFailureCode,
+  manualFocusSession,
+  type ManualFocusInput,
   type FocusActions,
   type FocusActionsOptions,
   type FocusLogFailureCode,
@@ -62,6 +64,20 @@ export {
   type FocusOverview,
   type FocusRecord,
 } from './focus-overview.js';
+
+/**
+ * 统计视图读侧（覆盖图谱 #16/#46/#48/#50）：习惯打卡记录、完成率/连续趋势、
+ * 专注日周月序列、今日/本周总结数字。口径全在 `@heyta/domain` 的纯函数里，
+ * 与 `focusOverview` / `motivation` 同一个"摊平 + 注入 now"的分工。
+ */
+export {
+  summaryFromState,
+  habitCheckInRecordsFromState,
+  habitRateSeriesFromState,
+  habitStreakSeriesFromState,
+  focusSeriesFromState,
+  type SummarySnapshot,
+} from './stats.js';
 
 /**
  * 清单 / 标签 / 习惯动作。同一理由：**op 的构造只有一份**（AGENTS.md §3.5）。
@@ -1373,3 +1389,12 @@ export {
   type FilterActionsOptions,
   type NewFilterFields,
 } from './filter-actions.js';
+
+// 任务模板（`TASK_TEMPLATE`，ADR-0093）：保存任务为模板 / 从模板建任务。
+// 个人数据，永不进 share op-log；写入只经本动作层的 `ctx.dispatch` 单入口。
+export {
+  createTaskTemplateActions,
+  type TaskTemplateActions,
+  type TaskTemplateActionsOptions,
+  type TaskTemplateWriteFields,
+} from './template-actions.js';

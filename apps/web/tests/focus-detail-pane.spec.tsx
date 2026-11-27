@@ -69,8 +69,12 @@ function countOf(el: HTMLElement, testId: string): number {
   return el.querySelectorAll(`[data-testid="${testId}"]`).length;
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   localStorage.clear();
+  // #50：详情面新挂了统计图表（读引擎现取序列），挂载前必须有引擎；
+  // 这里只补测试前置，不改本文件任何断言。
+  __resetOpLogForTests();
+  await initOpLog();
   // 这组接线判据覆盖桌面三栏：任务无选中时，详情列由单一 AI Agent 占位。
   // 直接挂 FocusDetailPane 的单元测试不依赖这个媒体查询。
   window.matchMedia = ((query: string) => ({
@@ -94,6 +98,7 @@ afterEach(() => {
   root = undefined;
   useFocusStore.setState({ overview: overview() });
   window.matchMedia = originalMatchMedia;
+  __resetOpLogForTests();
 });
 
 describe('A 四张卡读的是那个出口，不是自己算的', () => {

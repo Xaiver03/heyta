@@ -36,6 +36,9 @@
 @import './app/danger-confirm.css';
 @import './app/admin.css';
 @import './app/habits.css';
+/* 统计 / 总结布局（覆盖图谱 #16 / #46 / #48 / #50）。放在 habits.css 之后，
+   因为它补的是习惯详情 / 专注详情里的两块新内容。 */
+@import './app/stats.css';
 @import './app/projects-settings.css';
 @import './app/narrow.css';
 
@@ -44,5 +47,17 @@
 /* 方向 A · WeKnora 对齐视觉层（2026-11-25）。位于 borderless-controls 之前，
    保证全局焦点规则在级联最末（check:focus-single-source）。 */
 @import './app/ai-chat-direction-a.css';
+
+/* 命令面板 + 快捷键一览（覆盖图谱 #6 / #7）。位于 borderless-controls 之前，
+   保证全局焦点规则仍在级联最末（check:focus-single-source）。 */
+@import './app/command-palette.css';
+
+/* 打印样式（覆盖图谱 #70）—— 只在 `@media print` 里收掉导航外壳，不碰焦点环；
+   import 顺序仍是 borderless 最后（check:focus-single-source 的硬约束）。 */
+@import './app/print.css';
+
+/* 本地应用锁（覆盖图谱 #61）：锁屏遮罩 + 设置里的 PIN 表单。位于 borderless 之前，
+   保证全局焦点规则仍在级联最末（check:focus-single-source 的硬约束）。 */
+@import './app/app-lock.css';
 
 @import './app/borderless-controls.css';

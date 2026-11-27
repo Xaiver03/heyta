@@ -50,7 +50,7 @@
 
 import { useCallback, useMemo, type ReactNode } from 'react';
 
-import { dailyActivityCountsFromState, habitGrowth } from '@heyta/app-host';
+import { dailyActivityCountsFromState, habitGrowth, summaryFromState } from '@heyta/app-host';
 import type { IdentityTagKind } from '@heyta/domain';
 import { useI18n, type I18nValue, type MessageKey } from '@heyta/i18n';
 import {
@@ -73,6 +73,7 @@ import { CategoryBreakdown } from '../categories/CategoryBreakdown.js';
 import { useHabitStore } from '../habits/store.js';
 import { useTaskStore } from '../tasks/store.js';
 import { HEADLINE_COPY, IDENTITY_TAG_COPY, KIND_COPY, buildShareSummary } from './copy.js';
+import { SummaryBoard } from './SummaryBoard.js';
 import { todayProgressLabels } from './labels.js';
 import {
   selectIdentityTags,
@@ -317,6 +318,9 @@ export function GrowthView() {
 
   const summary = buildShareSummary(review, totals, t);
 
+  // #16 总结屏：今天/本周的收尾数字（口径在 app-host#summaryFromState）。
+  const snapshot = useMemo(() => summaryFromState(entities, now), [entities, now]);
+
   const renderSectionHeader = useCallback(
     (id: MotivationSectionId): ReactNode => {
       const entry = SECTION_COPY[id];
@@ -361,6 +365,8 @@ export function GrowthView() {
       指名道姓说 `GrowthBoard` 落在 Provider 之外 —— 别把这一层删掉。
     */
     <HeytaUiProvider>
+      {/* #16 总结屏：放在成长板之上 —— 先看"今天/本周收尾"，再看周复盘/年度等长周期。 */}
+      <SummaryBoard snapshot={snapshot} />
       <GrowthBoard
         now={now}
         todayProgress={todayProgress}

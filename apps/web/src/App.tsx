@@ -60,6 +60,12 @@ import {
   type MemoryOp,
   type TaskDateGroup,
   type TaskSortKey,
+  moveSmartList,
+  setSmartListVisible,
+  visibleSmartListKeys,
+  type SmartListConfig,
+  type SmartListKey,
+  type NotificationDefaults,
 } from '@heyta/domain';
 
 import { normalizeRouteOrder, withManagedEndpoint } from '@heyta/ai';
@@ -135,6 +141,7 @@ import { useProjectStore } from './features/projects/store.js';
 import { ConflictDialog } from './features/sync/ConflictDialog.js';
 import { PrivacyConsentSheet } from './features/privacy/PrivacyConsentSheet.js';
 import { LegalReconfirmSheet } from './features/legal-recheck/LegalReconfirmSheet.js';
+import { WelcomeTour } from './features/onboarding/WelcomeTour.js';
 import { usePrivacyStore } from './features/privacy/store.js';
 import { armFirstLaunchConsent } from './features/privacy/first-launch.js';
 import { CalendarSidebar } from './features/calendar/CalendarSidebar.js';
@@ -147,6 +154,11 @@ import { CalendarView } from './features/calendar/CalendarView.js';
 import { CalendarSubscriptionsAutoSync } from './features/calendar/useCalendarSubscriptionsAutoSync.js';
 import { useNoteStore } from './features/notes/store.js';
 import { ReminderNotifyPanel } from './features/reminders/ReminderNotifyPanel.js';
+import { NotificationDefaultsPanel } from './features/reminders/NotificationDefaultsPanel.js';
+import {
+  loadNotificationDefaults,
+  saveNotificationDefaults,
+} from './features/reminders/notification-defaults-pref.js';
 import { useReminderNotifications } from './features/reminders/use-reminder-notifications.js';
 import { useShareActivitySignal } from './features/share/use-share-activity-signal.js';
 import { useShareOpenPull } from './features/share/use-share-open-pull.js';
@@ -171,6 +183,8 @@ import {
   type SearchResultEntry,
 } from '@heyta/ui';
 import { FeatureModulesPanel } from './features/shell/FeatureModulesPanel.js';
+import { SmartListSettingsPanel } from './features/shell/SmartListSettingsPanel.js';
+import { loadSmartListConfig, saveSmartListConfig } from './features/shell/smart-list-pref.js';
 import {
   SHELL_MODULES,
   loadEnabledModules,
@@ -231,6 +245,8 @@ import { PrivacyPanel } from './features/settings/PrivacyPanel.js';
 // 改登录密码 —— `/api/password/change` 与 `useAuthStore.changePassword` 都在，
 // 缺的就是这张表（在此之前那条动作**全仓库零调用点**）。见 PasswordPanel 文件头。
 import { PasswordPanel } from './features/settings/PasswordPanel.js';
+// 两步验证（TOTP）—— 账号安全里第二种"登录方式"，算法在 lib/totp.ts。见 TotpPanel 文件头。
+import { TotpPanel } from './features/settings/TotpPanel.js';
 // 从滴答清单导入（B2-1）—— 逻辑层早就做完了，这是它的界面入口。
 import { WidgetJourneyPanel } from './features/settings/WidgetJourneyPanel.js';
 import { WidgetPushPanel } from './features/settings/WidgetPushPanel.js';
@@ -276,6 +292,9 @@ import {
   saveFontScale,
   type FontScale,
 } from './lib/font-scale.js';
+import { ACCENTS, applyAccent, loadAccent, saveAccent, type Accent } from './lib/accent.js';
+import { APP_ICONS, applyAppIcon, loadAppIcon, saveAppIcon, type AppIcon } from './lib/app-icon.js';
+import { isAppLockEnabled } from './lib/app-lock.js';
 
 import './styles/app.css';
 
@@ -291,7 +310,17 @@ import { NavButton } from './features/shell/NavButton.js';
 import { Button } from './components/hta/index.js';
 import { EmptyState, isActive } from './features/shell/EmptyState.js';
 import { SETTINGS_ANCHORS, type SettingsAnchor } from './features/shell/settings-anchors.js';
+import { CommandPalette, type ResolvedShortcut } from './features/shell/CommandPalette.js';
+import {
+  COMMAND_PALETTE_COMBOS,
+  SHORTCUT_CATALOG,
+  SHORTCUT_OVERVIEW_COMBOS,
+  SHORTCUT_SCOPE_LABEL_KEYS,
+} from './features/shell/shortcut-catalog.js';
+import { matchShortcut, keyComboFromEvent, type Command, type ShortcutBinding } from '@heyta/ui';
 import { SyncSettingsPanel } from './features/sync/SyncSettingsPanel.js';
+import { AppLockPanel } from './features/settings/AppLockPanel.js';
+import { LockScreen } from './features/app-lock/LockScreen.js';
 import { AdminConsolePage } from './features/admin/AdminConsolePage.js';
 import { AnnouncementBanner } from './features/announcements/AnnouncementBanner.js';
 import { AppUpdateNotice } from './features/app-update/AppUpdateNotice.js';
@@ -447,6 +476,17 @@ function SettingsSectionNav({ active, onSelect }: {
  */
 const SHEET_EXIT_SLACK_MS = 120;
 
+/**
+ * 强调色选项的色块取哪个原色阶（与 `lib/accent.ts` 的 `ACCENT_TOKENS` 同源）。
+ * 🔴 只在这里画"选择器长什么样"；真正写进 `<html>` 的覆盖值由 `applyAccent` 负责。
+ */
+const ACCENT_SWATCH: Record<Accent, string> = {
+  default: 'var(--ht-blue-600)',
+  emerald: 'var(--ht-emerald-600)',
+  sky: 'var(--ht-sky-600)',
+  amber: 'var(--ht-amber-600)',
+};
+
 export function App(): React.JSX.Element {
   const { t, locale } = useI18n();
   /**
@@ -464,6 +504,37 @@ export function App(): React.JSX.Element {
     setFontScaleState(value);
     saveFontScale(value);
     applyFontScale(value);
+  }, []);
+  /**
+   * 强调色（设备属性，ADR-0085：写本机、零 op）。只改 `--ht-color-primary*` 一族，
+   * 组件仍只消费语义变量；`default` = 不覆盖（基准蓝白）。
+   */
+  const [accent, setAccentState] = useState<Accent>(loadAccent);
+  const setAccent = useCallback((value: Accent) => {
+    setAccentState(value);
+    saveAccent(value);
+  }, []);
+  /**
+   * 应用图标（设备属性，ADR-0085：写本机、零 op）。Web 的等价物是动态换 favicon
+   * （见 `lib/app-icon.ts` 文件头：装进系统的图标 Web 改不了，只有标签页图标能换）。
+   */
+  const [appIcon, setAppIconState] = useState<AppIcon>(loadAppIcon);
+  const setAppIcon = useCallback((value: AppIcon) => {
+    setAppIconState(value);
+    saveAppIcon(value);
+  }, []);
+  /**
+   * 本地应用锁（#61，设备属性、零 op）。`appLockEnabled` 决定要不要在启动时挂锁屏；
+   * `locked` 是本次会话的开关 —— 冷启动时若已开启则初始为 locked。
+   */
+  const [appLockEnabled, setAppLockEnabled] = useState<boolean>(isAppLockEnabled);
+  const [locked, setLocked] = useState<boolean>(() => isAppLockEnabled());
+  const handleAppLockEnabledChange = useCallback((value: boolean) => {
+    setAppLockEnabled(value);
+    if (!value) setLocked(false);
+  }, []);
+  const lockNow = useCallback(() => {
+    setLocked(true);
   }, []);
   /**
    * 行着色三态（**只有清单图标着色**，产品拍板 2026-11-08）。
@@ -521,6 +592,16 @@ export function App(): React.JSX.Element {
   );
 
   /**
+   * 智能清单的显示 / 排序（**设备本地**，见 `features/shell/smart-list-pref.ts`）。
+   * 判断在 `@heyta/domain` 的 `smart-list.ts`；这里只持有状态与落盘。
+   */
+  const [smartListConfig, setSmartListConfig] = useState<SmartListConfig>(loadSmartListConfig);
+  /** 通知的行为默认值（设备本地，见 `features/reminders/notification-defaults-pref.ts`）。 */
+  const [notificationDefaults, setNotificationDefaults] = useState<NotificationDefaults>(
+    loadNotificationDefaults,
+  );
+
+  /**
    * 账号邮箱（头像的首字母）。
    *
    * 用 `useShallow` 只订阅这一个字段：整店订阅会让**每一次同步状态变化**
@@ -561,6 +642,21 @@ export function App(): React.JSX.Element {
       completed: count({ kind: 'completed' }),
     } as Record<'today' | 'tomorrow' | 'next7Days' | 'completed', number>;
   }, [store.entities.tasks, store.now]);
+
+  /**
+   * 智能清单渲染顺序 = 用户配置的顺序，且只留可见项（#18）。
+   * 词表 / 归并在 `@heyta/domain` 的 `smart-list.ts`；这里只做 key → NavEntry 的映射。
+   */
+  const visiblePrimaryNav = useMemo(() => {
+    const byKey = new Map<string, (typeof PRIMARY_NAV)[number]>();
+    for (const entry of PRIMARY_NAV) byKey.set(entry.filter.kind, entry);
+    const ordered: (typeof PRIMARY_NAV)[number][] = [];
+    for (const key of visibleSmartListKeys(smartListConfig)) {
+      const entry = byKey.get(key);
+      if (entry !== undefined) ordered.push(entry);
+    }
+    return ordered;
+  }, [smartListConfig]);
 
   /**
    * 任务列表的**日期分组头**（滴答同款：`已过期 / 今天, 周一 / 9月30日, 周三 / 无截止时间`）。
@@ -917,6 +1013,16 @@ export function App(): React.JSX.Element {
    * 它复用 `web.shell.search.*` 那三条词条 —— 那些词条因此不是死词条，别删。
    */
   const [searchQuery, setSearchQuery] = useState('');
+
+  /**
+   * 命令面板 / 快捷键一览（覆盖图谱 #6 / #7）。
+   *
+   * 两者共用一个非模态浮层，`mode` 决定画动作清单还是快捷键一览。
+   * 🔴 `⌘K` **仍然是搜索**（现有判据锁死，且它是键盘用户找搜索的第一反应）；
+   *    命令面板另给 `⌘⇧P` 并列 —— 不覆盖既有行为，只是多一个入口。
+   */
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [paletteMode, setPaletteMode] = useState<'commands' | 'shortcuts'>('commands');
 
   /**
    * G-11：**首启必须问过用户**。
@@ -1779,6 +1885,24 @@ export function App(): React.JSX.Element {
   }, [themePreset]);
 
   /**
+   * 强调色写成 `<html>` 的 inline `--ht-color-primary*` 变量（设备属性、零 op）。
+   * 🔴 依赖里**必须带 `theme`**：暗版的派生色（hover 往浅走、subtle 用深底）与亮版不同，
+   *    换明暗时要按新主题重算一次，否则暗色下会留一套按亮色算出来的 hover。
+   */
+  useEffect(() => {
+    applyAccent(accent, theme);
+  }, [accent, theme]);
+
+  /**
+   * 应用图标 → 动态换 `<link rel="icon">`（设备属性、零 op）。
+   * 取色读的是 `document` 上的 token，必须等样式表就绪；`app-icon.ts` 内部已经
+   * 对"取不到颜色 → 回落真实图标"做了兜底，所以这里不做额外判断。
+   */
+  useEffect(() => {
+    applyAppIcon(appIcon);
+  }, [appIcon]);
+
+  /**
    * 行首那枚「清单图标」的颜色（产品拍板：**只有清单图标着色**）。
    *
    * 🔴 三档的解析在 `features/tasks/row-color.ts`，这里只把两张**实体表**递进去：
@@ -2507,6 +2631,121 @@ export function App(): React.JSX.Element {
   }, [view, closeSecondarySurface, goToView]);
 
   /**
+   * 命令面板 / 快捷键一览的键位（覆盖图谱 #6 / #7）。
+   *
+   * 🔴 与搜索分开、并列存在：`⌘K` 仍是搜索（现有判据锁死），这里给 `⌘⇧P`（面板）
+   *    与 `⌘/`（一览）。键位判断走 `@heyta/ui` 的 `matchShortcut`（纯函数），
+   *    本处只做"命中 → 开哪个态"的接线。
+   */
+  const paletteBindings = useMemo<ShortcutBinding[]>(
+    () => [
+      ...COMMAND_PALETTE_COMBOS.map((combo) => ({ id: 'commandPalette', combo })),
+      ...SHORTCUT_OVERVIEW_COMBOS.map((combo) => ({ id: 'shortcutOverview', combo })),
+    ],
+    [],
+  );
+
+  const openPalette = useCallback((mode: 'commands' | 'shortcuts') => {
+    setPaletteMode(mode);
+    setPaletteOpen(true);
+  }, []);
+
+  const closePalette = useCallback(() => setPaletteOpen(false), []);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.altKey) return;
+      const hit = matchShortcut(paletteBindings, keyComboFromEvent(event));
+      if (hit === undefined) return;
+      event.preventDefault();
+      openPalette(hit === 'shortcutOverview' ? 'shortcuts' : 'commands');
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [paletteBindings, openPalette]);
+
+  /** 「新建任务」= 切到任务视图并把光标放进收集框（复用既有输入框，不另建一个）。 */
+  const focusCapture = useCallback(() => {
+    goToView('tasks');
+    const focus = () =>
+      document.querySelector<HTMLElement>('[data-testid="capture-input"]')?.focus();
+    // 视图切换是异步提交的：等两帧后再聚焦，避免"切过去时输入框还没挂载"。
+    requestAnimationFrame(() => requestAnimationFrame(focus));
+  }, [goToView]);
+
+  const paletteCommands = useMemo<Command[]>(() => {
+    const list: Command[] = quickActions.map((action) => ({
+      id: `nav:${action.id}`,
+      title: action.label,
+      group: 'navigate',
+      keywords: action.keywords,
+      run: action.onSelect,
+    }));
+    list.push({
+      id: 'create:task',
+      title: t('web.commandPalette.newTask'),
+      group: 'create',
+      keywords: ['task', 'add'],
+      run: focusCapture,
+    });
+    list.push({
+      id: 'open:search',
+      title: t('web.commandPalette.openSearch'),
+      group: 'open',
+      keywords: ['search'],
+      run: () => goToView('search'),
+    });
+    list.push({
+      id: 'open:settings',
+      title: t('web.commandPalette.openSettings'),
+      group: 'open',
+      keywords: ['settings', 'preferences'],
+      run: () => goToView('settings'),
+    });
+    list.push({
+      id: 'open:toggleDetail',
+      title: t('web.commandPalette.toggleDetail'),
+      group: 'open',
+      keywords: ['detail'],
+      run: toggleDetailPane,
+    });
+    return list;
+  }, [quickActions, t, goToView, toggleDetailPane, focusCapture]);
+
+  const paletteLabels = useMemo(
+    () => ({
+      title: t('web.commandPalette.title'),
+      inputAria: t('web.commandPalette.inputAria'),
+      placeholder: t('web.commandPalette.placeholder'),
+      noResults: t('web.commandPalette.noResults'),
+      groupLabels: {
+        navigate: t('web.commandPalette.group.navigate'),
+        create: t('web.commandPalette.group.create'),
+        open: t('web.commandPalette.group.open'),
+      },
+      shortcutsEntry: t('web.commandPalette.shortcutsEntry'),
+      shortcutsTitle: t('web.shortcuts.title'),
+      scopeLabels: {
+        global: t(SHORTCUT_SCOPE_LABEL_KEYS.global),
+        navigation: t(SHORTCUT_SCOPE_LABEL_KEYS.navigation),
+        palette: t(SHORTCUT_SCOPE_LABEL_KEYS.palette),
+      },
+    }),
+    [t],
+  );
+
+  const paletteShortcuts = useMemo<ResolvedShortcut[]>(
+    () =>
+      SHORTCUT_CATALOG.map((entry) => ({
+        id: entry.id,
+        label: t(entry.labelKey),
+        combos: entry.combos,
+        scope: entry.scope,
+      })),
+    [t],
+  );
+
+  /**
    * 把光标那一行滚进视野。
    *
    * 只能在宿主做：共享层不许碰 DOM（它要跑在 RN 上），而"按 8 次 ↓ 之后
@@ -2571,6 +2810,28 @@ export function App(): React.JSX.Element {
     });
   }, []);
 
+  /** 智能清单：显隐 / 排序改动立刻落盘、立刻反映到侧栏（与功能模块同一条）。 */
+  const onToggleSmartList = useCallback((key: SmartListKey, visible: boolean) => {
+    setSmartListConfig((current) => {
+      const next = setSmartListVisible(current, key, visible);
+      saveSmartListConfig(next);
+      return next;
+    });
+  }, []);
+  const onMoveSmartList = useCallback((key: SmartListKey, direction: 'up' | 'down') => {
+    setSmartListConfig((current) => {
+      const next = moveSmartList(current, key, direction);
+      saveSmartListConfig(next);
+      return next;
+    });
+  }, []);
+
+  /** 通知行为默认值改动立刻落盘（与功能模块同一条：即时生效、无保存按钮）。 */
+  const onChangeNotificationDefaults = useCallback((next: NotificationDefaults) => {
+    setNotificationDefaults(next);
+    saveNotificationDefaults(next);
+  }, []);
+
 
 
   /**
@@ -2627,7 +2888,14 @@ export function App(): React.JSX.Element {
    * 裁决者（§4.3）：手工把地址敲成 `/admin` 的人拿到的是一个说明原因的页面，
    * 不是一条数据。
    */
-  if (isAdminConsoleLocation()) return <AdminConsolePage />;
+  if (isAdminConsoleLocation()) {
+    return (
+      <>
+        <AdminConsolePage />
+        {appLockEnabled && locked ? <LockScreen onUnlocked={() => setLocked(false)} /> : null}
+      </>
+    );
+  }
 
   return (
     /*
@@ -2780,7 +3048,7 @@ export function App(): React.JSX.Element {
           */}
           <div className="ht-sidebar__body">
             <div className="ht-nav">
-              {PRIMARY_NAV.map((entry) => (
+              {visiblePrimaryNav.map((entry) => (
                 <NavButton
                   key={entry.labelKey}
                   entry={entry}
@@ -3589,6 +3857,21 @@ export function App(): React.JSX.Element {
             </HeytaUiProvider>
             </div>
           )}
+          {/*
+            命令面板 / 快捷键一览（覆盖图谱 #6 / #7）。与搜索是**并列**的两个浮层：
+            `⌘K` 搜索、`⌘⇧P` 面板、`⌘/` 一览。它是非模态键盘浮层（不带 role=dialog），
+            动作用 `App` 里装配好的 `paletteCommands`，全部复用既有命令（quickActions /
+            goToView / toggleDetailPane），面板本身不重写任何业务逻辑。
+          */}
+          <CommandPalette
+            open={paletteOpen}
+            mode={paletteMode}
+            commands={paletteCommands}
+            shortcuts={paletteShortcuts}
+            labels={paletteLabels}
+            onClose={closePalette}
+            onOpenShortcuts={() => setPaletteMode('shortcuts')}
+          />
           {contentView === 'calendar' && (
             <>
               <CalendarView />
@@ -3809,6 +4092,16 @@ export function App(): React.JSX.Element {
                 <ProfilePanel active={activeSettingsSection === 'settings-group-profile'} />
               </div>
               {/*
+                本地应用锁（#61）：设备属性、零 op，**与是否登录无关** —— 所以放在
+                `accountNeedsSignIn` 那道登录门槛**之外**，未登录时也能开关。
+                它回答的是"谁能在这台设备上打开它"，与下面四块"谁能登录这个账号"同组。
+              */}
+              <AppLockPanel
+                enabled={appLockEnabled}
+                onChangeEnabled={handleAppLockEnabledChange}
+                onLockNow={lockNow}
+              />
+              {/*
                 账号门槛：**四个账号能力共享一个登录入口**，避免未登录时同一屏重复渲染四张卡。
                 🔴 未登录时这一块整段由下面这张卡承接；四个面板自身仍保留独立 guard，
                 单独挂载时不会误显示注销控件。
@@ -3824,6 +4117,8 @@ export function App(): React.JSX.Element {
               <PasskeyPanel active={activeSettingsSection === 'settings-group-profile'} />
               {/* 账号安全：改登录密码（`/api/password/change` 的唯一界面入口）。 */}
               <PasswordPanel />
+              {/* 账号安全：两步验证（TOTP）。排在密码之后、设备会话之前。 */}
+              <TotpPanel active={activeSettingsSection === 'settings-group-profile'} />
               {/*
                 账号安全：**谁现在还能用你的账号登录**（列 / 逐个撤销）。
                 它排在两种"登录方式"之后、"注销账号"之前 —— 这一面板管的不是能不能登录，
@@ -3903,6 +4198,10 @@ export function App(): React.JSX.Element {
                 而入口必须和那句话在同一屏上 —— 挂在详情面板里等于要用户再找第二条路）。
               */}
               <ReminderNotifyPanel />
+              <NotificationDefaultsPanel
+                defaults={notificationDefaults}
+                onChange={onChangeNotificationDefaults}
+              />
               {/*
                 共享协作的**本地**通知偏好（W5）：它是同步的下游偏好（服务端只广播信号，
                 响不响由本机过滤），所以归属是"打扰偏好"而不是"连到哪"。
@@ -4122,6 +4421,83 @@ export function App(): React.JSX.Element {
                 </div>
               </div>
               {/*
+                强调色（#56）：设备属性（ADR-0085），只覆盖 `--ht-color-primary*` 一族。
+                选项来自 `ACCENTS`（`lib/accent.ts`）；`default` = 清空覆盖、回到基准蓝白。
+              */}
+              <div className="ht-settings__preference-row">
+                <h3 className="ht-settings__h3 ht-type-row-title">
+                  {t('web.settings.display.accentTitle')}
+                </h3>
+                <div
+                  className="ht-settings__preset-grid"
+                  role="radiogroup"
+                  aria-label={t('web.settings.display.accentTitle')}
+                >
+                  {ACCENTS.map((option) => (
+                    <button
+                      key={option}
+                      type="button"
+                      role="radio"
+                      aria-checked={accent === option}
+                      className="ht-settings__preset-option"
+                      data-testid={`accent-${option}`}
+                      onClick={() => {
+                        setAccent(option);
+                      }}
+                    >
+                      <span
+                        className="ht-settings__preset-swatch"
+                        style={{ background: ACCENT_SWATCH[option] }}
+                        aria-hidden="true"
+                      />
+                      <span>{t(`web.settings.display.accent.${option}` as const)}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {/*
+                应用图标（#56）：Web 的等价物是动态换 favicon（`lib/app-icon.ts`）。
+                装进系统的应用图标由各平台决定、Web 运行期改不了 —— 这条**边界**如实写进 `?`，
+                然后真的提供能换的那一层（浏览器标签页图标），不假装改了系统图标。
+                选项来自 `APP_ICONS`；色块与强调色同源（`ACCENT_SWATCH`）。
+              */}
+              <div className="ht-settings__preference-row">
+                <h3 className="ht-settings__h3 ht-type-row-title">
+                  {t('web.settings.display.appIconTitle')}
+                  <SettingsInfoTip
+                    testId="tip-app-icon"
+                    label={t('web.settings.display.appIconTitle')}
+                    text={t('web.settings.display.appIconTip')}
+                  />
+                </h3>
+                <div
+                  className="ht-settings__preset-grid"
+                  role="radiogroup"
+                  aria-label={t('web.settings.display.appIconTitle')}
+                >
+                  {APP_ICONS.map((option) => (
+                    <button
+                      key={option}
+                      type="button"
+                      role="radio"
+                      aria-checked={appIcon === option}
+                      className="ht-settings__preset-option"
+                      data-testid={`app-icon-${option}`}
+                      onClick={() => {
+                        setAppIcon(option);
+                      }}
+                    >
+                      <span
+                        className="ht-settings__preset-swatch"
+                        style={{ background: ACCENT_SWATCH[option] }}
+                        aria-hidden="true"
+                      />
+                      <span>{t(`web.settings.display.appIcon.${option}` as const)}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {/*
                 行着色三态（**只有清单图标着色**，产品拍板 2026-11-08）。
                 🔴 第三档「关」是**不渲染那枚图标节点**，不是把它画成透明 ——
                 判据在 `packages/ui/tests/task-row-icon-color.spec.ts`。
@@ -4173,6 +4549,11 @@ export function App(): React.JSX.Element {
             */}
             <section className="ht-settings__group" hidden={activeSettingsSection !== 'settings-group-ai'} id="settings-group-ai" aria-label={t('mobile.settings.section.features')}>
               <FeatureModulesPanel enabled={enabledModules} onToggle={onToggleModule} />
+              <SmartListSettingsPanel
+                config={smartListConfig}
+                onToggle={onToggleSmartList}
+                onMove={onMoveSmartList}
+              />
               <AiSettings
                 active={activeSettingsSection === 'settings-group-ai'}
                 initial={aiSettings}
@@ -4471,6 +4852,10 @@ export function App(): React.JSX.Element {
       <ConflictDialog />
       <PrivacyConsentSheet />
       <LegalReconfirmSheet />
+      {/* Web 首启导览（#69）：每次冷启动只在"这台设备从没看过"时出现一次。 */}
+      <WelcomeTour />
+      {/* 本地应用锁（#61）：开启后冷启动先挡这一层，输对 PIN 才摘掉（纯客户端 gate）。 */}
+      {appLockEnabled && locked ? <LockScreen onUnlocked={() => setLocked(false)} /> : null}
       {shareDialog !== undefined ? (
         <ShareFeature
           projectId={shareDialog.projectId}

@@ -163,6 +163,12 @@ export function armGlobalSummon(
     });
 
   let tray: Tray | null = null;
+  /**
+   * 托盘右键菜单。**不**用 `tray.setContextMenu()` 挂上 —— 那样 macOS 上左键
+   * 会直接弹菜单、`click` 事件根本不来，常驻面板窗（#72）就没法从托盘落下。
+   * 改为：左键 → `toggleResidentPanel()`；右键 → `popUpContextMenu(menu)`。
+   */
+  let trayMenu: Menu | null = null;
   let lastStatus: SummonStatus = {
     configPath: '',
     config: { showHide: '', quickAdd: '' },
@@ -238,13 +244,25 @@ export function armGlobalSummon(
       try {
         tray = new Tray(createTrayIcon());
         tray.setToolTip('heyta');
+        // 闭包里不能靠外层可空变量做类型收窄：先固定成非空的局部常量。
+        const created = tray;
+        /**
+         * 左键：落下/收起常驻面板窗（覆盖图谱 #72）；右键：弹原有的命令菜单。
+         * 这样"点托盘"与"托盘菜单"两个入口都在，且不互相吞事件。
+         */
+        created.on('click', () => {
+          targets.toggleResidentPanel();
+        });
+        created.on('right-click', () => {
+          if (trayMenu !== null) created.popUpContextMenu(trayMenu);
+        });
       } catch (error: unknown) {
         // Linux 上没有 appindicator 时这里会抛；托盘缺席要如实说，而不是让整个功能消失。
         configProblems.push(`托盘没能建出来：${String(error)}`);
         tray = null;
       }
     }
-    if (tray !== null) tray.setContextMenu(buildMenu(file.config, configProblems));
+    if (tray !== null) trayMenu = buildMenu(file.config, configProblems);
 
     lastStatus = {
       configPath: file.path,

@@ -23,6 +23,8 @@ import { useI18n, type Locale } from '@heyta/i18n';
 import { EmptyState, HeytaUiProvider } from '@heyta/ui';
 
 import { formatDuration } from '../categories/copy.js';
+import { FocusManualEntry } from './FocusManualEntry.js';
+import { FocusStatsChart } from './FocusStatsChart.js';
 import { useFocusStore } from './store.js';
 
 /**
@@ -119,6 +121,10 @@ export function FocusDetailPane(): React.JSX.Element {
           ))}
         </ul>
       )}
+
+      {/* #50：日/周/月图表 + 手动补录入口（写路径走 op-log，见各自文件头）。 */}
+      <FocusStatsChart />
+      <FocusManualEntry />
     </div>
   );
 }

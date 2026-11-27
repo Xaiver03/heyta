@@ -31,6 +31,7 @@ import {
 } from '../../lib/focus-config.js';
 import { selection, useSelected } from '../../lib/selection.js';
 import { useFocusStore } from './store.js';
+import { NoiseSettings } from './NoiseSettings.js';
 
 /**
  * 时长设置
@@ -324,6 +325,8 @@ export function FocusTimer() {
         </FormField>
 
         <DurationSettings />
+        {/* 白噪音（覆盖图谱 #51）：与「时长设置」同族的次级入口，默认收起。 */}
+        <NoiseSettings />
       </FocusPanel>
     </div>
   );

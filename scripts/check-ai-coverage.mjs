@@ -951,6 +951,16 @@ const ENTITY_COVERAGE_DEBT = new Map([
         '唯一可写的是本地标签，而标签写路径与 Heyta 既有 TAG 工具同批评估，不在本实体落地时硬塞。',
     },
   ],
+  [
+    'TASK_TEMPLATE',
+    {
+      gap: 'AI-COV-10',
+      reason:
+        'ADR-0093 的任务模板先落"保存任务为模板 / 从模板建任务"两条**用户手势**（动作层 + UI）；' +
+        'AI 读写工具（list_templates / create_template_from_task / create_task_from_template）' +
+        '需要与"从模板建任务"的字段继承语义一起定稿，随后续一刀补 —— 本批登记缺口、不留假期工具。',
+    },
+  ],
   // 2026-11-23：`COMMENT`（AI-COV-8）已**闭合** —— 评论工具（`add_task_comment` /
   // `list_task_comments` / `delete_task_comment`）随"share 感知的独立工具通道"落地
   // （`packages/local-api/src/tools/comment.ts`），读与写都有了工具，于是它按本段

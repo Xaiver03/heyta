@@ -1604,6 +1604,34 @@ export {
 } from './control/menu.js';
 
 /**
+ * 命令面板的数据层（覆盖图谱 #6）与快捷键模型（#7）。
+ * 🔴 与 `control/menu.ts` 同一分工：这两份只有**数据与纯判断**，
+ *    不碰 DOM、不读 i18n、不含业务动作；`run` 由宿主在绑定层注入。
+ */
+export {
+  COMMAND_CURSOR_NONE,
+  createCommandRegistry,
+  filterCommands,
+  moveCommandCursor,
+  type Command,
+  type CommandRegistry,
+} from './control/command-registry.js';
+
+export {
+  comboMatches,
+  findShortcutConflicts,
+  formatKeyCombo,
+  keyComboFromEvent,
+  matchShortcut,
+  parseKeyCombo,
+  type KeyCombo,
+  type KeyEventLike,
+  type ShortcutBinding,
+  type ShortcutConflict,
+  type ShortcutPlatform,
+} from './control/shortcut-model.js';
+
+/**
  * 收集框对齐滴答清单（2026-11-04 单）新增的出口。
  * 🔴 本块是**追加**的（`index.ts` 是多写者共享文件，只许在末尾加）。
  *
@@ -1675,3 +1703,12 @@ export {
   projectGestureOffset,
   rubberBandOffset,
 } from './motion/gesture.js';
+
+// 手写 SVG 图表原语（覆盖图谱 #48 / #50）：无第三方图表库，颜色/线宽全走 token。
+export {
+  BarChart,
+  LineChart,
+  type BarChartProps,
+  type LineChartProps,
+  type ChartDatum,
+} from './stats/charts.js';

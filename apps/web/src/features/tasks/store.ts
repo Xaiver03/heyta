@@ -119,6 +119,15 @@ interface TaskState {
   renameTask: (id: string, title: string) => Promise<void>;
   setPriority: (id: string, priority: Priority) => Promise<void>;
   /**
+   * 指派 / 清除指派人（写 `Task.assigneeUserId`，ADR-0062 决策 7 / ADR-0088）。
+   *
+   * 🔴 **只转交**，走**既有**写路径 `taskActions.patchDetails(id, { assigneeUserId })`
+   * —— 一个用户手势 = 一条 `UPD` op（§3.4）。本层不预读、不判断"这条清单共享没共享"：
+   * 那个判断是界面上「这一格要不要画」的事（`shareId` 有没有），不是写语义。
+   * `undefined` = 清除（`patchDetails` 把 `null` 写进载荷）；语义只对共享清单内的任务有意义。
+   */
+  setAssignee: (id: string, assigneeUserId: string | undefined) => Promise<void>;
+  /**
    * 置顶 / 取消置顶（写 `Task.pinnedAt`，ADR-0083 §3.2）。
    *
    * 🔴 顺序**不在这里排**：这一层只把意图发出去。界面上的行序由领域的
@@ -442,6 +451,12 @@ export const useTaskStore = create<TaskState>((set) => ({
 
   setPriority: async (id, priority) => {
     await taskActions.setPriority(id, priority);
+  },
+
+  setAssignee: async (id, assigneeUserId) => {
+    // 复用既有的 `patchDetails` 写路径（ADR-0088 的唯一写入通道）。
+    // `undefined` → `null`（清除指派），一条 UPD op。
+    await taskActions.patchDetails(id, { assigneeUserId: assigneeUserId ?? null });
   },
 
   setPinned: async (id, pinned) => {

@@ -825,6 +825,24 @@ export type LocalApiWriteIntent =
   | { action: 'set-task-checklist'; taskId: string; items: readonly { id?: string; text: string; done?: boolean }[] }
   /** 勾选/取消任务某条子项（TASK）。按文本唯一匹配；全勾时正常任务自动完成。 */
   | { action: 'toggle-checklist-item'; taskId: string; itemText: string; done: boolean }
+  /**
+   * 设 / 清某一条**检查项**（checklist item）自己的提醒时刻（TASK，checklist 内联字段）。
+   * 两种形态**二选一**（互斥由本包 `toIntent` 判）：
+   *   · `date` + `time` —— 设置到该绝对时刻；
+   *   · `clear: true` —— 清除这条检查项的提醒。
+   *
+   * 🔴 与任务级提醒（`create-reminder` → `REMINDER` 实体）是两回事：这是**单条勾选项**
+   * 的一个时刻，内联在 `Task.checklist` 上，写它是**一条 TASK UPD**。
+   * 🔴 本包不产生时刻：换算成 epoch 毫秒在宿主一处完成（同 `create-reminder`）。
+   */
+  | {
+      action: 'set-checklist-item-reminder';
+      taskId: string;
+      itemText: string;
+      date?: string;
+      time?: string;
+      clear?: boolean;
+    }
   // 附件（ATTACHMENT）：改名是纯 op；移除先发 DEL op、再尽力回收字节。
   /**
    * 改附件展示名（ATTACHMENT）。**纯 op，不碰字节** —— 字节以 `id` 为键存取，

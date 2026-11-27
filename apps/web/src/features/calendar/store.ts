@@ -32,6 +32,11 @@ import {
   type TaskScope,
 } from '@heyta/domain';
 import {
+  loadCalendarDisplayPref,
+  saveCalendarDisplayPref,
+  type CalendarColorBy,
+} from './calendar-display-pref.js';
+import {
   calendarCursorFor,
   calendarMonthDrill,
   calendarSelectedForCursor,
@@ -55,6 +60,14 @@ interface CalendarViewState {
    *   把工具栏搬进页头时踩过的形状（"两份状态"的症状是滚轮翻月而标题不动）。
    */
   view: CalendarViewKind;
+  /**
+   * Web 端本地的额外一档：`'timetable'`（课程表）或 `null`（不在额外档）。
+   *
+   * 🔴 它**不进共享 `CalendarViewKind`**（理由见 `calendar-views.ts` 文件头）：课程表是
+   *   Web 本次补的档，移动端把同类档扩在本地。`view` 仍记录"最后一次共享档位"，
+   *   于是从课程表切回月/周/日/年时，游标与选中不会丢。
+   */
+  extraView: 'timetable' | null;
   /**
    * 「往选中那天加一条」那行输入框开着没有（R11 批五）。
    *
@@ -80,6 +93,16 @@ interface CalendarViewState {
    * 默认 `true`（滴答默认开启，也是 web 接上倒数日之后的既有行为）。
    */
   showCountdown: boolean;
+  /**
+   * 显示设置：日历条目的**着色模式**（覆盖图谱 #40「配色」）。
+   *
+   * - `list`（默认）—— 按任务所属清单的颜色上强调色（`barAccentOf`）；
+   * - `priority` —— 按任务优先级的语义色（复用 `@heyta/ui` 的 `priorityColorToken`）；
+   * - `off` —— 不着色（`barAccentOf` 恒 `undefined`）。
+   *
+   * 🔴 与 `showCompleted` / `showCountdown` 一样是**阅读偏好**，不触碰存储与同步。
+   */
+  colorBy: CalendarColorBy;
   /**
    * 公共事实（调休 / 补班）覆盖表的**变更计数**（W4b）。
    *
@@ -119,6 +142,12 @@ interface CalendarViewActions {
    */
   setView: (view: CalendarViewKind) => void;
   /**
+   * 切到/退出 Web 本地的额外档（课程表）。
+   *
+   * `setView` 遇到任何共享档会把它清空；这里只负责进入课程表（把游标当成"某一周"）与显式退出。
+   */
+  setExtraView: (view: 'timetable' | null) => void;
+  /**
    * 从年档点进某一个月（R13）。**要改什么由共享层决定**（`calendarMonthDrill`），
    * 这里只负责把它写进状态 —— 包括"选中那天不动"那一条：那个函数返回的对象里
    * 根本没有 `selected`，所以不是"我记得别改"。
@@ -131,6 +160,8 @@ interface CalendarViewActions {
   /** 「显示设置」两个开关（阅读偏好，见 `showCompleted` / `showCountdown`）。 */
   setShowCompleted: (value: boolean) => void;
   setShowCountdown: (value: boolean) => void;
+  /** 显示设置：着色模式（见 `colorBy`）。 */
+  setColorBy: (value: CalendarColorBy) => void;
   /** 勾/去掉一条清单或一个标签。 */
   toggleScopeItem: (kind: ScopeKind, id: string) => void;
   /**
@@ -158,17 +189,37 @@ function withIds(scope: TaskScope, kind: ScopeKind, ids: readonly string[]): Tas
   return kind === 'project' ? { ...scope, projectIds: ids } : { ...scope, tagIds: ids };
 }
 
-export const useCalendarViewStore = create<CalendarViewState & CalendarViewActions>((set) => ({
+/** 把三项显示偏好写回本机存储。切换即持久，「界面变了但没存」不可能发生。 */
+function persistDisplay(state: CalendarViewState): void {
+  saveCalendarDisplayPref({
+    showCompleted: state.showCompleted,
+    showCountdown: state.showCountdown,
+    colorBy: state.colorBy,
+  });
+}
+
+/**
+ * 显示设置的初始值：**模块初始化时读一次**本机偏好（`localStorage`）。
+ *
+ * 🔴 只在建 store 时读一次，不在每次渲染读 —— 否则"用户在设置里切换"与
+ * "每次渲染重新读盘"会互相覆盖（切换后立刻被旧值盖回）。
+ */
+const displayPref = loadCalendarDisplayPref();
+
+export const useCalendarViewStore = create<CalendarViewState & CalendarViewActions>((set, get) => ({
   // ⚠️ 这里读一次时钟是**给界面播种**，不是业务判断 —— 领域层的
   // "now 显式传入、不在函数里读时钟"那条纪律针对的是判据，不是首屏渲染。
   cursor: startOfMonth(toLocalDate(Date.now())),
   selected: toLocalDate(Date.now()),
   scope: FULL_SCOPE,
   view: 'month',
+  extraView: null,
   captureOpen: false,
   calendarSidebarOpen: true,
-  showCompleted: true,
-  showCountdown: true,
+  // 显示设置三项：**从本机偏好读初始值**（刷新后仍在），读取失败退默认（见 readonly 文件头）。
+  showCompleted: displayPref.showCompleted,
+  showCountdown: displayPref.showCountdown,
+  colorBy: displayPref.colorBy,
   publicFactsEpoch: 0,
 
   setCursor: (date) => {
@@ -176,26 +227,46 @@ export const useCalendarViewStore = create<CalendarViewState & CalendarViewActio
     //   日档里"游标必须带走选中"的理由与它的判据写在那里（`calendarSelectedForCursor`），
     //   症状是**安静地各指一天**：轴翻到 10-05、侧栏还圈着 10-03、新任务写进了 10-03。
     //   判据：`apps/web/tests/calendar-day-view.spec.tsx`（含变异臂 Z）。
-    set((state) => ({
-      cursor: calendarCursorFor(state.view, date),
-      selected: calendarSelectedForCursor(state.view, date, state.selected),
-    }));
+    //   课程表档把游标当成"一周里的任意一天"，行为与周档一致（不归到月首、不带选中）。
+    set((state) => {
+      const kind = state.extraView === 'timetable' ? 'week' : state.view;
+      return {
+        cursor: calendarCursorFor(kind, date),
+        selected: calendarSelectedForCursor(kind, date, state.selected),
+      };
+    });
   },
 
   selectDay: (date) => {
-    set((state) => ({ selected: date, cursor: calendarCursorFor(state.view, date) }));
+    set((state) => ({
+      selected: date,
+      cursor: calendarCursorFor(state.extraView === 'timetable' ? 'week' : state.view, date),
+    }));
   },
 
   goToToday: (today) => {
-    set((state) => ({ selected: today, cursor: calendarCursorFor(state.view, today) }));
+    set((state) => ({
+      selected: today,
+      cursor: calendarCursorFor(state.extraView === 'timetable' ? 'week' : state.view, today),
+    }));
   },
 
   setView: (view) => {
-    set((state) => ({ view, cursor: calendarCursorFor(view, state.selected) }));
+    // 切到任何共享档都退出课程表 —— 分段控件里选中态只能有一个。
+    set((state) => ({ view, extraView: null, cursor: calendarCursorFor(view, state.selected) }));
+  },
+
+  setExtraView: (extraView) => {
+    set((state) =>
+      extraView === 'timetable'
+        ? // 进入课程表：把游标当成"包含选中那天的那一周"（周档的约定：任意一天）。
+          { extraView, cursor: calendarCursorFor('week', state.selected) }
+        : { extraView: null },
+    );
   },
 
   drillIntoMonth: (monthFirstDay) => {
-    set(() => ({ ...calendarMonthDrill(monthFirstDay) }));
+    set(() => ({ ...calendarMonthDrill(monthFirstDay), extraView: null }));
   },
 
   toggleCapture: () => {
@@ -212,10 +283,17 @@ export const useCalendarViewStore = create<CalendarViewState & CalendarViewActio
 
   setShowCompleted: (value) => {
     set({ showCompleted: value });
+    persistDisplay(get());
   },
 
   setShowCountdown: (value) => {
     set({ showCountdown: value });
+    persistDisplay(get());
+  },
+
+  setColorBy: (value) => {
+    set({ colorBy: value });
+    persistDisplay(get());
   },
 
   toggleScopeItem: (kind, id) => {

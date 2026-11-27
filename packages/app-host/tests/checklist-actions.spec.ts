@@ -96,3 +96,52 @@ describe('toggleChecklistItem', () => {
     expect(after.completedAt).toBe(CLOCK);
   });
 });
+
+describe('setChecklistItemReminder（#29 检查项级提醒）', () => {
+  it('设到指定子项 → 只那一条带 reminderAt；勾选不改动它', async () => {
+    const id = await mkTask();
+    await actions.setChecklist(id, [{ text: '甲' }, { text: '乙' }]);
+    const list = engine.getState().tasks[id]!.checklist!;
+    await actions.setChecklistItemReminder(id, list[0]!.id, CLOCK + 3_600_000);
+    const after = engine.getState().tasks[id]!.checklist!;
+    expect(after[0]!.reminderAt).toBe(CLOCK + 3_600_000);
+    expect(after[1]!.reminderAt).toBeUndefined();
+    // 勾选走 `{...it, done}`，应保留同一条上的提醒
+    await actions.toggleChecklistItem(id, list[0]!.id, true);
+    expect(engine.getState().tasks[id]!.checklist![0]!.reminderAt).toBe(CLOCK + 3_600_000);
+  });
+
+  it('清除 → 字段被摘掉（不是写 0）', async () => {
+    const id = await mkTask();
+    await actions.setChecklist(id, [{ text: '甲' }]);
+    const itemId = engine.getState().tasks[id]!.checklist![0]!.id;
+    await actions.setChecklistItemReminder(id, itemId, CLOCK + 3_600_000);
+    await actions.setChecklistItemReminder(id, itemId, undefined);
+    expect('reminderAt' in engine.getState().tasks[id]!.checklist![0]!).toBe(false);
+  });
+
+  it('不存在的子项 / 非正整数时刻 → 写之前 throw（读状态不变）', async () => {
+    const id = await mkTask();
+    await actions.setChecklist(id, [{ text: '甲' }]);
+    const itemId = engine.getState().tasks[id]!.checklist![0]!.id;
+    await expect(actions.setChecklistItemReminder(id, 'nope', CLOCK)).rejects.toThrow();
+    await expect(actions.setChecklistItemReminder(id, itemId, 0)).rejects.toThrow();
+    await expect(actions.setChecklistItemReminder(id, itemId, 1.5)).rejects.toThrow();
+    expect(engine.getState().tasks[id]!.checklist![0]!.reminderAt).toBeUndefined();
+  });
+
+  it('覆盖式 setChecklist 保留同 id 条目的 reminderAt（不因改文本而静默清提醒）', async () => {
+    const id = await mkTask();
+    await actions.setChecklist(id, [{ text: '甲' }, { text: '乙' }]);
+    const aId = engine.getState().tasks[id]!.checklist![0]!.id;
+    await actions.setChecklistItemReminder(id, aId, CLOCK + 3_600_000);
+    // 重写整组，保留同 id 的「甲」并改文本
+    await actions.setChecklist(id, [
+      { id: aId, text: '甲改' },
+      { text: '丙' },
+    ]);
+    const after = engine.getState().tasks[id]!.checklist!;
+    expect(after.find((x) => x.id === aId)?.reminderAt).toBe(CLOCK + 3_600_000);
+    expect(after).toHaveLength(2);
+  });
+});

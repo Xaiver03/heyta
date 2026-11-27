@@ -33,6 +33,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { IDBFactory } from 'fake-indexeddb';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { markWelcomeSeen } from '../src/features/onboarding/first-run.js';
 
 vi.mock('../src/features/privacy/consent-gate.js', async (importOriginal) => ({
   ...await importOriginal<typeof import('../src/features/privacy/consent-gate.js')>(),
@@ -109,6 +110,8 @@ beforeEach(async () => {
   // ⚠️ 走生产代码 `privacyConsentActions.accept()`，不往 localStorage 手写自造串
   //（与 J1 同一条做法；面板自己的判据在 `privacy-consent-sheet.spec.tsx`）。
   privacyConsentActions.accept();
+  // 首启导览(#69)是全局浮层；这些用例测的不是它，先标记已看过以隔离。
+  markWelcomeSeen();
 });
 
 afterEach(() => {

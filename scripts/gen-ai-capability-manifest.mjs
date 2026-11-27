@@ -327,6 +327,8 @@ const PREPOSITIONS = new Set(['by', 'in', 'on', 'at', 'for', 'to', 'from', 'with
 export const TOOL_ENTITY_OVERRIDES = Object.freeze({
   // 名字里没有实体名词（checklist / item 都不在名词表），启发式判不出；它操作的是任务子项 → TASK。
   toggle_checklist_item: 'TASK',
+  // 同上：末尾的「reminder」会让启发式误判成 REMINDER，但它其实是改**任务子项**上的提醒时刻 → TASK。
+  set_checklist_item_reminder: 'TASK',
 });
 
 /**

@@ -38,6 +38,7 @@ import type {
   Section,
   Tag,
   Task,
+  TaskTemplate,
   UserMemory,
 } from '@heyta/domain';
 import { OpType, compareVectorClocks } from '@heyta/sync-core';
@@ -148,6 +149,11 @@ export interface MaterializedState {
    * 判定恒 false，冲突覆盖静默不生效 —— 见该常量上方的警告），两处缺一不可。
    */
   sections: Record<string, Section>;
+  /**
+   * 任务模板（ADR-0093）。用户自建、可命名排序的任务模板；「保存任务为模板 /
+   * 从模板建任务」。桶里存的是**模板定义**（预填字段），不是任务，也不物化任务。
+   */
+  taskTemplates: Record<string, TaskTemplate>;
 }
 
 export function emptyState(): MaterializedState {
@@ -170,6 +176,7 @@ export function emptyState(): MaterializedState {
     attachments: {},
     filters: {},
     sections: {},
+    taskTemplates: {},
   };
 }
 
@@ -193,6 +200,7 @@ const BUCKET_BY_ENTITY = {
   ATTACHMENT: 'attachments',
   FILTER: 'filters',
   SECTION: 'sections',
+  TASK_TEMPLATE: 'taskTemplates',
 } as const;
 
 type ModeledEntity = keyof typeof BUCKET_BY_ENTITY;

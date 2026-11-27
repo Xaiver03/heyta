@@ -34,7 +34,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { adjustmentOn, canRescheduleByCalendarDrag, parseCategorySlot, planCalendarDrop, planCalendarTimeDrop, scopeTasks, toLocalDate, type LocalDate } from '@heyta/domain';
+import { adjustmentOn, canRescheduleByCalendarDrag, parseCategorySlot, planCalendarDrop, planCalendarTimeDrop, scopeTasks, toLocalDate, type LocalDate, type Task } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
 import { CATEGORY_SLOT_TOKEN_BY_SLOT, type TokenName } from '@heyta/design-system';
 import {
@@ -42,9 +42,12 @@ import {
   HeytaUiProvider,
   stepCalendarCursor,
 } from '@heyta/ui';
+import { resolveCalendarBarAccent } from './calendar-display-pref.js';
 
 import { CalendarCapturePopover } from './CalendarCapturePopover.js';
 import { CalendarDragBar, CalendarDragProvider, CalendarDropDay, CalendarDropHour } from './CalendarDnd.js';
+import { CalendarTimetable } from './CalendarTimetable.js';
+import { CalendarTimetableImport } from './CalendarTimetableImport.js';
 import { useCountdownStore } from '../countdown/store.js';
 import { useTaskStore } from '../tasks/store.js';
 import { useProjectStore } from '../projects/store.js';
@@ -86,6 +89,22 @@ export function CalendarView(): React.JSX.Element {
     }
     return map;
   }, [projects]);
+
+  /**
+   * 显示设置「配色」：任务条强调色怎么取（覆盖图谱 #40）。
+   *
+   * - `list`（默认）—— 按所属清单的颜色（上面那张 `projectAccentToken` 表）；
+   * - `priority` —— 按优先级语义色，**复用 `@heyta/ui` 的 `priorityColorToken`**
+   *   （全仓唯一一份优先级→色映射，见 `task-list/priority-color.ts` 文件头）；
+   * - `off` —— 恒 `undefined`（共享板退回默认色）。
+   *
+   * 🔴 判断只有一份：这里只把"用户选了哪种"翻成回调，颜色取值仍由 token 唯一决定。
+   */
+  const barAccentOf = useCallback(
+    (task: Task): TokenName | undefined =>
+      resolveCalendarBarAccent(view.colorBy, task, (projectId) => projectAccentToken.get(projectId)),
+    [view.colorBy, projectAccentToken],
+  );
 
   const today = toLocalDate(store.now);
   /** 正在写入的任务 id —— 防止连点产生两次 toggle。 */
@@ -295,6 +314,18 @@ export function CalendarView(): React.JSX.Element {
              也不叫 AI：这条是纯规则解析，零模型、不出境（ADR-0013 的
              `retention-undecided` 仍然挡着 `managed`，而这条根本不需要它）。
         */}
+        {view.extraView === 'timetable' ? (
+          <>
+            <CalendarTimetableImport />
+            <CalendarTimetable
+              cursor={view.cursor}
+              today={today}
+              weekdays={labels.weekdays}
+              habits={Object.values(store.entities.habits)}
+            />
+          </>
+        ) : (
+          <>
         {view.captureOpen ? (
           <CalendarCapturePopover date={view.selected} title={labels.dayTitle(view.selected)} onClose={view.toggleCapture} />
         ) : null}
@@ -322,10 +353,8 @@ export function CalendarView(): React.JSX.Element {
           /* 🔴 日档那条"现在"线的时钟**只有一个来源**：任务 store 的 `now`。
              界面 store 刻意不存时钟（存了就会漂 —— 放着不动的一屏，线还在走才算"现在"）。 */
           now={store.now}
-          /* 彩色日历：每条任务条按**所属清单**的颜色上强调色（未归属/未设色 ⇒ 默认色）。 */
-          barAccentOf={(task) =>
-            task.projectId === undefined ? undefined : projectAccentToken.get(task.projectId)
-          }
+          /* 彩色日历：每条任务条按所选**配色模式**上强调色（按清单 / 按优先级 / 不着色）。 */
+          barAccentOf={barAccentOf}
           onToday={() => {
             // 「今天」跳回：选中今天 + 月份跟过去（与迷你月历的 ○ 同一条路径）。
             view.goToToday(today);
@@ -363,6 +392,8 @@ export function CalendarView(): React.JSX.Element {
           )}
           testID={BOARD_TEST_ID}
         />
+          </>
+        )}
       </div>
       </CalendarDragProvider>
     </HeytaUiProvider>

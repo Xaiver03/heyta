@@ -46,9 +46,11 @@ import { LocaleHost } from './lib/locale-host.js';
 import { ErrorBoundary } from './lib/error-boundary.js';
 import { installFatalErrorHooks } from './lib/fatal-hooks.js';
 import { installPressOrigin } from './lib/press-origin.js';
+import { armPrintShortcut } from './lib/print-shortcut.js';
 import { eraseWebLocalData } from './lib/local-data-destruction.js';
 import { startupMode } from './lib/startup-mode.js';
 import { applyFontScale, loadFontScale } from './lib/font-scale.js';
+import { applyAppIcon, loadAppIcon } from './lib/app-icon.js';
 import { applyTheme, resolveInitialTheme } from './lib/theme.js';
 import { startWidgetLifecycle } from './pwa/lifecycle.js';
 import { registerWidgetServiceWorker } from './pwa/register.js';
@@ -130,6 +132,15 @@ bootstrapDesktopChrome();
 installPressOrigin();
 
 /**
+ * 打印当前视图的快捷键（覆盖图谱 #70）。
+ *
+ * 与 `installPressOrigin` 同一条位置理由：四条渲染出口共用这一个装配点。
+ * 判断本身在 `lib/print-shortcut.ts`（纯函数、可测），这里只挂副作用 ——
+ * 浏览器自带 ⌘P 在桌面壳（无菜单）里不保证命中，所以显式接一条。
+ */
+armPrintShortcut();
+
+/**
  * 🔴 全局错误钩子必须**先于 createRoot** 装上（崩溃审计 U12 第 2 条 P0）。
  *
  * 在此之前全仓没有任何 `error` / `unhandledrejection` 监听，于是
@@ -143,6 +154,9 @@ const root = createRoot(container);
 
 /* 用户字号偏好：在任何 render 之前覆盖 `--ht-font-size-*`（只缩放文字）。 */
 applyFontScale(loadFontScale());
+
+/* 应用图标（#56）：在 render 之前把 favicon 换成用户选的那一档（设备本地偏好、零 op）。 */
+applyAppIcon(loadAppIcon());
 
 /**
  * 渲染"启动失败"屏 —— 所有**渲染出口**的失败都必须走这里。

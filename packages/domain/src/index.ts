@@ -35,6 +35,8 @@ export * from './timeline.js';
 export * from './timeline-position.js';
 export * from './notes.js';
 export * from './sections.js';
+// ADR-0093：任务模板（`TASK_TEMPLATE`）—— 名校验 / 规范顺序 / 任务 ⇄ 模板 字段映射（纯函数）。
+export * from './task-template.js';
 export * from './trash-rows.js';
 
 export * from './events.js';
@@ -47,11 +49,14 @@ export * from './trash-rows.js';
 export * from './search.js';
 export * from './habit-streak.js';
 export * from './course-import.js';
+export * from './timetable.js';
 export * from './habit-resilience.js';
 export * from './habit-icons.js';
 export * from './habit-backfill.js';
 export * from './habit-review.js';
 export * from './habit-year.js';
+// 覆盖图谱 #46 / #48：习惯打卡记录清单 + 完成率/连续天数趋势序列（统计怎么算的唯一实现）。
+export * from './habit-stats.js';
 export * from './milestones.js';
 export * from './today-progress.js';
 export * from './weekly-review.js';
@@ -59,6 +64,8 @@ export * from './activity-categories.js';
 export * from './project-settings.js';
 export * from './identity-tags.js';
 export * from './focus.js';
+// 覆盖图谱 #50：专注统计的日/周/月序列（图表数据来源）。
+export * from './focus-series.js';
 export * from './recurrence.js';
 export * from './capture.js';
 // 2026-11-15：任务行「今天」快捷要用它算到期 epoch（与捕获面板同一个换算）。
@@ -108,3 +115,9 @@ export * from './mention-tasks.js';
 //    「Module '@heyta/domain' has no exported member 'projectTaskActivity'」，
 //    而 domain 自己的 build 是绿的（它编译的是模块，不是入口）。
 export * from './task-activity.js';
+
+// 智能清单显示配置（#18）：词表与归并规则住这里，存储与渲染在壳里。
+export * from './smart-list.js';
+
+// 通知行为默认值（#57）：词表与逐字段回落住这里，存储与渲染在壳里。
+export * from './notification-defaults.js';

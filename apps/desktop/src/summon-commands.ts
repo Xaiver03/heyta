@@ -15,15 +15,16 @@
 
 import { type SummonConfig, normalizeAccelerator } from './summon-config.js';
 
-/** 托盘菜单的四条命令 id。 */
-export const TRAY_COMMANDS = ['today', 'quickAdd', 'showMainWindow', 'quit'] as const;
+/** 托盘菜单的五条命令 id。`sticky` 是「置顶便签」——覆盖图谱 #36 的常驻窗入口。 */
+export const TRAY_COMMANDS = ['today', 'quickAdd', 'sticky', 'showMainWindow', 'quit'] as const;
 
 export type TrayCommandId = (typeof TRAY_COMMANDS)[number];
 
-/** 四条命令的文案。`显示主窗` 与 `退出` 是 macOS 与滴答两家的共同形状。 */
+/** 五条命令的文案。`显示主窗` 与 `退出` 是 macOS 与滴答两家的共同形状。 */
 export const TRAY_LABELS: Record<TrayCommandId, string> = {
   today: '今天',
   quickAdd: '快速添加',
+  sticky: '置顶便签',
   showMainWindow: '显示主窗',
   quit: '退出',
 };
@@ -35,6 +36,8 @@ export const TRAY_LABELS: Record<TrayCommandId, string> = {
 export const TRAY_TARGETS: Record<TrayCommandId, keyof SummonTargetNames> = {
   today: 'showToday',
   quickAdd: 'openQuickAdd',
+  // 与托盘左键同一个动作：落下/收起那枚 alwaysOnTop 常驻面板窗。
+  sticky: 'toggleResidentPanel',
   showMainWindow: 'showMainWindow',
   quit: 'quit',
 };
@@ -51,6 +54,12 @@ export interface SummonTargetNames {
   openQuickAdd: () => void;
   showToday: () => void;
   showMainWindow: () => void;
+  /**
+   * 菜单栏常驻窗（覆盖图谱 #72 / #36）：点托盘图标（左键）落下/收起那一枚
+   * alwaysOnTop 小窗。它**不是**托盘菜单项 —— 触发源是 `tray.on('click')`，
+   * 所以这里只有一个动作名，没有对应 `TRAY_COMMANDS`。
+   */
+  toggleResidentPanel: () => void;
   quit: () => void;
 }
 

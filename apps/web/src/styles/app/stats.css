@@ -1,0 +1,93 @@
+/* 统计 / 总结相关的布局（覆盖图谱 #16 / #46 / #48 / #50）。
+ * 取值全部来自 token（`pnpm check:design` 会扫这里）。只放布局，不放控件外观
+ * （按钮/输入框的外观归 `.ht-btn` / `.ht-input`）。 */
+
+/* 习惯详情里「打卡记录」「统计」两块之间、以及与上方月/年板之间的间距。 */
+.ht-habit__records,
+.ht-habit__stats,
+.ht-app__focus-stats {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+  margin-block-start: var(--ht-space-4);
+}
+
+/* 一张图（标题 + 图 + 轴标签）的竖排容器。 */
+.ht-app__stats__figure {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+  margin: 0;
+}
+
+.ht-app__stats__caption {
+  color: var(--ht-color-foreground-muted);
+}
+
+/* 柱状图下方的等距标签行。 */
+.ht-app__stats__axis {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--ht-space-1);
+  color: var(--ht-color-foreground-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+.ht-app__stats__axis-label {
+  flex: 1;
+  min-inline-size: 0;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── 总结屏（#16） ─────────────────────────────────────── */
+.ht-app__summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-3);
+  margin-block-end: var(--ht-space-5);
+}
+
+.ht-app__summary__periods {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ht-space-3);
+}
+
+.ht-app__summary__text {
+  margin: 0;
+  padding: var(--ht-space-3);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface-sunken);
+  color: var(--ht-color-foreground);
+  white-space: pre-wrap;
+}
+
+.ht-app__summary__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--ht-space-2);
+}
+
+/* ── 专注手动补录（#50） ───────────────────────────────── */
+.ht-app__focus__manual {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--ht-space-2);
+  margin-block-start: var(--ht-space-2);
+}
+
+.ht-app__focus__manual-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-sm);
+}
+
+.ht-app__focus__manual-error {
+  color: var(--ht-color-danger);
+}

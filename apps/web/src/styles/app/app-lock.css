@@ -1,0 +1,49 @@
+/*
+ * 本地应用锁（#61）的样子
+ * =========================
+ *
+ * 两处落点：
+ *   1. 锁屏遮罩 —— `.ht-app__lock-scrim` / `.ht-app__lock-dialog`（走 `WebModalShell` 的
+ *      overlayClass / dialogClass）。它是**承诺档**浮层（`--ht-z-modal-commitment`），
+ *      压在普通模态之上；满屏、居中、底色用 `--ht-color-overlay`。
+ *   2. 设置面板里的 PIN 表单 —— `.ht-app__lock-form` 与其动作行（纵向堆叠 FormField）。
+ *
+ * 命名归 `.ht-app` 族（不新开 `ht-*` 顶层族）；全部取值走 token，避免裸 hex/px/ms/z-index。
+ */
+
+.ht-app__lock-scrim {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--ht-space-4);
+  background: var(--ht-color-overlay);
+  z-index: var(--ht-z-modal-commitment);
+}
+
+.ht-app__lock-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-5);
+  width: 100%;
+  max-width: var(--ht-layout-modal-max);
+  padding: var(--ht-space-6);
+  border-radius: var(--ht-radius-dialog);
+  background: var(--ht-color-surface-raised);
+  box-shadow: var(--ht-shadow-lg);
+  color: var(--ht-color-foreground);
+}
+
+.ht-app__lock-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-4);
+}
+
+.ht-app__lock-form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--ht-space-3);
+}
