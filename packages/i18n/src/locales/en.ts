@@ -1931,7 +1931,7 @@ export const en = {
   'web.organize.moveBlockedShared': 'Tasks in a shared list cannot change lists yet',
   'web.organize.tagsLegend': 'Tags',
   'web.organize.tagToggle': 'Add or remove tag “{name}” on task “{title}”',
-  'web.organize.noTags': 'No tags yet — create one under “Tags” on the left.',
+  'web.organize.noTags': 'No tags yet',
   // ── Web · per-row "due" editor (batch 1, multi-end coverage goal §2) ──
   'web.due.trigger': 'Due',
   'web.due.summaryAria': 'Set due date for task “{title}”',
@@ -3865,6 +3865,8 @@ export const en = {
   'mobile.tabbarCustomize.restore': 'Restore default',
   'mobile.tabbarCustomize.error.min': 'Keep at least {min}',
   'mobile.tabbarCustomize.error.max': 'At most {max}',
+  'mobile.tabbarCustomize.reorder': 'Reorder',
+  'mobile.settings.more': 'More settings',
   'mobile.settings.section.about': 'About & help',
   'mobile.settings.section.profile': 'Profile',
   'mobile.settings.section.general': 'General',

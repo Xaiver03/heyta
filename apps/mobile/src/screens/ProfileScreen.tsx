@@ -70,6 +70,7 @@ import {
 import {
   AssistantMark,
   SettingsRow,
+  SettingsSection,
   resolvePendingUploadPresentation,
   type SettingsRowModel,
 } from '@heyta/ui';
@@ -965,7 +966,7 @@ export function ProfileScreen({ onNavigateTab }: { onNavigateTab?: (key: 'habits
     kind: 'action',
       discloses: true,
     testID: 'profile-entry-settings',
-    label: t('mobile.profile.entry.settings'),
+    label: t('mobile.settings.more'),
     leading: <Icon name="action.settings" size="sm" color={tokens['color.foreground-muted']} />,
     onPress: () => {
       setSettingsSection(undefined);
@@ -1001,6 +1002,22 @@ export function ProfileScreen({ onNavigateTab }: { onNavigateTab?: (key: 'habits
     leading: <Icon name="action.subscription" size="sm" color={tokens['color.foreground-muted']} />,
     onPress: () => {
       setSettingsSection('subscription');
+      navigation.push('settings');
+    },
+  };
+
+  /**
+   * 外观与语言：**直接落在「我的」首屏**（改版要求：主要设置前置，深层次才进「更多设置」）。
+   * 点开直接进那一节，返回即回到「我的」—— 不再先经过一层目录。
+   */
+  const appearanceRow: SettingsRowModel = {
+    kind: 'action',
+    discloses: true,
+    testID: 'profile-entry-appearance',
+    label: t('mobile.settings.section.appearance'),
+    leading: <Icon name="action.display" size="sm" color={tokens['color.foreground-muted']} />,
+    onPress: () => {
+      setSettingsSection('appearance');
       navigation.push('settings');
     },
   };
@@ -1143,10 +1160,9 @@ export function ProfileScreen({ onNavigateTab }: { onNavigateTab?: (key: 'habits
     (HUB_ROW_TEST_IDS as readonly string[]).includes(row.testID ?? ''),
   );
 
-  const QUICK_ENTRY_TEST_IDS = ['profile-entry-habits', 'profile-entry-countdown', 'profile-entry-share'] as const;
   const quickEntryRows = entryRows.filter(
     (row): row is Extract<SettingsRowModel, { kind: 'action' }> =>
-      row.kind === 'action' && (QUICK_ENTRY_TEST_IDS as readonly string[]).includes(row.testID ?? ''),
+      row.kind === 'action' && (HUB_ROW_TEST_IDS as readonly string[]).includes(row.testID ?? ''),
   );
 
   /**
@@ -1405,6 +1421,9 @@ export function ProfileScreen({ onNavigateTab }: { onNavigateTab?: (key: 'habits
 
   const profileEditor = accountHasCredential ? (
     <Stack>
+      <SectionHeader title={t('mobile.profile.section.account')} />
+      <Card shadow="card">
+        <Stack>
       {!profileNetworkAllowed ? (
         <Text variant="caption" tone="subtle">{t('mobile.profile.localOnly')}</Text>
       ) : savedName === undefined ? (
@@ -1413,23 +1432,6 @@ export function ProfileScreen({ onNavigateTab }: { onNavigateTab?: (key: 'habits
           {profileReadState === 'loading' ? null : <Button label={t('mobile.profile.retry')} tone="secondary" onPress={() => { void fetchDisplayName(); }} />}
         </>
       ) : null}
-          {/*
-            🔴 昵称行**只在真的读到之后**出现。没凭据 / 没同意出境 ⇒ 一个请求都不发，
-            于是这里连行都不画 —— 画一行"昵称：（空）"会被读成"设置坏了"，
-            而它其实是"你还没登录"。这两件事在界面上必须长得不一样。
-
-            ⚠️ 这一段**一个 `style={{ }}` 都不许出现**：`check:l4` 的 mobile 段
-            现量恰在基线 90、零余量（只减不增的棘轮）。行、输入框、按钮的样式
-            全在 `SettingsRow` 与 `ui/kit` 里，这里只给模型与文案。
-          */}
-          {/*
-            🔴 头像行与昵称行**同一次读取**才出现（`savedName === undefined` 就是不出现）。
-            理由与昵称那条一样：没登录时画一个空的、点不动的头像圈，
-            会被读成"设置坏了"，而它其实是"你还没登录"。
-
-            ⚠️ 这一段同样**一个 `style={{ }}` 都不许有**：圈和图的样式在 `ui/avatar.tsx`
-            （那是 `check:l4` mobile 段豁免的目录），这里只给数据与文案。
-          */}
           {savedName === undefined ? null : !profileNetworkAllowed ? null : (
             <>
               <HStack gap="default" align="center">
@@ -1437,32 +1439,33 @@ export function ProfileScreen({ onNavigateTab }: { onNavigateTab?: (key: 'habits
                 <Text variant="row-title" grow>
                   {t('common.profile.avatar.label')}
                 </Text>
-              </HStack>
-              <HStack gap="tight">
-                <Button
-                  label={t('common.profile.avatar.change')}
-                  onPress={() => {
-                    void changeAvatar();
-                  }}
-                  tone="secondary"
-                  loading={avatarBusy}
-                />
-                {avatarImage === undefined ? null : (
+                <HStack gap="tight">
                   <Button
-                    label={t('common.profile.avatar.remove')}
+                    label={t('common.profile.avatar.change')}
                     onPress={() => {
-                      void removeAvatar();
+                      void changeAvatar();
                     }}
-                    tone="ghost"
+                    tone="secondary"
                     loading={avatarBusy}
                   />
-                )}
+                  {avatarImage === undefined ? null : (
+                    <Button
+                      label={t('common.profile.avatar.remove')}
+                      onPress={() => {
+                        void removeAvatar();
+                      }}
+                      tone="ghost"
+                      loading={avatarBusy}
+                    />
+                  )}
+                </HStack>
               </HStack>
               {avatarLine === null ? null : (
                 <Text variant="caption" tone={avatarLineDanger ? 'danger' : 'subtle'}>
                   {avatarLine}
                 </Text>
               )}
+              <Divider />
             </>
           )}
           {savedName === undefined ? null : !profileNetworkAllowed ? null : nameEditing ? (
@@ -1487,31 +1490,33 @@ export function ProfileScreen({ onNavigateTab }: { onNavigateTab?: (key: 'habits
                 }}
                 testID="profile-nickname-input"
               />
-              <Button
-                label={t('common.profile.nickname.save')}
-                onPress={() => {
-                  void saveDisplayName();
-                }}
-                tone="primary"
-                loading={nameSaving}
-              />
-              <Button
-                label={t('mobile.common.cancel')}
-                onPress={() => {
-                  setNameEditing(false);
-                  setNameNotice(null);
-                }}
-                tone="ghost"
-              />
+              <HStack gap="tight">
+                <Button
+                  label={t('common.profile.nickname.save')}
+                  onPress={() => {
+                    void saveDisplayName();
+                  }}
+                  tone="primary"
+                  loading={nameSaving}
+                />
+                <Button
+                  label={t('mobile.common.cancel')}
+                  onPress={() => {
+                    setNameEditing(false);
+                    setNameNotice(null);
+                  }}
+                  tone="ghost"
+                />
+              </HStack>
+              <Divider />
             </>
           ) : (
             <>
               <SettingsRow
                 row={{
                   kind: 'value',
+                  discloses: true,
                   label: t('common.profile.nickname.label'),
-                  // 🔴 `null` 显示的是那句「留空则显示邮箱」，**不是空字符串**：
-                  //    空值会被读成"没读到"，而那与"读到了、用户确实没设"是两件事。
                   value: savedName ?? t('common.profile.nickname.placeholder'),
                   tone: savedName === null ? 'subtle' : 'default',
                   onPress: () => {
@@ -1522,24 +1527,20 @@ export function ProfileScreen({ onNavigateTab }: { onNavigateTab?: (key: 'habits
                   valueTestID: 'profile-nickname-value',
                 }}
               />
-              <Text
-                variant="caption"
-                tone={nameNotice?.danger === true ? 'danger' : 'subtle'}
-              >
-                {nameNotice?.text ?? t('mobile.profile.nickname.hint')}
-              </Text>
+              {nameNotice === null ? null : (
+                <Text
+                  variant="caption"
+                  tone={nameNotice.danger ? 'danger' : 'subtle'}
+                >
+                  {nameNotice.text}
+                </Text>
+              )}
+              <Divider />
             </>
           )}
-      <SettingsRow row={{ kind: 'value', label: t('common.profile.email.label'), value: signedInEmail ?? t('mobile.profile.account.offline') }} />
-      <Text variant="caption" tone="subtle">{t('common.profile.email.hint')}</Text>
-      {/*
-        🔴 「更换登录邮箱」紧接在只读的邮箱行**下面** —— `common.profile.email.hint`
-        那句"请用下面的「更换登录邮箱」"指的就是这里。那句指引指不到东西时，
-        比留着空白更糟（用户会去别处找那个"不能改"的理由）。
-        表单**不许**进「我的」的滚动流（`check:mobile-settings` R3 +
-        `profile-settings-ia.spec.ts`），所以它是一个自带卡片的外挂组件，
-        由这里的 `profileEditor` 摆进设置面的 `profile` 分组。
-      */}
+          <SettingsRow row={{ kind: 'value', label: t('common.profile.email.label'), value: signedInEmail ?? t('mobile.profile.account.offline') }} />
+        </Stack>
+      </Card>
       <EmailChangeSection baseUrl={form.serverUrl} token={form.token} currentEmail={signedInEmail} />
     </Stack>
   ) : undefined;
@@ -1751,30 +1752,35 @@ export function ProfileScreen({ onNavigateTab }: { onNavigateTab?: (key: 'habits
                 <Text variant="caption" numberOfLines={1} style={{ textAlign: 'center' }}>{row.label}</Text>
               </Pressable>
             ))}
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={t('notes.title')}
-              testID="profile-entry-notes-tile"
-              onPress={() => { navigation.push('profile:notes'); }}
-              style={({ pressed }) => [{ width: '25%', alignItems: 'center', gap: tokens['space.1'], paddingVertical: tokens['space.2'] }, pressed ? { opacity: tokens['state.pressed-opacity'] } : null]}
-            >
-              <Icon name="note.sticky" size="sm" color={tokens['color.foreground-muted']} />
-              <Text variant="caption" numberOfLines={1} style={{ textAlign: 'center' }}>{t('notes.title')}</Text>
-            </Pressable>
           </View>
         )}
       />
 
-      {/* ── ③ 功能入口 ─────────────────────────────────────────────── */}
-      <Card shadow="card">
-        <SettingsRow row={subscriptionRow} />
-        <Divider />
-        <SettingsRow row={settingsRow} />
-        <Divider />
-        <SettingsRow row={notificationsRow} />
-        <Divider />
-        <SettingsRow row={tabBarCustomizeRow} />
-      </Card>
+      {/*
+        ── ③ 主要设置前置到「我的」，深层次的收进「更多设置」 ────────────────
+        🔴 2026-11-27 产品改版（对标滴答清单把设置收紧在「我的」里）：
+        功能模块 / 外观与语言 / 提醒与通知 / 订阅这些**高频**设置直接摊在首屏；
+        「更多设置」只留一条入口，落进去才是账号安全 / 数据与同步 / AI / 关于这些**深层**配置。
+
+        同时把这一块从「Card + 逐行 Divider」换成共享的 `SettingsSection variant="card"`：
+        `Card` 默认 `space.4` 的行间距把每行撑到 ~60dp（真机实测行距 160px / 420dpi），
+        而 `SettingsSection` 的卡用 0 间距 + 发丝分隔线，行高压到触控下限 44dp —— 就是滴答那种密度。
+      */}
+      <SettingsSection
+        variant="card"
+        testID="profile-group-modules"
+        rows={[tabBarCustomizeRow]}
+      />
+      <SettingsSection
+        variant="card"
+        testID="profile-group-preferences"
+        rows={[appearanceRow, notificationsRow, subscriptionRow]}
+      />
+      <SettingsSection
+        variant="card"
+        testID="profile-group-more"
+        rows={[settingsRow]}
+      />
 
       {/*
         ── ④ 同步：**一行**（§5.2）────────────────────────────────────────

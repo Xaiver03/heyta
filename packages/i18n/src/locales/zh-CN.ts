@@ -2118,7 +2118,7 @@ export const zhCN = {
   'web.organize.moveBlockedShared': '共享清单里的任务暂时不能换清单',
   'web.organize.tagsLegend': '标签',
   'web.organize.tagToggle': '给任务「{title}」加上或去掉标签「{name}」',
-  'web.organize.noTags': '还没有标签 —— 在左侧「标签」里新建一个。',
+  'web.organize.noTags': '还没有标签',
   // ── Web · 行尾「截止」控件（批一，多端入口覆盖 goal §2）──────────────
   //    日期措辞本身复用 common.date.* / common.weekday.*（共享 DatePicker
   //    的 monthTitle/dayLabel 由宿主拼），这里只有控件自己的话。
@@ -4277,6 +4277,8 @@ export const zhCN = {
   'mobile.tabbarCustomize.restore': '恢复默认',
   'mobile.tabbarCustomize.error.min': '至少保留 {min} 个',
   'mobile.tabbarCustomize.error.max': '最多 {max} 个',
+  'mobile.tabbarCustomize.reorder': '拖动排序',
+  'mobile.settings.more': '更多设置',
   'mobile.settings.section.about': '关于与帮助',
   'mobile.settings.section.profile': '个人资料',
   'mobile.settings.section.general': '常规',

@@ -116,22 +116,23 @@ const WIDGET_ADD_STEPS = widgetAddSteps(resolveWidgetPlatform(Platform.OS));
  */
 function makeStyles(tokens: HeytaNativeTokens) {
   return StyleSheet.create({
-    /** 弹层根：铺满 + 主题底色。`paddingTop` 来自安全区，留在调用点。 */
+    /** 弹层根：铺满 + 分组灰底（与 ProfileScreen 同一张画布，白卡清晰分层）。 */
     sheetRoot: {
       flex: 1,
-      backgroundColor: tokens['color.background'],
+      backgroundColor: tokens['color.grouped-background'],
     },
-    /** 弹层自己的页头（`Screen`/`AppBar` 是给整页的，Modal 里没有标签栏）。 */
+    /** 弹层自己的页头：跟随分组底色，消除顶栏纯白硬条。 */
     appBar: {
       height: tokens['nav.app-bar-height'],
       flexDirection: 'row',
       alignItems: 'center',
       paddingHorizontal: tokens['screen.gutter'],
       gap: tokens['space.2'],
-      backgroundColor: tokens['color.surface'],
+      backgroundColor: tokens['color.grouped-background'],
     },
     flex1: { flex: 1 },
     gap4: { gap: tokens['space.4'] },
+    alignStart: { alignSelf: 'flex-start' },
     /** 语言胶囊一行：换行铺满。 */
     chipRow: {
       flexDirection: 'row',
@@ -261,7 +262,17 @@ export function SettingsScreen({
     () => form.token.trim() !== '' && form.serverUrl.trim() !== '' && form.serverUrl !== DEFAULT_SERVER_URL,
   );
   const sectionRef = useRef<SettingsSectionKey | undefined>(initialSection);
+  /**
+   * 这一层是**从目录点进来的**（true），还是「我的」把一个分节**直接**推进来的（false）。
+   *
+   * 用途只有一个：返回键要分两种。
+   *   · 从目录进来 → 返回回到「更多设置」目录（同 iOS 设置的第二层）；
+   *   · 从「我的」直接进来（外观与语言 / 订阅 / 数据与同步…）→ 返回直接关掉、
+   *     回到「我的」，不该先弹出一个用户没见过的目录。
+   */
+  const enteredThroughDirectory = useRef(false);
   const openSection = useCallback((next: SettingsSectionKey | undefined): void => {
+    enteredThroughDirectory.current = next !== undefined;
     sectionRef.current = next;
     setSection(next);
   }, []);
@@ -325,6 +336,7 @@ export function SettingsScreen({
 
   useEffect(() => {
     if (!visible) return;
+    enteredThroughDirectory.current = false;
     sectionRef.current = initialSection;
     setSection(initialSection);
   }, [initialSection, visible]);
@@ -529,6 +541,7 @@ export function SettingsScreen({
     )
     .map((key): SettingsRowModel => ({
       kind: 'action',
+      discloses: true,
       testID: `settings-section-${key}`,
       label: sectionLabels[key],
       leading: <Icon name={sectionIcons[key]} size="sm" color={tokens['color.foreground-muted']} />,
@@ -538,11 +551,14 @@ export function SettingsScreen({
   const handleRequestClose = useCallback((): boolean => {
     const current = sectionRef.current;
     if (current !== undefined) {
-      sectionRef.current = undefined;
-      setSection(undefined);
-    } else {
-      closeParent();
+      if (enteredThroughDirectory.current) {
+        enteredThroughDirectory.current = false;
+        sectionRef.current = undefined;
+        setSection(undefined);
+        return true;
+      }
     }
+    closeParent();
     return true;
   }, [closeParent]);
   // Keep the existing SettingsScreen close contract as the Modal callback. The
@@ -556,7 +572,7 @@ export function SettingsScreen({
   }, [handleRequestClose, navigation, visible]);
 
   const renderPrivacy = (): React.JSX.Element => (
-    <Stack gap="loose" testID="privacy-consent-section">
+    <Stack gap="tight" testID="privacy-consent-section">
       <SectionHeader title={t('common.privacy.settings.title')} />
       <Card>
         <Stack>
@@ -570,26 +586,23 @@ export function SettingsScreen({
               })}
             </Text>
           )}
-          <Text variant="caption" tone="subtle">
-            {t(consentRecord?.decision === 'accepted' ? 'common.privacy.settings.revokeHint' : 'common.privacy.settings.chooseHint')}
-          </Text>
+          {consentRecord?.decision !== 'accepted' ? (
+            <Button
+              label={t('common.privacy.settings.chooseAgain')}
+              onPress={chooseAgain}
+              tone="primary"
+              style={styles.alignStart}
+            />
+          ) : (
+            <Button
+              label={t('common.privacy.settings.revoke')}
+              onPress={revokeConsent}
+              tone="secondary"
+              style={styles.alignStart}
+            />
+          )}
         </Stack>
       </Card>
-      {consentRecord?.decision !== 'accepted' ? (
-        <Button
-          label={t('common.privacy.settings.chooseAgain')}
-          onPress={chooseAgain}
-          tone="primary"
-          style={{ alignSelf: 'flex-start' }}
-        />
-      ) : (
-        <Button
-          label={t('common.privacy.settings.revoke')}
-          onPress={revokeConsent}
-          tone="secondary"
-          style={{ alignSelf: 'flex-start' }}
-        />
-      )}
       {consentNotPersisted ? (
         <Text variant="caption" tone="warning">
           {t('common.privacy.consent.notPersisted')}
@@ -757,31 +770,12 @@ export function SettingsScreen({
     </>
   );
 
-  /** G5 外观与语言。 */
+  /** G5 外观与语言：统一卡片外 SectionHeader + 无废话 ChoiceRows。 */
   const renderAppearance = (): React.JSX.Element => (
     <>
-      {/*
-        🔴 「外观」这一段是 2026-11-14 补的。此前这一页只有语言，组名却叫
-        「外观与语言」—— 名不副实，更早一次修法是把它改名成「语言」。
-        但那只是绕开：用户在深色系统上想用浅色时**没有出路**。
-        现在 `HeytaUiProvider` 有了 `schemeOverride`，组名可以光明正大改回「外观」。
-
-        三档而不是两档：少了「跟随系统」就只能二选一，而"用户改系统设置时
-        还得回来再改一次"是没必要的负担。
-      */}
-      <SettingsSection
-        variant="card"
-        testID="settings-theme"
-        title={t('mobile.profile.section.appearance')}
-        note={t('mobile.profile.theme.hint')}
-      >
+      <SectionHeader title={t('mobile.profile.section.appearance')} />
+      <SettingsSection variant="card" testID="settings-theme">
         <ChoiceRows
-          /*
-           * 🔴 **不传 `groupLabel`**：外层 `SettingsSection` 的 `title` 已经是「外观」，
-           * 再给一条组标签就是同一句话说两遍（真机量到标题 y=408、组标签 y=594）。
-           * `groupLabel` 的用途是"同一张面板里多组单选时区分它们"——
-           * 这里只有一组。
-           */
           value={scheme}
           onChange={setScheme}
           options={[
@@ -792,24 +786,8 @@ export function SettingsScreen({
           testID="settings-theme-choice"
         />
       </SettingsSection>
-      <SettingsSection
-        variant="card"
-        testID="profile-language"
-        title={t('mobile.profile.section.language')}
-        note={t('mobile.profile.language.hint')}
-      >
-        {/*
-          🔴 2026-11-14：`Chip` 组 → `ChoiceRows`。
-          
-          看图才发现的：**同一屏两种控件表达同一种语义** ——
-          上面「外观」是三行 + 右侧勾（`ChoiceRows`），下面「语言」是两枚胶囊
-          （`Chip selected`）。两者都是"从 N 个里选 1 个"。
-          
-          这是 `ux-principles` §6b 的原话：**一个面板里，同一语义只允许一种控件**。
-          两种控件会让用户以为它们不是一回事（"胶囊像是标签筛选，行像是开关"）。
-          
-          语言只有 2 项时胶囊看着更省地方 —— 但省下的那点高度不值这个歧义。
-        */}
+      <SectionHeader title={t('mobile.profile.section.language')} />
+      <SettingsSection variant="card" testID="profile-language">
         <ChoiceRows
           value={locale}
           onChange={setLocale}
@@ -823,63 +801,61 @@ export function SettingsScreen({
     </>
   );
 
-  /** G7 关于与帮助：反馈、运营者与备案号（法务承诺在移动端的兑现）。 */
+  /** G7 关于与帮助：反馈、运营者与备案号。 */
   const renderAbout = (): React.JSX.Element => (
-    <SettingsSection
-      variant="card"
-      testID="settings-feedback"
-      title={t('mobile.settings.feedback.section')}
-      rows={
-        [
-          {
-            kind: 'action',
-            testID: 'settings-entry-feedback',
-            label: t('common.feedback.label'),
-            hint: t('common.feedback.hint'),
-            leading: <Icon name="action.send" size="sm" color={tokens['color.foreground-muted']} />,
-            onPress: openFeedbackMail,
-          },
-          ...(feedbackFailed
-            ? [
-                {
-                  kind: 'note' as const,
-                  testID: 'settings-feedback-failed',
-                  text: t('mobile.settings.feedback.failed', { email: OPERATOR.contactEmail }),
-                  tone: 'warning' as const,
-                  // 失败反馈不是说明（门禁例外通道）。
-                  role: 'alert' as const,
-                },
-              ]
-            : []),
-          /*
-            运营者与备案号 —— 隐私政策里一句承诺在移动端的兑现：政策写着
-            「App 备案号以应用内「关于」页与服务端对外页公布者为准」，
-            而移动端才是要提审的那个壳。文本由 `@heyta/legal` 的 `operatorFilingLine`
-            生成，与 web 的「关于」页同一份实现。
-          */
-          ...(isOfficialHostedInstance(readSyncConfig()?.serverUrl ?? '')
-            ? [
-                {
-                  kind: 'note' as const,
-                  testID: 'settings-operator',
-                  text: operatorFilingLine(OPERATOR),
-                },
-              ]
-            : []),
-        ] as readonly SettingsRowModel[]
-      }
-    />
+    <>
+      <SectionHeader title={t('mobile.settings.feedback.section')} />
+      <SettingsSection
+        variant="card"
+        testID="settings-feedback"
+        rows={
+          [
+            {
+              kind: 'action',
+              discloses: true,
+              testID: 'settings-entry-feedback',
+              label: t('common.feedback.label'),
+              hint: t('common.feedback.hint'),
+              leading: <Icon name="action.send" size="sm" color={tokens['color.foreground-muted']} />,
+              onPress: openFeedbackMail,
+            },
+            ...(feedbackFailed
+              ? [
+                  {
+                    kind: 'note' as const,
+                    testID: 'settings-feedback-failed',
+                    text: t('mobile.settings.feedback.failed', { email: OPERATOR.contactEmail }),
+                    tone: 'warning' as const,
+                    role: 'alert' as const,
+                  },
+                ]
+              : []),
+            ...(isOfficialHostedInstance(readSyncConfig()?.serverUrl ?? '')
+              ? [
+                  {
+                    kind: 'note' as const,
+                    testID: 'settings-operator',
+                    text: operatorFilingLine(OPERATOR),
+                  },
+                ]
+              : []),
+          ] as readonly SettingsRowModel[]
+        }
+      />
+    </>
   );
 
   const renderSecurity = (): React.JSX.Element => (
     <>
       {securityActions !== undefined && securityActions.length > 0 ? (
-        <SettingsSection
-          variant="card"
-          testID="settings-security-actions"
-          title={sectionLabels.account}
-          rows={securityActions}
-        />
+        <>
+          <SectionHeader title={t('mobile.security.trigger')} />
+          <SettingsSection
+            variant="card"
+            testID="settings-security-actions"
+            rows={securityActions}
+          />
+        </>
       ) : null}
       <VaultSettingsSection onVaultCleanupPending={onVaultCleanupPending} />
       {vaultCleanupPending && onRetryVaultCleanup !== undefined ? (
@@ -928,44 +904,37 @@ export function SettingsScreen({
           </Card>
         </View>
       ) : null}
-      {/*
-        🔴 这枚的闸门不许按"表单里此刻有没有凭据"判。凭据按设计只放内存
-        （`apps/mobile/src/sync/config.ts` 文件头那条取舍）⇒ 冷启动后它必然为空，
-        而这一步要连带清掉的小组件快照与设备密钥**跨进程活着**。装机态实测到的是：
-        闸门灰着 ⇒ 想"把手机给别人前把屏幕上的数据清掉"的用户在这台设备上没有任何入口，
-        主屏继续显示上一个账号的任务而且没有任何报错。
-        清理动作幂等、永不抛（`credential-wipe.ts`），而那里已经写明不对称的方向是
-        "宁可多清一次" —— 没有东西可清时按下去就是一次无副作用的空操作。
-      */}
-      <Button
-        label={t('mobile.profile.clearCredentials')}
-        onPress={onClearCredentials}
-        tone="ghost"
-      />
+      <Card>
+        <Button
+          label={t('mobile.profile.clearCredentials')}
+          onPress={onClearCredentials}
+          tone="ghost"
+          style={styles.alignStart}
+        />
+      </Card>
     </>
   );
 
   const renderSection = (): React.JSX.Element => {
     switch (section) {
-      /*
-        G1 账号：身份 + 登录方式 + 会话 + 危险区。
-        🔴 `security` 那一屏**并进这里**了：它原来是一个独立的第七组，
-        而它管的正是"我这个人怎么登录"—— 与账号是同一个意图。
-      */
       case 'account':
         return (
           <>
             {profileEditor}
             {onOpenAuth !== undefined && accountHasCredential === true ? (
-              <Card>
-                <Button
-                  label={t('mobile.profile.account.switchAccount')}
-                  tone="secondary"
-                  onPress={() => onOpenAuth()}
-                  testID="settings-account-switch"
-                  style={{ alignSelf: 'flex-start' }}
-                />
-              </Card>
+              <SettingsSection
+                variant="card"
+                rows={[
+                  {
+                    kind: 'action',
+                    discloses: true,
+                    testID: 'settings-account-switch',
+                    label: t('mobile.profile.account.switchAccount'),
+                    leading: <Icon name="tab.profile" size="sm" color={tokens['color.foreground-muted']} />,
+                    onPress: () => onOpenAuth(),
+                  },
+                ]}
+              />
             ) : null}
             {renderSecurity()}
           </>
@@ -1006,29 +975,30 @@ export function SettingsScreen({
       case undefined:
         return (
           /*
-            🔴 这里**没有** `note`：此前挂的是「选择要调整的内容。」——
-            用户已经点了「设置」，这句话不提供任何他不知道的信息，只吃掉 54px 首屏。
-            实测（真机 bounds）：它占 y 492–546，把这 6 行的起点从 570 推到 606。
+            🔴 「更多设置」= 深层配置的**二级目录**。主要设置（功能模块 / 外观与语言 /
+            订阅 / 提醒）已经前置到「我的」首屏；这里只留账号安全、数据与同步、
+            提醒与通知（送达与小组件）、AI、关于这些不常改的东西。
 
-            判据：**页头说明只有在说出"用户不知道的事"时才留**。
-            滴答的设置首页页头没有任何说明文字（9 行直接从会员卡下方开始）。
+            分组不是为了好看：原来是「一张卡 6 行靠在顶部、下面一大片空白」，
+            现在拆成两张卡（账号与数据 / 提醒与应用），既交代了关系，
+            也让一屏里的内容**占满**而不是全挤在最上面。
           */
-          <SettingsSection
-            variant="card"
-            testID="settings-directory"
-            /*
-             * 🔴 2026-11-14 **去掉组标题「偏好与账号」**。
-             *
-             * 看图才注意到的：那一组下面六行是「订阅 / 数据与同步 / 提醒与通知 /
-             * 外观与语言 / 功能与 AI / 关于与帮助」—— 只有「订阅」勉强算账号相关，
-             * 其余五组既不是"偏好"也不在"账号"里。组标题盖不住它的内容，
-             * 读起来像一句放错位置的分类名。
-             *
-             * 而且这一屏**就是设置**，顶栏已经写着「设置」。iOS 设置页的第一组
-             * 也没有组标题 —— 组标题只用来分隔"多组"，单组页面不需要它。
-             */
-            rows={sectionRows}
-          />
+          <>
+            <SettingsSection
+              variant="card"
+              testID="settings-directory"
+              rows={sectionRows.filter((row) =>
+                ['account', 'data'].some((key) => row.testID === `settings-section-${key}`),
+              )}
+            />
+            <SettingsSection
+              variant="card"
+              testID="settings-directory-app"
+              rows={sectionRows.filter((row) =>
+                ['notifications', 'features', 'about'].some((key) => row.testID === `settings-section-${key}`),
+              )}
+            />
+          </>
         );
     }
   };
@@ -1056,7 +1026,7 @@ export function SettingsScreen({
           />
           <View style={styles.flex1}>
             <Text variant="headline" numberOfLines={1}>
-              {section === undefined ? t('mobile.settings.title') : sectionLabels[section]}
+              {section === undefined ? t('mobile.settings.more') : sectionLabels[section]}
             </Text>
           </View>
           {section === undefined ? null : (

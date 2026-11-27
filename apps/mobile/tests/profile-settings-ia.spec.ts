@@ -68,7 +68,7 @@ describe('移动端个人中心与设置的 IA 接线', () => {
 
   it('近期状态紧跟账号、位于各功能入口之前，资料编辑入口进入账号分组', () => {
     const home = between(profile, 'return (\n    <Screen', '<SettingsScreen');
-    const accountEnd = home.indexOf("<SettingsRow row={settingsRow} />");
+    const accountEnd = home.indexOf('testID="profile-group-preferences"');
     const growthSummary = home.indexOf('<ProfileProgressSummary');
 
     expect(accountEnd).toBeGreaterThan(-1);
@@ -181,26 +181,28 @@ describe('移动端个人中心与设置的 IA 接线', () => {
     ⚠️ 判据仍然是**行数账**，不是"看起来更短"：显式 8 + 卡片 3 = 11。
     再要往 10 走的那一行（通知 / 清单与标签）是产品还没定的取舍，见 plan §6。
   */
-  it('A1 首屏 11 行 = 显式 8 行 + 近期状态卡 3 行（功能入口改为 Icon 网格，不再占 SettingsRow）', () => {
+  it('A1 首屏主要设置按三组前置（功能模块 / 偏好 / 更多设置），行高交给 SettingsSection', () => {
     const home = between(profile, 'return (\n    <Screen', '<SettingsScreen');
 
-    // 显式那些行：订阅 / 设置 / 同步摘要 / 通知 / 功能与 AI / 自定义底部导航。
-    // 🔴 这条能红：往首屏加一行 `<SettingsRow` 就会变成 10。
-    expect(
-      [...home.matchAll(/<SettingsRow\b/g)],
-      '「我的」首屏的显式设置行数变了 —— 功能入口改 Icon 网格后应为 8',
-    ).toHaveLength(8);
+    // 2026-11-27 改版：主要设置改用共享 `SettingsSection variant="card"` ——
+    // 行高压到触控下限 44dp，替代原来 `Card + 逐行 Divider` 把每行撑到 ~60dp 的形状。
+    // 因此首屏不再是一串裸 `<SettingsRow>`，而是三个具名分组。
+    expect(home, '功能模块分组不见了').toContain('testID="profile-group-modules"');
+    expect(home, '偏好分组不见了').toContain('testID="profile-group-preferences"');
+    expect(home, '更多设置分组不见了').toContain('testID="profile-group-more"');
 
-    // 首屏那几行各自是哪一行（名字写死，防止"数量对、成分错"）。
+    // 首屏各行成分（名字写死，防止"分组在、行错位"）。
     for (const row of [
+      'tabBarCustomizeRow',
+      'appearanceRow',
+      'notificationsRow',
       'subscriptionRow',
       'settingsRow',
-      'syncSummaryRow',
-      'notificationsRow',
-      'tabBarCustomizeRow',
     ]) {
-      expect(home, `首屏少了 ${row} 那一行`).toContain(`<SettingsRow row={${row}} />`);
+      expect(home, `首屏少了 ${row} 那一行`).toContain(row);
     }
+    // 同步摘要仍是首屏的一行（A3 再细判）。
+    expect(home).toContain('<SettingsRow row={syncSummaryRow} />');
     // 🔴 「统计与回顾」不再是独立入口：统计从「近期状态」进。
     expect(profile, '`profile-entry-stats` 又冒出来了').not.toContain("testID: 'profile-entry-stats'");
 
@@ -232,7 +234,7 @@ describe('移动端个人中心与设置的 IA 接线', () => {
     ).not.toMatch(/entryRows\.(filter|map)\(/);
 
     // 通知留在首屏：§5.5 说移动端没有 web 那种顶栏铃铛位，这是唯一收件入口。
-    expect(home).toContain('<SettingsRow row={notificationsRow} />');
+    expect(home).toContain('notificationsRow');
     // 成长不再有第二条路：唯一入口是「近期状态」卡里那一行（§5.3 删掉重复那一行）。
     expect(profile, '`profile-entry-growth` 又渲染出来了').not.toMatch(
       /row=\{featureRows\[|profile-entry-growth'/,
