@@ -36,6 +36,7 @@ import {
   weekGrid,
   type CountdownEvent,
   type LocalDate,
+  type LocalTime,
   type MonthGridCell,
   type Task,
 } from '@heyta/domain';
@@ -285,6 +286,10 @@ export interface CalendarBoardProps {
    * 注入点（Web 专用）：日档里**每个小时行**包一层（投放目标）。`hour` 是 0–23。
    */
   readonly renderHourRowWrapper?: ((hour: number, node: React.ReactNode) => React.ReactNode) | undefined;
+  readonly onSelectSlot?: ((day: LocalDate, time: LocalTime) => void) | undefined;
+  readonly activeSlot?: { readonly day: LocalDate; readonly time: LocalTime } | undefined;
+  readonly renderSlotWrapper?: ((hour: number, minute: number, node: React.ReactNode) => React.ReactNode) | undefined;
+  readonly renderAllDayWrapper?: ((node: React.ReactNode) => React.ReactNode) | undefined;
 }
 
 /**
@@ -714,6 +719,10 @@ export function CalendarBoard({
   renderBarWrapper,
   renderDayTaskRowWrapper,
   renderHourRowWrapper,
+  onSelectSlot,
+  activeSlot,
+  renderSlotWrapper,
+  renderAllDayWrapper,
 }: CalendarBoardProps): React.JSX.Element {
   const tokens = useHeytaTokens();
   const text = useHeytaText();
@@ -874,6 +883,10 @@ export function CalendarBoard({
               {...(boardAppearance === undefined ? {} : { appearance: boardAppearance })}
               {...(renderDayTaskRowWrapper === undefined ? {} : { renderRowWrapper: renderDayTaskRowWrapper })}
               {...(renderHourRowWrapper === undefined ? {} : { renderHourRowWrapper })}
+              {...(onSelectSlot === undefined ? {} : { onSelectSlot })}
+              {...(activeSlot === undefined ? {} : { activeSlot })}
+              {...(renderSlotWrapper === undefined ? {} : { renderSlotWrapper })}
+              {...(renderAllDayWrapper === undefined ? {} : { renderAllDayWrapper })}
               testID={`${testID}-day`}
             />
           )}
@@ -1185,26 +1198,6 @@ export function CalendarBoard({
         </View>
       ) : null}
 
-      {/* 如实说明这一页看不到什么 —— 否则"任务没设截止时间"会被读成"任务丢了"。
-          见 `groupTasksByDueDate` 的说明。 */}
-      {boardAppearance === 'flat' ? null : (
-      <Text
-        style={[
-          text['row-meta'],
-          {
-            color: tokens['color.foreground-subtle'],
-            /**
-             * 2026-11-16：左右边距不再由脚注自己补 —— 外壳已统一给
-             * （移动端 `Screen` 的 board 响应式 gutter / web 的 `.ht-content`）。
-             * 这里再补一条会与外壳叠加成双倍缩进；去掉后脚注与内容卡同一条轴线。
-             */
-          },
-        ]}
-        testID={`${testID}-footnote`}
-      >
-        {labels.footnote}
-      </Text>
-      )}
     </View>
   );
 }

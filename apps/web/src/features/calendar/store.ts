@@ -29,6 +29,7 @@ import {
   startOfMonth,
   toLocalDate,
   type LocalDate,
+  type LocalTime,
   type TaskScope,
 } from '@heyta/domain';
 import {
@@ -67,6 +68,8 @@ interface CalendarViewState {
    *   只服务一个视图的状态（本文件文件头记过这个理由）。
    */
   captureOpen: boolean;
+  /** 日档 25 分钟槽位点击触发捕获时的锚点时刻。 */
+  captureTime: LocalTime | undefined;
   /** 日历侧栏是否展开。筛选范围独立保留，收起侧栏不会让任务悄悄消失。 */
   calendarSidebarOpen: boolean;
   /**
@@ -145,6 +148,8 @@ interface CalendarViewActions {
   drillIntoMonth: (monthFirstDay: LocalDate) => void;
   /** 开/关那一行输入。开着再点 `+` 就是收起 —— 一屏只有一行输入框。 */
   toggleCapture: () => void;
+  /** 在指定日期与时刻槽位打开捕获浮层。 */
+  openCaptureAtSlot: (date: LocalDate, time: LocalTime) => void;
   toggleCalendarSidebar: () => void;
   setCalendarSidebarOpen: (open: boolean) => void;
   /** 「显示设置」两个开关（阅读偏好，见 `showCompleted` / `showCountdown`）。 */
@@ -195,6 +200,7 @@ export const useCalendarViewStore = create<CalendarViewState & CalendarViewActio
   scope: FULL_SCOPE,
   view: 'month',
   captureOpen: false,
+  captureTime: undefined,
   calendarSidebarOpen: true,
   showCompleted: true,
   showCountdown: true,
@@ -222,7 +228,7 @@ export const useCalendarViewStore = create<CalendarViewState & CalendarViewActio
   },
 
   selectDay: (date) => {
-    set((state) => ({ selected: date, cursor: calendarCursorFor(state.view, date) }));
+    set((state) => ({ selected: date, cursor: calendarCursorFor(state.view, date), captureTime: undefined }));
   },
 
   goToToday: (today) => {
@@ -278,7 +284,16 @@ export const useCalendarViewStore = create<CalendarViewState & CalendarViewActio
   },
 
   toggleCapture: () => {
-    set((state) => ({ captureOpen: !state.captureOpen }));
+    set((state) => ({ captureOpen: !state.captureOpen, captureTime: undefined }));
+  },
+
+  openCaptureAtSlot: (date, time) => {
+    set((state) => ({
+      selected: date,
+      cursor: calendarCursorFor(state.view, date),
+      captureTime: time,
+      captureOpen: true,
+    }));
   },
 
   toggleCalendarSidebar: () => {

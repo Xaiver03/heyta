@@ -66,6 +66,7 @@ import {
   quickDuePickDates,
   today,
   type LocalDate,
+  type LocalTime,
 } from '@heyta/domain';
 
 import {
@@ -121,6 +122,8 @@ export interface CaptureComposerProps {
    *   就是在做这件事，别把它改成通用 placeholder。
    */
   anchorDate?: LocalDate | undefined;
+  /** 锚点时刻（如日档点击 25 分钟槽位时携带）。 */
+  anchorTime?: LocalTime | undefined;
   /**
    * 日期面板**就地展开**（不套锚定浮层）。
    *
@@ -311,6 +314,7 @@ export function CaptureComposer(props: CaptureComposerProps): React.JSX.Element 
         labels={labels}
         onSubmit={onSubmit}
         anchorDate={anchorDate}
+        anchorTime={props.anchorTime}
         quickPicks={quickPicks}
         fillRequest={props.fillRequest}
         renderDuePanel={props.inlineDuePanel === true ? undefined : renderDuePanel}

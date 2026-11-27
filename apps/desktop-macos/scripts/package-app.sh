@@ -268,6 +268,10 @@ echo "  自检数据库：${PACKAGE_SMOKE_DB_DIR}（保留供验收）"
 if HEYTA_ALLOW_SECOND_INSTANCE=1 HEYTA_SHELL_DB_DIR="$PACKAGE_SMOKE_DB_DIR" HEYTA_NO_FOCUS=1 HEYTA_SELF_CAPTURE="$SELFIE" "$APP/Contents/MacOS/HeytaMac" 2>&1 | awk '{print "  " $0}'; then
   :
 fi
+if [ ! -f "$SELFIE" ] && [ -f "$SELFIE.webview.png" ]; then
+  echo "  ⚠️ 窗口服务器未授权 ScreenCaptureKit，退回 WebView 快照（$SELFIE.webview.png）作启动取证"
+  cp "$SELFIE.webview.png" "$SELFIE"
+fi
 [ -f "$SELFIE" ] || { echo "  🔴 打包后的 .app 没能自截屏 —— 它跑不起来或渲染失败"; exit 1; }
 
 cd "$REPO"

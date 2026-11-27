@@ -46,10 +46,10 @@
  */
 
 import React, { useMemo } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import type { HeytaNativeTokens } from '@heyta/design-system';
-import { toLocalDate, type LocalDate, type Task } from '@heyta/domain';
+import { toLocalDate, type LocalDate, type LocalTime, type Task } from '@heyta/domain';
 
 import { EmptyState } from '../empty-state/EmptyState.js';
 import { TaskList } from '../task-list/TaskList.js';
@@ -62,6 +62,8 @@ import {
   type CalendarDayEvent,
   type CalendarEventBarLabels,
 } from './model.js';
+
+export const DAY_SLOT_MINUTES = [0, 15, 30, 45] as const;
 
 export interface CalendarDayBoardProps {
   /** 全部候选任务（已按范围筛过）。分桶只看 `dueDate` 落在 `day` 的那些。 */
@@ -111,6 +113,10 @@ export interface CalendarDayBoardProps {
    * `hour` 是 0–23。宿主不传 ⇒ 原样返回，行为不变。
    */
   readonly renderHourRowWrapper?: ((hour: number, node: React.ReactNode) => React.ReactNode) | undefined;
+  readonly onSelectSlot?: ((day: LocalDate, time: LocalTime) => void) | undefined;
+  readonly activeSlot?: { readonly day: LocalDate; readonly time: LocalTime } | undefined;
+  readonly renderSlotWrapper?: ((hour: number, minute: number, node: React.ReactNode) => React.ReactNode) | undefined;
+  readonly renderAllDayWrapper?: ((node: React.ReactNode) => React.ReactNode) | undefined;
   readonly testID?: string;
 }
 
@@ -129,6 +135,10 @@ export function CalendarDayBoard({
   appearance = 'card',
   renderRowWrapper,
   renderHourRowWrapper,
+  onSelectSlot,
+  activeSlot,
+  renderSlotWrapper,
+  renderAllDayWrapper,
   testID = 'calendar-day-board',
 }: CalendarDayBoardProps): React.JSX.Element {
   const tokens = useHeytaTokens();
@@ -163,11 +173,8 @@ export function CalendarDayBoard({
     ...(renderRowWrapper === undefined ? {} : { renderRowWrapper }),
   };
 
-  return (
-    <View style={styles.root} testID={testID}>
-      {/* ── 全天带：这一天里**没有时刻**的那些 ─────────────────── */}
-      {/* flat（Apple）且这天没有全天事项时，整块不画 —— Apple 无全天事项直接从时间轴开始。 */}
-      {flat && buckets.allDay.length === 0 && allDayHabitIds.length === 0 && (events?.length ?? 0) === 0 ? null : (
+  const allDayNode =
+    flat && buckets.allDay.length === 0 && allDayHabitIds.length === 0 && (events?.length ?? 0) === 0 ? null : (
       <View style={[styles.card, flat ? styles.flatCard : null, styles.allDay]} testID={`${testID}-all-day`}>
         {labels.dayAllDay !== undefined ? (
           <Text
@@ -217,12 +224,19 @@ export function CalendarDayBoard({
           />
         ))}
       </View>
-      )}
+    );
+
+  return (
+    <View style={styles.root} testID={testID}>
+      {/* ── 全天带：这一天里**没有时刻**的那些 ─────────────────── */}
+      {/* flat（Apple）且这天没有全天事项时，整块不画 —— Apple 无全天事项直接从时间轴开始。 */}
+      {allDayNode === null ? null : renderAllDayWrapper === undefined ? allDayNode : renderAllDayWrapper(allDayNode)}
 
       {/* ── 24 小时轴（可滚）───────────────────────────────────── */}
       <View style={[styles.card, flat ? styles.flatCard : null, styles.axisWrap]} testID={`${testID}-axis-card`}>
         <ScrollView style={styles.axis} testID={`${testID}-axis`}>
           {buckets.hours.map((bucket, hour) => {
+            const pad = String(hour).padStart(2, '0');
             const hourHabitIds = (habitEntries ?? [])
               .filter((h) => h.hour === hour)
               .map((h) => h.id);
@@ -233,7 +247,7 @@ export function CalendarDayBoard({
                 styles.hourRow,
                 { minHeight: rowHeight, borderTopWidth: hour === 0 ? 0 : tokens['border-width.thin'] },
               ]}
-              testID={`${testID}-hour-${String(hour).padStart(2, '0')}`}
+              testID={`${testID}-hour-${pad}`}
             >
               {/*
                 🔴 这一列必须**整屏读得出"这一格是几点"**。它此前定宽 `space.8`（32px），
@@ -250,7 +264,7 @@ export function CalendarDayBoard({
               */}
               <Text
                 style={[text['row-meta'], styles.hourLabel]}
-                testID={`${testID}-clock-${String(hour).padStart(2, '0')}`}
+                testID={`${testID}-clock-${pad}`}
               >
                 {labels.hourLabel?.(hour) ?? ''}
               </Text>
@@ -259,12 +273,38 @@ export function CalendarDayBoard({
                   <TaskList
                     tasks={bucket}
                     {...taskListProps}
-                    testID={`${testID}-timed-${String(hour).padStart(2, '0')}`}
+                    testID={`${testID}-timed-${pad}`}
                   />
                 ) : null}
                 {hourHabitIds.map((id) => (
                   <React.Fragment key={`habit-${id}`}>{renderHabitEntry?.(id)}</React.Fragment>
                 ))}
+                {DAY_SLOT_MINUTES.map((minute) => {
+                  const minPad = String(minute).padStart(2, '0');
+                  const slotTime = `${pad}:${minPad}` as LocalTime;
+                  const slotTestID = `${testID}-slot-${pad}-${minPad}`;
+                  const slotNode = (
+                    <Pressable
+                      key={slotTestID}
+                      testID={slotTestID}
+                      style={styles.slotRow}
+                      onPress={onSelectSlot === undefined ? undefined : () => onSelectSlot(day, slotTime)}
+                    >
+                      {activeSlot !== undefined && activeSlot.day === day && activeSlot.time === slotTime ? (
+                        <View style={styles.draftSlotBar} testID={`${testID}-draft-slot`}>
+                          <Text style={[text['row-meta'], styles.draftSlotText]}>{`☐ ${slotTime}`}</Text>
+                        </View>
+                      ) : null}
+                    </Pressable>
+                  );
+                  return renderSlotWrapper === undefined ? (
+                    slotNode
+                  ) : (
+                    <React.Fragment key={slotTestID}>
+                      {renderSlotWrapper(hour, minute, slotNode)}
+                    </React.Fragment>
+                  );
+                })}
               </View>
             </View>
             );
@@ -354,6 +394,19 @@ function makeStyles(tokens: HeytaNativeTokens) {
       fontVariant: ['tabular-nums'],
     },
     hourBody: { flexGrow: 1, flexShrink: 1, flexBasis: 0 },
+    slotRow: {
+      minHeight: tokens['space.6'],
+      justifyContent: 'center',
+    },
+    draftSlotBar: {
+      backgroundColor: tokens['color.primary'],
+      borderRadius: tokens['radius.sm'],
+      paddingHorizontal: tokens['space.2'],
+      paddingVertical: tokens['space.1'],
+    },
+    draftSlotText: {
+      color: tokens['color.on-primary'],
+    },
     nowLine: {
       position: 'absolute',
       left: 0,

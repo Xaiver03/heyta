@@ -182,7 +182,7 @@ export function CalendarDisplaySettingsModal(): React.JSX.Element | null {
       onCancel={close}
     >
       <div className={`${ROOT}__header`}>
-        <h2 id={titleId} className={`${ROOT}__title`}>
+        <h2 id={titleId} className={`${ROOT}__title ht-type-headline`}>
           {t('web.calendar.display.title')}
         </h2>
         <button

@@ -370,17 +370,27 @@
   z-index: var(--ht-z-popover);
   inset-block-start: var(--ht-layout-header-height);
   inset-inline-start: var(--ht-space-3);
-  inline-size: min(var(--ht-layout-detail-max-width), calc(100vw - var(--ht-space-6)));
+  inline-size: min(var(--ht-layout-detail-width), calc(100vw - var(--ht-space-6)));
   max-block-size: calc(100dvh - var(--ht-space-6));
   overflow-y: auto;
-  padding: var(--ht-space-3);
-  border: 0;
+  padding: var(--ht-space-3) var(--ht-space-4);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
   border-radius: var(--ht-radius-lg);
   background: var(--ht-color-surface);
-  box-shadow: var(--ht-shadow-lg);
+  box-shadow: var(--ht-shadow-xl);
 }
 
 .ht-content__calendar-capture-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--ht-space-3); margin-block-end: var(--ht-space-2); }
+
+.ht-content__calendar-capture-heading [data-testid='calendar-capture-slot-time'] {
+  display: inline-flex;
+  align-items: center;
+  padding-block: var(--ht-space-1);
+  padding-inline: var(--ht-space-2);
+  border-radius: var(--ht-radius-full);
+  background: var(--ht-color-primary-subtle);
+  color: var(--ht-color-primary);
+}
 
 /* ── 运营公告那一横条（ADR-0075）────────────────────────────
  * 类名挂在既有的 `.ht-main` 族下，**不开 `.ht-announcements` 族** ——

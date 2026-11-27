@@ -213,6 +213,7 @@ export interface CaptureComposerProps {
    *   悄悄改变一条任务的落点，是"界面没说谎但用户以为没说"那一类缺陷。
    */
   readonly anchorDate?: LocalDate | undefined;
+  readonly anchorTime?: LocalTime | undefined;
   /**
    * 时间源（epoch ms）。默认 `Date.now()`（每次渲染取一次）。
    * 显式传入才能让"跨零点/今天是几号"可复现（与 `parseCapture` 同一约定）。
@@ -491,6 +492,7 @@ export function CaptureComposer({
   labels,
   onSubmit,
   anchorDate,
+  anchorTime,
   now,
   autoFocus,
   testID,
@@ -575,14 +577,14 @@ export function CaptureComposer({
     [chips],
   );
   const signature = useMemo(() => captureFragmentSignature(parsed), [parsed]);
-  const due = useMemo(() => captureDue(parsed, override, anchorDate), [parsed, override, anchorDate]);
+  const due = useMemo(() => captureDue(parsed, override, anchorDate, anchorTime), [parsed, override, anchorDate, anchorTime]);
   const capsuleKind = captureCapsuleKind(due);
   const capsuleText = labels.capsule(due, capsuleKind, renderNow);
   const canSubmit = captureCanSubmit(parsed);
 
   function submit(): void {
     if (!canSubmit) return;
-    const plan = toCaptureSubmitPlan(parsed, anchorDate, override);
+    const plan = toCaptureSubmitPlan(parsed, anchorDate, override, anchorTime);
     if (plan === undefined) return;
     /*
      * 🔴 描述是**独立的一行**，不参与 `parseCapture` 的任何识别：

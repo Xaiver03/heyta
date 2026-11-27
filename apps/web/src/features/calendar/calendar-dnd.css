@@ -74,6 +74,20 @@
   outline-offset: calc(var(--ht-border-width-thin) * -1);
 }
 
+/* 日档 25 分钟槽位投放目标。 */
+.ht-content__cal-slot-drop {
+  border-radius: var(--ht-radius-sm);
+  transition:
+    background-color var(--ht-duration-fast) var(--ht-ease-standard),
+    box-shadow var(--ht-duration-fast) var(--ht-ease-standard);
+}
+
+.ht-content__cal-slot-drop[data-over='true'] {
+  background: var(--ht-color-primary-subtle);
+  outline: var(--ht-border-width-thin) solid var(--ht-color-primary);
+  outline-offset: calc(var(--ht-border-width-thin) * -1);
+}
+
 /* ── 跟手的浮影：一张缩小版任务卡 ───────────────────────────────────────── */
 
 /*
@@ -120,9 +134,6 @@
 }
 
 .ht-content__cal-drag-overlay-title {
-  font-size: var(--ht-font-size-sm);
-  font-weight: var(--ht-font-weight-medium);
-  line-height: var(--ht-line-height-tight);
   color: var(--ht-color-foreground);
   white-space: nowrap;
   overflow: hidden;

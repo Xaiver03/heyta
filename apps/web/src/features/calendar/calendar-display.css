@@ -46,9 +46,6 @@
 
 .ht-content__calendar-display__title {
   margin: 0;
-  font-size: var(--ht-font-size-xl);
-  font-weight: var(--ht-font-weight-semibold);
-  line-height: var(--ht-line-height-tight);
   color: var(--ht-color-foreground);
 }
 

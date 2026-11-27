@@ -13,13 +13,14 @@
  * ─────────────────────────────────────────────────────────────────────────
  * 🔴 两个刻意的边界（不是"没做完"，是"故意不做"）
  *
- * 1. **只接受"只有截止日、没有排期起点/时长"的任务。**
- *    一个 `startDate + dueDate` 的跨天任务在日历上会画成**好几段的连续条**
- *    （`calendarTaskSpan` / `bar.span`），拖哪一段该改 `startDate` 还是
- *    `dueDate` 是**没有唯一答案**的：拖"尾段"改 due、拖"头段"改 start，
- *    两者混在一起就是"用户拖了、结果改错了字段"。所以这类任务在日历上
+ * 1. **只有"跨多天的连续条"不可拖。**
+ *    一个 `startDate + dueDate` 且两者不在同一天的跨天任务，在日历上会画成
+ *    **好几段的连续条**（`calendarTaskSpan` / `bar.span`），拖哪一段该改
+ *    `startDate` 还是 `dueDate` 是**没有唯一答案**的：拖"尾段"改 due、拖"头段"改 start，
+ *    两者混在一起就是"用户拖了、结果改错了字段"。所以只有这类任务在日历上
  *    **不可拖**（`canRescheduleByCalendarDrag` 返回 false），拖拽语义留给
- *    时间线排期面（`setSchedule`）。单日任务的改期没有这个歧义。
+ *    时间线排期面（`setSchedule`）。单日任务（含带 `durationMinutes`、只有一天
+ *    `startDate` 的）与没有截止时间的新任务都没有这个歧义，可以拖。
  *
  * 2. **拖到同一天 = no-op，返回 `undefined`。**
  *    别用"落到同一天也写一次"来省判断：那会产生一条**值没变的 op**，
@@ -35,7 +36,9 @@ import { dueDateToEpoch } from './capture.js';
 import {
   dueLocalDateOf,
   localTimeOf,
+  startLocalDateOf,
   type LocalDate,
+  type LocalTime,
 } from './date.js';
 import type { Task } from './entities.js';
 
@@ -55,30 +58,48 @@ export interface CalendarDropPlan {
 
 const LOCAL_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
+/** 补零到两位（`9` → `'09'`）。 */
+function pad2(value: number): string {
+  return String(value).padStart(2, '0');
+}
+
+/**
+ * 任务截止上带的时刻；`undefined` = 全天 / 没有截止。
+ *
+ * 与 `DueEditor.onChange` 的 `timeValue` 完全是同一个判定：
+ *   · `dueDateLocal` 存在        → 这是"只到日"，时刻 = undefined；
+ *   · 否则 `localTimeOf(dueDate)` → 有时刻给 HH:MM，本地零点给 undefined（全天）；
+ *   · 没有 `dueDate`              → 没有时刻可言。
+ */
+function dueTimeOf(task: CalendarReschedulableTask): LocalTime | undefined {
+  if (task.dueDateLocal !== undefined || task.dueDate === undefined) return undefined;
+  return localTimeOf(task.dueDate);
+}
+
 /**
  * 这条任务能不能被「在日历上拖到另一天」改期。
  *
- * 只认**纯截止日**任务（有 due、无排期起点/时长）。跨天排期任务与纯排期任务
- * 都返回 false —— 理由见文件头第 1 条：拖一段该改哪个字段没有唯一答案。
+ * 唯一不可拖的是**跨多天的连续条**（`startDate` 与 `dueDate` 都有、且不在同一天）——
+ * 理由见文件头第 1 条：拖一段该改哪个字段没有唯一答案。
+ * 没有截止时间的新任务、带 `durationMinutes` 或只有单日 `startDate` 的任务
+ * 都能拖：它们改期时只有 `dueDate` 一个候选字段。
  */
 export function canRescheduleByCalendarDrag(task: CalendarReschedulableTask): boolean {
-  if (
-    task.startDate !== undefined ||
-    task.startDateLocal !== undefined ||
-    task.durationMinutes !== undefined
-  ) {
-    return false;
-  }
-  return task.dueDate !== undefined || task.dueDateLocal !== undefined;
+  // 没有"排期起点 + 截止"两头，就画不出跨天连续条。
+  if (task.startDate === undefined || task.dueDate === undefined) return true;
+  return startLocalDateOf(task) === dueLocalDateOf(task);
 }
 
 /**
  * 拖到 `targetDate` 之后要写什么；`undefined` 表示**不该产生任何 op**。
  *
  * 什么时候 `undefined`：
- *   · 不是可改期的任务（见 `canRescheduleByCalendarDrag`）；
+ *   · 是跨多天的连续条（见 `canRescheduleByCalendarDrag`）；
  *   · `targetDate` 形状非法（没有落点可言）；
  *   · 落点就是当前的截止日（no-op）。
+ *
+ * 没有截止时间的新任务也走这里：落到 `targetDate` 就是"给它一个截止日"，
+ * 写 date-only（`dueDateLocal` + 本地零点）。
  */
 export function planCalendarDrop(
   task: CalendarReschedulableTask,
@@ -91,16 +112,9 @@ export function planCalendarDrop(
   if (dueLocalDateOf(task) === targetDate) return undefined;
 
   /*
-   * 保留原先的时刻：date-only 任务继续 date-only；有时刻的搬到新一天的同一时刻。
-   * 与 `DueEditor.onChange` 的 `timeValue` 完全是同一个判定：
-   *   · `dueDateLocal` 存在        → 这是"只到日"，时刻 = undefined；
-   *   · 否则 `localTimeOf(dueDate)` → 有时刻给 HH:MM，本地零点给 undefined（全天）。
+   * 保留原先的时刻：date-only / 无截止任务写 date-only；有时刻的搬到新一天的同一时刻。
    */
-  const time = task.dueDateLocal !== undefined
-    ? undefined
-    : task.dueDate === undefined
-      ? undefined
-      : localTimeOf(task.dueDate);
+  const time = dueTimeOf(task);
 
   /*
    * 形状对了不代表那天真的存在：`2026-13-40` 过得了正则，但 `dueDateToEpoch`
@@ -137,31 +151,34 @@ export interface CalendarTimeDropPlan {
 }
 
 /**
- * 日档：把任务拖到某一天的第 `hour` 点 ⇒ 把截止**时刻**设成那天 `hour:00`。
+ * 日档：把任务拖到某一天的第 `hour` 点 `minute` 分 ⇒ 把截止**时刻**设成那天 `hour:minute`。
  *
  * 与 `planCalendarDrop`（改"哪一天"）是同一天里改"几点"的另一半：
- *   · 拖一个**全天**任务到小时轴 ⇒ 它从"没有时刻"变成"那天 hour:00"；
+ *   · 拖一个**全天 / 无截止**任务到小时轴 ⇒ 它从"没有时刻"变成"那天 hour:minute"；
  *   · 拖一个**有时刻**任务到别的小时 ⇒ 时刻平移。
  *
  * 🔴 写 `dueDate`（带时刻）就必须把 `dueDateLocal`（date-only）清掉 ——
  *    `setDueDate(id, dueDate)` 不传第三参，动作层把 `dueDateLocal` 写成 `null`（老约定）。
  *    带着 date-only 又给时刻，是"同一件事两个来源"。
  *
- * 什么时候 `undefined`：不可改期任务 / `hour` 不是 0–23 的整数 / 落点日期非法 /
+ * 什么时候 `undefined`：跨多天连续条 / `hour` 不是 0–23 的整数 /
+ * `minute` 不是 0–59 的整数 / 落点日期非法 /
  * 已经是这个 `dueDate`（no-op，不写空 op）。
  */
 export function planCalendarTimeDrop(
   task: CalendarReschedulableTask,
   targetDate: LocalDate,
   hour: number,
+  minute: number = 0,
 ): CalendarTimeDropPlan | undefined {
   if (!canRescheduleByCalendarDrag(task)) return undefined;
   if (!Number.isInteger(hour) || hour < 0 || hour > 23) return undefined;
+  if (!Number.isInteger(minute) || minute < 0 || minute > 59) return undefined;
   if (!LOCAL_DATE_PATTERN.test(targetDate)) return undefined;
 
   let dueDate: number;
   try {
-    dueDate = dueDateToEpoch(targetDate, `${String(hour).padStart(2, '0')}:00`);
+    dueDate = dueDateToEpoch(targetDate, `${pad2(hour)}:${pad2(minute)}`);
   } catch {
     return undefined;
   }
@@ -169,4 +186,35 @@ export function planCalendarTimeDrop(
   // 已经就是这一刻（且没有 date-only 残留）⇒ no-op。
   if (task.dueDate === dueDate && task.dueDateLocal === undefined) return undefined;
   return { dueDate };
+}
+
+/**
+ * 全天档：把**带时刻或没有截止**的任务落成 `targetDate` 的全天任务。
+ *
+ * 拖到全天行要的是"这一天、没有具体时刻"，所以写 date-only：
+ * `{ dueDate: 那天本地零点, dueDateLocal: targetDate }`（与 `planCalendarDrop` 同一形状）。
+ *
+ * 什么时候 `undefined`：
+ *   · 是跨多天的连续条（同 `canRescheduleByCalendarDrag`：拖一段没有唯一答案）；
+ *   · `targetDate` 形状非法 / 那天不存在；
+ *   · 已经是**这一天的全天**（no-op，不写空 op）。
+ */
+export function planCalendarAllDayDrop(
+  task: CalendarReschedulableTask,
+  targetDate: LocalDate,
+): CalendarDropPlan | undefined {
+  if (!canRescheduleByCalendarDrag(task)) return undefined;
+  if (!LOCAL_DATE_PATTERN.test(targetDate)) return undefined;
+
+  // 已经是这天全天 ⇒ 值没变，不写 op。
+  if (dueLocalDateOf(task) === targetDate && dueTimeOf(task) === undefined) return undefined;
+
+  let dueDate: number;
+  try {
+    dueDate = dueDateToEpoch(targetDate);
+  } catch {
+    return undefined;
+  }
+
+  return { dueDate, dueDateLocal: targetDate };
 }

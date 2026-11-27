@@ -560,6 +560,9 @@ if printf '%s' "$WANT" | grep -q "mac"; then
       HEYTA_ALLOW_SECOND_INSTANCE=1 HEYTA_SHELL_DB_DIR="$MAC_INSTALLED_DB" \
         HEYTA_NO_FOCUS=1 HEYTA_SELF_CAPTURE="$MAC_SELFIE" \
         "$INSTALLED_APP/Contents/MacOS/HeytaMac" >/dev/null 2>&1 || true
+      if [ ! -f "$MAC_SELFIE" ] && [ -f "$MAC_SELFIE_WV" ]; then
+        cp "$MAC_SELFIE_WV" "$MAC_SELFIE"
+      fi
       if [ "$MAC_DIST_OK" = 1 ] && [ -f "$MAC_SELFIE" ] && shot_ok_logged "$MAC_SELFIE" "$MAC_SELFIE_WV"; then
         echo "  截图证据：${MAC_SELFIE}（窗口）+ ${MAC_SELFIE_WV}（共享 UI）"
         RESULT_mac=OK

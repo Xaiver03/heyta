@@ -129,6 +129,11 @@ import {
   ReorderHandle,
   makeManualSortRowWrapper,
 } from './features/tasks/ManualSortDnd.js';
+import {
+  TASK_DRAG_MIME,
+  executeWorkspaceTaskDrop,
+  resolveWorkspaceDropTarget,
+} from './features/tasks/task-workspace-drop.js';
 import { FilterPanel } from './features/tasks/FilterPanel.js';
 import { savedFilterNameOf } from './features/tasks/saved-filters.js';
 import { CaptureComposer } from './features/capture/CaptureComposer.js';
@@ -891,10 +896,77 @@ export function App(): React.JSX.Element {
    * 所以**不需要"切档时归位"那一轮 N 条写入**。
    */
   const manualSortActive = effectiveTaskSort === 'manual';
-  /** 行外面那一层（只有手动档才需要；其余档位传 `undefined` ⇒ 共享层原样返回行）。 */
+  const activeWorkspaceDropElRef = useRef<HTMLElement | null>(null);
+  const clearWorkspaceDropOver = useCallback(() => {
+    if (activeWorkspaceDropElRef.current !== null) {
+      activeWorkspaceDropElRef.current.removeAttribute('data-workspace-drop-over');
+      activeWorkspaceDropElRef.current = null;
+    }
+  }, []);
+  const handleAppDragOver = useCallback(
+    (event: React.DragEvent<HTMLDivElement>) => {
+      const types = Array.from(event.dataTransfer.types ?? []);
+      if (!types.includes(TASK_DRAG_MIME) && !types.includes('text/plain')) return;
+      const drop = resolveWorkspaceDropTarget(
+        event.target,
+        toLocalDate(useTaskStore.getState().now),
+        useCalendarViewStore.getState().cursor,
+      );
+      if (drop === undefined) {
+        clearWorkspaceDropOver();
+        return;
+      }
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'move';
+      if (activeWorkspaceDropElRef.current !== drop.element) {
+        clearWorkspaceDropOver();
+        drop.element.setAttribute('data-workspace-drop-over', 'true');
+        activeWorkspaceDropElRef.current = drop.element;
+      }
+    },
+    [clearWorkspaceDropOver],
+  );
+  const handleAppDrop = useCallback(
+    (event: React.DragEvent<HTMLDivElement>) => {
+      clearWorkspaceDropOver();
+      const rawTaskId =
+        event.dataTransfer.getData(TASK_DRAG_MIME) ||
+        event.dataTransfer.getData('text/plain');
+      const taskId = rawTaskId.trim();
+      if (taskId === '' || useTaskStore.getState().entities.tasks[taskId] === undefined) return;
+      const drop = resolveWorkspaceDropTarget(
+        event.target,
+        toLocalDate(useTaskStore.getState().now),
+        useCalendarViewStore.getState().cursor,
+      );
+      if (drop === undefined) return;
+      event.preventDefault();
+      void executeWorkspaceTaskDrop(taskId, drop);
+    },
+    [clearWorkspaceDropOver],
+  );
+  /** 行外面那一层（手动档走 dnd-kit；其余档位提供跨工作区原生拖拽包装）。 */
   const manualRowWrapper = useMemo(
-    () => (manualSortActive ? makeManualSortRowWrapper() : undefined),
-    [manualSortActive],
+    () =>
+      manualSortActive
+        ? makeManualSortRowWrapper()
+        : (row: SharedTaskRow, node: React.ReactNode) => (
+            <div
+              className="ht-row__universal-drag"
+              draggable
+              data-testid={`task-draggable-${row.id}`}
+              data-drag-task-id={row.id}
+              onDragStart={(event) => {
+                event.dataTransfer.setData(TASK_DRAG_MIME, row.id);
+                event.dataTransfer.setData('text/plain', row.id);
+                event.dataTransfer.effectAllowed = 'move';
+              }}
+              onDragEnd={clearWorkspaceDropOver}
+            >
+              {node}
+            </div>
+          ),
+    [clearWorkspaceDropOver, manualSortActive],
   );
   const changeTaskSort = useCallback((next: TaskSortKey) => {
     const currentFilter = useTaskStore.getState().filter;
@@ -2774,6 +2846,13 @@ export function App(): React.JSX.Element {
         // 关掉后选中态天然恢复 —— 选中住在 store 里，从未被清。它与 `data-detail-empty`
         // 是**两条规则**：那条说"没内容"，这条说"有内容也要让位给浮层"。
         data-detail-suppressed={view === 'settings' ? '' : undefined}
+        onDragOver={handleAppDragOver}
+        onDragLeave={(event) => {
+          if (event.relatedTarget === null || !(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) {
+            clearWorkspaceDropOver();
+          }
+        }}
+        onDrop={handleAppDrop}
       >
       {/*
         ═══════════════════════════════════════════════════════════════════════

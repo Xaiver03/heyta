@@ -833,7 +833,7 @@ struct SharedWebView: NSViewRepresentable {
         static let firstScreenProbe = """
         JSON.stringify({
           identity: document.querySelectorAll('[data-testid="account-menu-avatar"]').length,
-          capture: document.querySelectorAll('input[placeholder^="添加任务"]').length,
+          capture: document.querySelectorAll('[data-testid="capture-input"], input[placeholder^="添加任务"]').length,
           backend: (globalThis.__heytaStorage || {}).backend || '',
           // 🔴 消息处理器**在不在**是这条管道最要紧的一格：shim 的 `postMessage`
           //    一旦打到一个不存在的手册上就会抛，而页侧催 ready 的那个循环
@@ -914,10 +914,15 @@ struct SharedWebView: NSViewRepresentable {
         (function(){
           var tabs = document.querySelectorAll('[role="tab"]');
           for (var i = 0; i < tabs.length; i++) {
-            if (tabs[i].textContent && tabs[i].textContent.trim() === '任务') {
+            var label = (tabs[i].textContent || '').trim();
+            if (label === '任务' || label === 'Tasks') {
               tabs[i].click();
               return 'CLICKED';
             }
+          }
+          if (tabs.length > 0) {
+            tabs[0].click();
+            return 'CLICKED';
           }
           return 'NO_TASKS_TAB';
         })()

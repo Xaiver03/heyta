@@ -96,17 +96,17 @@
 .ht-row-menu__dialog {
   display: flex;
   flex-direction: column;
-  gap: var(--ht-space-4);
-  inline-size: min(100%, var(--ht-layout-modal-max));
+  gap: var(--ht-space-2);
+  inline-size: min(100%, var(--ht-layout-detail-width));
   /* 一屏放不下时**正文滚动**，标题与关闭那一行留在顶上（它本身就是出口）。 */
   max-block-size: calc(100dvh - var(--ht-space-8));
   overflow-y: auto;
-  padding: var(--ht-space-6);
-  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  padding: var(--ht-space-3) var(--ht-space-4);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
   border-radius: var(--ht-radius-lg);
-  background: var(--ht-color-surface-raised);
+  background: var(--ht-color-surface);
   color: var(--ht-color-foreground);
-  box-shadow: var(--ht-shadow-lg);
+  box-shadow: var(--ht-shadow-xl);
 }
 
 .ht-row-menu__dialog-head {
@@ -667,4 +667,17 @@
   margin: var(--ht-space-1) 0;
   font-size: var(--ht-font-size-xs);
   color: var(--ht-color-foreground-muted);
+}
+
+.ht-row__universal-drag {
+  cursor: grab;
+}
+.ht-row__universal-drag:active {
+  cursor: grabbing;
+}
+[data-workspace-drop-over='true'] {
+  outline: var(--ht-border-width-thick) solid var(--ht-color-primary);
+  outline-offset: calc(var(--ht-border-width-thin) * -1);
+  background: var(--ht-color-primary-subtle);
+  border-radius: var(--ht-radius-md);
 }

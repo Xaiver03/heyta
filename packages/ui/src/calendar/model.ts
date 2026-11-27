@@ -518,7 +518,7 @@ export function calendarSelectedForCursor(
  * 🔴 为什么"整除"是硬规矩而不是好看：12 张卡摆 5 列会剩两张孤零零挂在最后一行，
  *   而那块空白在界面上读起来像"这一年只有 12 个月里的 10 个月有东西、剩下两格坏了"。
  *   这不是审美：日历上任何一处"看着像缺了什么"都会被当成数据没了 ——
- *   本仓为这一类症状记过一整页（`labels.footnote` 存在的理由就是它）。
+ *   本仓为这一类症状记过一整页。
  *   所以候选只有 1 / 2 / 3 / 4 / 6 / 12（12 的约数），取**装得下的那个里最大的**。
  *
  * ⚠️ 入参 `fits` 是宿主量出来的"这一宽能塞几张"（见 `CalendarYearBoard` 文件头：
@@ -759,13 +759,6 @@ export interface CalendarBoardLabels {
    * 真机上就是「11月15日 星期日 …… 0」—— 没单位没标签，读者要猜它是什么。
    */
   readonly dayCount: (count: number) => string;
-  /**
-   * 页脚那句"这一页看不到什么"。
-   *
-   * 🔴 它不是装饰：**没设截止时间的任务不会出现在日历上**，
-   * 不说清楚的话"任务没设时间"会被读成"任务丢了"。
-   */
-  readonly footnote: string;
   /** 当日列表里那些行自己的文案（勾选框读屏名等）—— 原样转交给共享 `TaskList`。 */
   readonly taskRow: TaskListLabels;
 }
@@ -801,8 +794,8 @@ export type CalendarToolbarLabels = Pick<
  * 而拼的过程中极易用上 UTC 口径 —— 结果是"凌晨到期的任务落到前一天"，
  * 且只对某些时区的用户复现。
  *
- * 没有截止但有排期起点的任务落在起点日；两者都没有才不进入日期格。
- * `labels.footnote` 仍要说明未排期任务不在日历上。
+ * 没有截止但有排期起点的任务落在起点日；两者都没有才不进入日期格 ——
+ * 这种任务不在日历上，它们在「任务」页的收集箱里（界面不再用一句话说明这件事）。
  */
 export function groupTasksByDueDate(tasks: readonly Task[]): Map<LocalDate, Task[]> {
   const map = new Map<LocalDate, Task[]>();
