@@ -102,6 +102,7 @@ heyta 是一个**本地优先**的任务管理应用，目标是做一个功能�
 - 不改已接受的 ADR 的结论（要变更就新写一份）
 - 不修改 `AGENTS.md` / `CONTRIBUTING.md` 的**规则**部分，除非用户在当前任务里明确要求
 - 不在 `CURRENT_SCHEMA_VERSION` / 线协议 / 迁移上做"顺手改一下"
+- 🔴 **严禁在 Android 真机执行 `adb uninstall`**（会把它变成"首次安装未知来源"，ColorOS 弹安全验证/要密码）。真机安装一律 `adb install -r` 原地更新同一固定签名。详见 [`environment-traps.md` #689](docs/reference/environment-traps.md) 与 [`multi-end-build.md`](docs/agents/multi-end-build.md)「Android release 签名固定」。
 
 > **本仓不适用「申请单」规则。** 产品负责人 2026-11-14：
 > 「申请单这个东西只是专项弄的……只需要在创业OS当中适用，不需要在这里适用。

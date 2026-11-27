@@ -218,6 +218,7 @@ Team `V5S2LT9YV8`，有效期到 2044）；Android 的 release keystore 在
 - Mac 与 `linux-dev` 都用这把（各自 `~/.gradle/gradle.properties` 的 `HEYTA_RELEASE_*` 指向它）。
 - 构建后必须核对：`apksigner verify --print-certs <apk>` 的 DN=`CN=heyta`、SHA-256 与上一致。
 - 禁止：改 `signingConfigs`、回退 debug keystore、换 keystore、重签名。
+- 🔴 **严禁在 Android 真机执行 `adb uninstall`**（会触发 ColorOS 首装校验 / 要密码）；真机一律 `adb install -r` 原地更新同一固定签名。
 - 手机安装若弹「输密码 / 安全验证」，那是 ColorOS「应用安全检测 / 纯净模式」的安装校验，**不是签名问题**；在手机「设置 → 安全」里关掉该开关即可，之后安装不再弹。
 - Android 真机 adb / 安装也在 `linux-dev` 上做（本机 Mac 的 adb 只连模拟器）。首次把已受信任的 `~/.android/adbkey`+`adbkey.pub` 同步到 `linux-dev:~/.android/`，手机即视为同一台受信任电脑。
 
