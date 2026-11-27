@@ -1,0 +1,331 @@
+{
+ "generated_at": "2026-11-28 01:05:31",
+ "root": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta",
+ "command": "python3 \"$CTX_KIT/bin/ctx\" map --root . --out docs/agents",
+ "tree_hash": "da750506defa0727",
+ "file_count": 12108,
+ "total_bytes": 92911623,
+ "lang_counts": {
+  "Shell": 231,
+  "JS": 532,
+  "Python": 196,
+  "TS": 2171,
+  "C": 6375,
+  "C#": 49,
+  "Swift": 68,
+  "TSX": 575,
+  "Ruby": 1,
+  "C++": 1907,
+  "Kotlin": 3
+ },
+ "dirs": [
+  {
+   "dir": "apps",
+   "files": 9579,
+   "bytes": 55192825,
+   "can_edit": "✅ 可改"
+  },
+  {
+   "dir": "packages",
+   "files": 1007,
+   "bytes": 14923827,
+   "can_edit": "✅ 可改"
+  },
+  {
+   "dir": "server",
+   "files": 442,
+   "bytes": 6682920,
+   "can_edit": "✅ 可改"
+  },
+  {
+   "dir": "scripts",
+   "files": 385,
+   "bytes": 7396162,
+   "can_edit": "✅ 可改"
+  },
+  {
+   "dir": "research",
+   "files": 378,
+   "bytes": 4975338,
+   "can_edit": "✅ 可改"
+  },
+  {
+   "dir": "e2e",
+   "files": 234,
+   "bytes": 2722646,
+   "can_edit": "✅ 可改"
+  },
+  {
+   "dir": "品牌资料",
+   "files": 42,
+   "bytes": 483336,
+   "can_edit": "✅ 可改"
+  },
+  {
+   "dir": "tmp",
+   "files": 18,
+   "bytes": 136621,
+   "can_edit": "✅ 可改"
+  },
+  {
+   "dir": "docs",
+   "files": 17,
+   "bytes": 328737,
+   "can_edit": "✅ 可改"
+  },
+  {
+   "dir": "(root)",
+   "files": 2,
+   "bytes": 29181,
+   "can_edit": "✅ 可改"
+  },
+  {
+   "dir": "design-system",
+   "files": 2,
+   "bytes": 36810,
+   "can_edit": "✅ 可改"
+  },
+  {
+   "dir": "design-demos",
+   "files": 1,
+   "bytes": 832,
+   "can_edit": "✅ 可改"
+  },
+  {
+   "dir": "assets",
+   "files": 1,
+   "bytes": 2388,
+   "can_edit": "✅ 可改"
+  }
+ ],
+ "entry_points": [
+  "apps/desktop/src/index.ts",
+  "apps/desktop/src/main.ts",
+  "apps/landing/src/pages/index.ts",
+  "apps/mobile/index.js",
+  "apps/mobile/src/App.tsx",
+  "apps/node-host/src/index.ts",
+  "apps/web/src/App.tsx",
+  "apps/web/src/components/hta/index.ts",
+  "packages/ai/src/index.ts",
+  "packages/app-host/src/connectors/index.ts",
+  "packages/app-host/src/index.ts",
+  "packages/design-system/src/index.ts",
+  "packages/domain/src/index.ts",
+  "packages/i18n/src/index.ts",
+  "packages/inbound-core/src/index.ts",
+  "packages/legal/src/index.ts",
+  "packages/local-api/src/index.ts",
+  "packages/local-api/src/server.ts",
+  "packages/op-log/src/index.ts",
+  "packages/shared-schema/src/index.ts",
+  "packages/shared-schema/src/migrations/index.ts",
+  "packages/storage/src/index.ts",
+  "packages/storage/src/indexeddb/index.ts",
+  "packages/storage/src/sqlite/index.ts",
+  "packages/sync-client/src/index.ts"
+ ],
+ "hubs": [
+  {
+   "file": "packages/domain/src/index.ts",
+   "imported_by": 513
+  },
+  {
+   "file": "packages/i18n/src/index.ts",
+   "imported_by": 490
+  },
+  {
+   "file": "packages/app-host/src/index.ts",
+   "imported_by": 301
+  },
+  {
+   "file": "packages/ui/src/index.ts",
+   "imported_by": 278
+  },
+  {
+   "file": "packages/design-system/src/index.ts",
+   "imported_by": 234
+  },
+  {
+   "file": "packages/sync-core/src/index.ts",
+   "imported_by": 217
+  },
+  {
+   "file": "packages/storage/src/index.ts",
+   "imported_by": 191
+  },
+  {
+   "file": "packages/shared-schema/src/index.ts",
+   "imported_by": 171
+  },
+  {
+   "file": "packages/op-log/src/index.ts",
+   "imported_by": 148
+  },
+  {
+   "file": "e2e/tests/helpers.ts",
+   "imported_by": 134
+  },
+  {
+   "file": "server/src/db.ts",
+   "imported_by": 108
+  },
+  {
+   "file": "packages/ai/src/index.ts",
+   "imported_by": 76
+  },
+  {
+   "file": "server/src/logger.ts",
+   "imported_by": 72
+  },
+  {
+   "file": "apps/mobile/src/ui/kit.tsx",
+   "imported_by": 65
+  },
+  {
+   "file": "server/src/sync/sync.types.ts",
+   "imported_by": 62
+  }
+ ],
+ "key_file_symbols": {
+  "packages/domain/src/index.ts": [],
+  "packages/i18n/src/index.ts": [],
+  "packages/app-host/src/index.ts": [],
+  "packages/ui/src/index.ts": [],
+  "packages/design-system/src/index.ts": [],
+  "packages/sync-core/src/index.ts": [],
+  "packages/storage/src/index.ts": [],
+  "packages/shared-schema/src/index.ts": [],
+  "packages/op-log/src/index.ts": [],
+  "e2e/tests/helpers.ts": [],
+  "server/src/db.ts": [
+   "prisma",
+   "disconnectDb"
+  ],
+  "packages/ai/src/index.ts": [],
+  "server/src/logger.ts": [
+   "writeToFile",
+   "AuditLogEntry",
+   "Logger"
+  ],
+  "apps/mobile/src/ui/kit.tsx": [
+   "TextTone",
+   "TextProps",
+   "Text",
+   "AppBarAction",
+   "AppBar",
+   "IconButton",
+   "Screen",
+   "SectionHeader",
+   "ProgressBar",
+   "Checkbox",
+   "BadgeProps",
+   "Badge",
+   "GapTier",
+   "gapValue",
+   "Stack",
+   "HStack",
+   "CardProps",
+   "Card",
+   "ButtonTone",
+   "ButtonProps",
+   "Button",
+   "Fab",
+   "Divider",
+   "EmptyState",
+   "TextFieldProps",
+   "TextField",
+   "Chip",
+   "ChoiceRows"
+  ],
+  "server/src/sync/sync.types.ts": [
+   "MAX_ACCEPTED_VECTOR_CLOCK_ENTRIES",
+   "CAUSAL_FULL_STATE_OPERATION_WHERE",
+   "latestCausalFullStateSql",
+   "LatestCausalFullStateRow",
+   "agedPrefixCausalFullStateSql",
+   "isFullStateOpType",
+   "SYNC_ERROR_CODES",
+   "STATE_REPLACEMENT_REQUIRED_ERROR",
+   "SyncErrorCode",
+   "ConflictType",
+   "ConflictResult",
+   "OP_TYPES",
+   "OpType",
+   "sanitizeVectorClock",
+   "Operation",
+   "isCausalFullStateOperation",
+   "DuplicateOperationCandidate",
+   "DUPLICATE_OP_SELECT",
+   "LatestEntityOperationRow",
+   "CONFLICT_DETECTION_ENTITY_BATCH_SIZE",
+   "ServerOperation",
+   "UploadOpsRequest",
+   "UploadResult",
+   "createStateReplacementRequiredResults",
+   "ProcessOperationResult",
+   "UploadOpsResponse",
+   "DownloadOpsQuery",
+   "DownloadOpsResponse",
+   "SyncDeviceInfo",
+   "SyncDevicesResponse",
+   "SyncStatusResponse",
+   "SnapshotResult",
+   "PayloadValidationResult",
+   "validatePayload",
+   "SyncConfig",
+   "MS_PER_MINUTE",
+   "MS_PER_HOUR",
+   "MS_PER_DAY",
+   "RETENTION_DAYS",
+   "RETENTION_MS"
+  ],
+  "apps/desktop/src/index.ts": [],
+  "apps/desktop/src/main.ts": [
+   "reportFatal",
+   "guardedLoad",
+   "armReminders",
+   "bootHost",
+   "settingsSectionFromEnv",
+   "resolveWebRoot",
+   "sendToMainWindow",
+   "flushPendingCommands",
+   "showMainWindow",
+   "hideMainWindow",
+   "toggleMainWindow",
+   "showToday",
+   "createQuickAddWindow",
+   "createSettingsWindow",
+   "registerWebProtocol",
+   "createWindow"
+  ],
+  "apps/landing/src/pages/index.ts": [
+   "PAGE_COMPONENTS"
+  ],
+  "apps/mobile/index.js": [],
+  "apps/mobile/src/App.tsx": [
+   "Shell",
+   "App",
+   "LocaleHost",
+   "Root"
+  ],
+  "apps/node-host/src/index.ts": [],
+  "apps/web/src/App.tsx": [
+   "isSettingsSectionId",
+   "resolveSettingsSection",
+   "SettingsSectionNav",
+   "App",
+   "onKeyDown",
+   "onKeyDown",
+   "focusable",
+   "onKey",
+   "onKey",
+   "onKey",
+   "onKey",
+   "onKey"
+  ],
+  "apps/web/src/components/hta/index.ts": [],
+  "packages/app-host/src/connectors/index.ts": [],
+  "packages/inbound-core/src/index.ts": []
+ }
+}

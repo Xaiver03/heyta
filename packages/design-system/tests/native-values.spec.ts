@@ -25,13 +25,14 @@ describe('resolveFontFamily', () => {
   const STACK = lightTokens['font.sans'];
 
   it('未打包任何字体时不返回字体名（而不是硬塞第一项）', () => {
-    // 这是真机那次乱码的直接防线：栈里第一项是 'PingFang SC'（2026-11-21 起），
-    // 但它没被打进任何 App 包，iOS/Android 未必有，传下去就是无效字体名。
+    // 真机那次乱码的直接防线：栈里第一项现在是 'HarmonyOS_Sans_SC'（2026-11-27 起，
+    // 随 App 打包的鸿蒙黑体资源名），但没打包的宿主未必有，传下去就是无效字体名。
     expect(resolveFontFamily(STACK, [])).toBeUndefined();
   });
 
   it('字体确实打包了才返回它', () => {
-    expect(resolveFontFamily(STACK, ['PingFang SC'])).toBe('PingFang SC');
+    // 2026-11-27 字体栈首项改为随包自带的鸿蒙黑体（RN Android 资源名用下划线）。
+    expect(resolveFontFamily(STACK, ['HarmonyOS_Sans_SC'])).toBe('HarmonyOS_Sans_SC');
   });
 
   it('去掉引号', () => {

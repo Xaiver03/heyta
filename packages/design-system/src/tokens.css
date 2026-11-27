@@ -344,14 +344,14 @@
 :root {
   /* 字体栈。CJK 回退必须显式给，否则中文会用系统默认衬线，与英文割裂。
      2026-11-21 产品负责人：「用苹方（PingFang SC），现在的字体太难看」。
-     原首项 'Plus Jakarta Sans' 并未随包分发（web 无 @font-face、RN 白名单为空），
-     实际一直回退到各平台系统字体 —— 不同机器回退结果不同。把苹方提到首位后：
-     macOS / iOS 直接命中苹方，Windows / Linux 回退 Segoe UI / 微软雅黑，
-     不再挂一个永远加载不到的 webfont。 */
+     2026-11-27 产品负责人改选「鸿蒙黑体（HarmonyOS Sans SC）」并授权随包自带。
+     首项 `HarmonyOS_Sans_SC` 是 **RN Android 的资源名**（字体文件 `fonts/HarmonyOS_Sans_SC.ttf`
+     的基名，RN 用文件名当 family）；第二项 `HarmonyOS Sans SC` 是 Web 端可识别的正式家族名。
+     RN 的 `resolveFontFamily` 取首项、且只认宿主登记过的名字，所以原生端用第一项。 */
   --ht-font-sans:
-    'PingFang SC', -apple-system, BlinkMacSystemFont, 'Helvetica Neue',
-    'Segoe UI', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans SC',
-    sans-serif;
+    'HarmonyOS_Sans_SC', 'HarmonyOS Sans SC', 'PingFang SC', -apple-system,
+    BlinkMacSystemFont, 'Helvetica Neue', 'Segoe UI', 'Hiragino Sans GB',
+    'Microsoft YaHei', 'Noto Sans SC', sans-serif;
   --ht-font-mono:
     'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
