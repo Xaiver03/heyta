@@ -169,7 +169,7 @@ describe('组 1：颜色与样式', () => {
     expect(useCalendarViewStore.getState().colorMode).toBe('quadrant');
     expect(quadrant?.getAttribute('aria-checked')).toBe('true');
     expect(project?.getAttribute('aria-checked')).toBe('false');
-    expect(modal()!.querySelectorAll('[aria-checked="true"]')).toHaveLength(1);
+    expect(quadrant!.parentElement!.querySelectorAll('[aria-checked="true"]')).toHaveLength(1);
   });
 
   it('样式分段：点「现代」写回 displayStyle', () => {
@@ -212,7 +212,7 @@ describe('组 2 / 组 3 / 组 4：开关', () => {
       expect(control, `${testId} 没渲染成开关`).not.toBeNull();
       expect(control!.getAttribute('aria-checked')).toBe(String(initial));
       const before = useCalendarViewStore.getState();
-      click(control);
+      click(control!);
       expect(useCalendarViewStore.getState()[field], `${field} 没有跟着开关走`).toBe(!initial);
       // 其余字段不许被顺手改掉（对照的是**这一次点击之前**的读数）。
       for (const [otherId, otherField] of switches) {

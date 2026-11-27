@@ -75,7 +75,7 @@ const VIEW_SHORTCUT_HINT: Readonly<Record<(typeof VIEW_MENU_KINDS)[number], stri
  * 快捷键真表：字母与数字两套并列，与上面的提示**一一对应**。
  * 🔴 提示画在界面上就必须真的能按 —— 不然那是一句假承诺。
  */
-const VIEW_SHORTCUTS: Readonly<Record<string, CalendarViewKind | 'agenda'>> = {
+const VIEW_SHORTCUTS: Readonly<Record<string, CalendarViewKind>> = {
   d: 'day',
   '1': 'day',
   w: 'week',
@@ -84,8 +84,6 @@ const VIEW_SHORTCUTS: Readonly<Record<string, CalendarViewKind | 'agenda'>> = {
   '3': 'month',
   y: 'year',
   '4': 'year',
-  a: 'agenda',
-  '5': 'agenda',
 };
 
 /** 焦点在可编辑控件里时，快捷键必须让路（否则打字会翻日历）。 */
@@ -207,9 +205,7 @@ export function CalendarHeaderToolbar({
       const next = VIEW_SHORTCUTS[event.key.toLowerCase()];
       if (next === undefined) return;
       event.preventDefault();
-      const state = useCalendarViewStore.getState();
-      if (next === 'agenda') state.setExtendedView('agenda');
-      else state.setView(next);
+      useCalendarViewStore.getState().setView(next);
     };
     window.addEventListener('keydown', onKeyDown);
     return () => {
@@ -448,7 +444,7 @@ export function CalendarHeaderToolbar({
           <MenuItem
             key={kind}
             testID={`calendar-view-${kind}`}
-            checked={view.extendedView === 'none' && view.view === kind}
+            checked={view.view === kind}
             onSelect={() => { view.setView(kind); }}
           >
             {t(CALENDAR_VIEW_LABEL_KEYS[kind])}
@@ -457,37 +453,6 @@ export function CalendarHeaderToolbar({
             </span>
           </MenuItem>
         ))}
-        <MenuItem
-          testID="calendar-view-agenda"
-          checked={view.extendedView === 'agenda'}
-          onSelect={() => { view.setExtendedView('agenda'); }}
-        >
-          {t('web.calendar.view.agenda')}
-          <span className="ht-content__cal-viewhint" aria-hidden="true">
-            A / 5
-          </span>
-        </MenuItem>
-        <MenuSeparator />
-        <MenuItem
-          testID="calendar-view-multi-day"
-          checked={view.extendedView === 'multiDay'}
-          onSelect={() => { view.setExtendedView('multiDay'); }}
-        >
-          {t('web.calendar.view.multiDay')}
-          <span className="ht-content__cal-viewhint" aria-hidden="true">
-            {t('web.calendar.view.multiDayValue', { n: 5 })}
-          </span>
-        </MenuItem>
-        <MenuItem
-          testID="calendar-view-multi-week"
-          checked={view.extendedView === 'multiWeek'}
-          onSelect={() => { view.setExtendedView('multiWeek'); }}
-        >
-          {t('web.calendar.view.multiWeek')}
-          <span className="ht-content__cal-viewhint" aria-hidden="true">
-            {t('web.calendar.view.multiWeekValue', { n: 2 })}
-          </span>
-        </MenuItem>
       </AnchoredMenu>
 
       <AnchoredMenu

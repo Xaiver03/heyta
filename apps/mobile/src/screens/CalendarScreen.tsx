@@ -117,6 +117,11 @@ import { CalendarWeekPager } from './CalendarWeekPager';
 import { CalendarCapsuleHeader } from './CalendarCapsuleHeader';
 import { CalendarWeekAgenda } from './CalendarWeekAgenda';
 import { CalendarHabitEntry } from './CalendarHabitEntry';
+import { CalendarDisplaySettingsSheet } from './CalendarDisplaySettingsSheet';
+import {
+  DEFAULT_MOBILE_DISPLAY_OPTIONS,
+  type MobileCalendarDisplayOptions,
+} from './calendar-display-model';
 import { useTokens } from '../theme';
 
 /**
@@ -180,6 +185,17 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
   const [scopeOpen, setScopeOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [viewMenuOpen, setViewMenuOpen] = useState(false);
+  /**
+   * 「显示设置」弹窗。默认值刻意取**与既有行为一致**的那一档（按象限着色、显示已完成/
+   * 倒数日），这样接上开关之前与之后画面逐字节相同；用户改了才变。
+   */
+  const [displaySettingsOpen, setDisplaySettingsOpen] = useState(false);
+  const [displayOptions, setDisplayOptions] = useState<MobileCalendarDisplayOptions>(() => ({
+    ...DEFAULT_MOBILE_DISPLAY_OPTIONS,
+    colorMode: 'byQuadrant',
+    showCompleted: true,
+    showCountdown: true,
+  }));
   /**
    * 视图菜单贴哪一边，由**触发它的那颗按钮**决定。
    * 左上角的标题 / 月胶囊 → 贴左；右上角的「视图」图标 → 贴右。
@@ -778,6 +794,15 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
     [scope, tasks],
   );
 
+  /** 显示设置 → 显示已完成：关掉时把已完成任务从日历数据源里筛掉（阅读偏好，不动存储与同步）。 */
+  const visibleTasks = useMemo(
+    () =>
+      displayOptions.showCompleted
+        ? scopedTasks
+        : scopedTasks.filter((task) => task.completedAt === undefined),
+    [displayOptions.showCompleted, scopedTasks],
+  );
+
   /** 周条小圆点：这天有没有内容（任务 / 习惯）。日期判断走领域 `isScheduledOn`。 */
   const taskDates = useMemo(() => {
     const set = new Set<string>();
@@ -961,7 +986,7 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
           weekdayLabelOf={(d) => labels.weekdays[(new Date(`${d}T00:00:00`).getDay() + 6) % 7]!}
           today={today}
           selected={selected}
-          tasks={scopedTasks}
+          tasks={visibleTasks}
           taskRow={labels.taskRow}
           onSelectDay={(date) => {
             pickDay(date);
@@ -979,7 +1004,7 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
           weekdayLabelOf={(d) => labels.weekdays[(new Date(`${d}T00:00:00`).getDay() + 6) % 7]!}
           today={today}
           selected={selected}
-          tasks={scopedTasks}
+          tasks={visibleTasks}
           onSelectDay={(date) => {
             pickDay(date);
           }}
@@ -1011,7 +1036,7 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
               today={today}
               selected={selected}
               weekdayLabelOf={(d) => labels.weekdays[(new Date(`${d}T00:00:00`).getDay() + 6) % 7]!}
-              tasks={scopedTasks}
+              tasks={visibleTasks}
               onToggleTask={onToggleTask}
               busyTaskId={busyId}
               onSelectDay={(date) => {
@@ -1044,7 +1069,7 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
           weekdayLabelOf={(d) => labels.weekdays[(new Date(`${d}T00:00:00`).getDay() + 6) % 7]!}
           today={today}
           selected={selected}
-          tasks={scopedTasks}
+          tasks={visibleTasks}
           onSelectDay={(date) => {
             pickDay(date);
           }}
@@ -1060,7 +1085,7 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
         />
       ) : (
       <CalendarBoard
-        tasks={scopedTasks}
+        tasks={visibleTasks}
         // 月份已经在顶栏标题里（点它切档）—— 板内不再重复一行。
         hideToolbarTitle
         /*
@@ -1088,7 +1113,10 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
          *
          * ⚠️ 逾期仍然优先用红色（那是"要注意"，不是分类），见 `CalendarBoard` 里的优先级。
          */
-        colorByQuadrant
+        colorByQuadrant={displayOptions.colorMode === 'byQuadrant'}
+        displayStyle={displayOptions.style}
+        todayHighlight="circle"
+        fadePastDays
         today={today}
         /**
          * 🔴 「回到今天」原来**在页脚**（日历网格下面），因为移动端没传 `onToday`，
@@ -1197,6 +1225,14 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
               setScopeOpen(true);
             },
           },
+          {
+            id: 'display',
+            label: t('web.calendar.display.title'),
+            onPress: () => {
+              setMoreOpen(false);
+              setDisplaySettingsOpen(true);
+            },
+          },
         ]}
       />
 
@@ -1210,6 +1246,12 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
           setScope(next);
           setScopeOpen(false);
         }}
+      />
+      <CalendarDisplaySettingsSheet
+        visible={displaySettingsOpen}
+        options={displayOptions}
+        onChange={setDisplayOptions}
+        onClose={() => { setDisplaySettingsOpen(false); }}
       />
       {/* 长按时间网格 → 在该 15 分钟时间点新建任务（滴答清单式「长按网格加事件」）。 */}
       <Modal

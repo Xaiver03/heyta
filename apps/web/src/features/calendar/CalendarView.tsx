@@ -45,6 +45,7 @@ import {
 
 import { CalendarCapturePopover } from './CalendarCapturePopover.js';
 import { CalendarDragBar, CalendarDragProvider, CalendarDropDay, CalendarDropHour } from './CalendarDnd.js';
+import { CalendarDisplaySettingsModal } from './CalendarDisplaySettingsModal.js';
 import { useCountdownStore } from '../countdown/store.js';
 import { useTaskStore } from '../tasks/store.js';
 import { useProjectStore } from '../projects/store.js';
@@ -337,6 +338,9 @@ export function CalendarView(): React.JSX.Element {
           dayMarkerLabels={dayMarkerLabels}
           events={boardEvents}
           eventLabels={eventLabels}
+          /* 显示设置 → 颜色（按清单 / 按象限）与事件条样式（经典 / 现代）。 */
+          colorByQuadrant={view.colorMode === 'quadrant'}
+          displayStyle={view.displayStyle}
           /*
             拖拽改期（Web 独有）。三个注入点全在 `CalendarDnd.tsx`：
             每格日期包成投放目标、每条任务条包成拖拽源。共享层不认识 dnd-kit。
@@ -365,6 +369,8 @@ export function CalendarView(): React.JSX.Element {
         />
       </div>
       </CalendarDragProvider>
+      {/* 分层卡片式「显示设置」弹窗：由 ⋮ 菜单的 entry 置 `displaySettingsOpen` 打开。 */}
+      <CalendarDisplaySettingsModal />
     </HeytaUiProvider>
   );
 }
