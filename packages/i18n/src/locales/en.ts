@@ -3306,7 +3306,7 @@ export const en = {
   'mobile.tab.tasks': 'Tasks',
   'mobile.tab.calendar': 'Calendar',
   'mobile.tab.focus': 'Focus',
-  'mobile.tab.profile': 'Profile',
+  'mobile.tab.profile': 'Me',
   'mobile.tab.categories': 'Stats',
   'mobile.tab.ai': 'AI',
 
@@ -3890,7 +3890,7 @@ export const en = {
   'mobile.settings.section.features': 'Features & AI',
   'mobile.profile.entry.features': 'All features',
   'mobile.profile.entry.stats': 'Stats & review',
-  'mobile.tabbarCustomize.title': 'Customize bottom bar',
+  'mobile.tabbarCustomize.title': 'Bottom bar',
   'mobile.tabbarCustomize.hint': 'Pick {min}–{max}; “Me” stays last',
   'mobile.tabbarCustomize.up': 'Move up',
   'mobile.tabbarCustomize.down': 'Move down',
@@ -5496,7 +5496,7 @@ export const en = {
 
   // Notes (the UI layer of hallucination #12). Distinct from a task's own
   // note field, so the copy deliberately avoids the word "note" alone.
-  'notes.title': 'Sticky notes',
+  'notes.title': 'Notes',
   'notes.empty': 'No sticky notes yet',
   'notes.composer.placeholder': 'Write something…',
   'notes.add': 'Add note',

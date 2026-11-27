@@ -3042,7 +3042,7 @@ export const zhCN = {
   'web.subscription.renew.fail.unknown': '下单失败（{code}）。',
   // ── 订阅页（移动端，2026-10-24 独立成节）──────────────────────────
   // 与 Web 的「订阅」一节同构（状态 → 选档 → 下单 → 脚注），只是形态是原生卡片。
-  'mobile.settings.section.subscription': '订阅',
+  'mobile.settings.section.subscription': '订阅管理',
   /*
    * 🔴 2026-11-15：删掉前半句。
    *
@@ -3593,12 +3593,12 @@ export const zhCN = {
   'mobile.weekday.sun': '日',
 
   // ── 移动端 · 底部标签栏 ───────────────────────────────────
-  'mobile.tab.tasks': '任务',
-  'mobile.tab.calendar': '日历',
-  'mobile.tab.focus': '专注',
-  'mobile.tab.profile': '我的',
+  'mobile.tab.tasks': '任务清单',
+  'mobile.tab.calendar': '日历视图',
+  'mobile.tab.focus': '专注计时',
+  'mobile.tab.profile': '个人中心',
   'mobile.tab.categories': '统计',
-  'mobile.tab.ai': 'AI',
+  'mobile.tab.ai': 'AI 助手',
 
   // ── 移动端 · 分类时长 ──────────────────────────────────────
   // 🔴 这一组里**只许有事实句**：某类做了多久、这些时间怎么算出来的。
@@ -4168,7 +4168,7 @@ export const zhCN = {
   // ── 标签 ───────────────────────────────────────────────────
   // 清单和标签在数据上是两个实体，在产品上是同一件事的两个面（组织任务）：
   // 清单回答"它属于哪个容器"（一个），标签回答"它还跟什么有关"（多个）。
-  'mobile.profile.section.tags': '标签',
+  'mobile.profile.section.tags': '标签管理',
   'common.organizer.tags.empty': '还没有标签',
   // 同 `lists.empty.hint`：web 有那枚 +，移动端没有（移动端是输入框 + 按钮）。
   'mobile.tags.nameLabel': '标签名称',
@@ -4274,13 +4274,13 @@ export const zhCN = {
   'mobile.profile.loading': '正在读取个人资料…',
   'mobile.profile.localOnly': '当前只用本机。可在设置的“同步与隐私”中允许联网后编辑个人资料。',
   'mobile.profile.retry': '重新读取',
-  'mobile.profile.title': '我的',
+  'mobile.profile.title': '个人中心',
   // 🔴 设置是**独立的第二层表面**（RN Modal），不是「我的」滚动流里的一段 ——
   //    对标 §11.5 的规律（次级表面独立成面）。入口行在「我的」上，内容在设置面里。
   // ── 设置分组的**意图命名**（2026-10-27 IA 迁移）────────────────────────────
   // 旧的 section.profile/general/sync/security 等键保留（深链与 e2e 还引用），
   // 但目录里显示的是下面这七条 —— 每一组回答"我要做的那件事属于哪一类"。
-  'mobile.settings.section.account': '账号',
+  'mobile.settings.section.account': '账号资料',
   'mobile.settings.section.notifications': '提醒与通知',
   // 🔴 这一格是**页面标题**（顶栏那行）。2026-11-14 之前叫「语言」，而那一页现在
   // 已经有两组：「外观」（三档手动主题）+「语言」。标题与内容对不上 ——
@@ -4299,7 +4299,7 @@ export const zhCN = {
    */
   'mobile.profile.entry.features': '全部功能',
   'mobile.profile.entry.stats': '统计与回顾',
-  'mobile.tabbarCustomize.title': '自定义底部导航',
+  'mobile.tabbarCustomize.title': '底部导航',
   'mobile.tabbarCustomize.hint': '选 {min}–{max} 个；「我的」固定在最后',
   'mobile.tabbarCustomize.up': '上移',
   'mobile.tabbarCustomize.down': '下移',
@@ -4324,7 +4324,7 @@ export const zhCN = {
   'mobile.settings.close': '关闭',
   'mobile.profile.entry.settings': '设置',
   'mobile.profile.entry.settings.hint': '个人资料、偏好、同步与安全',
-  'mobile.profile.section.sync': '同步',
+  'mobile.profile.section.sync': '同步状态',
   'mobile.profile.section.status': '状态',
   // 「我的」里那条托管同步权益。只有服务端**明确说**有才显示这一行
   // （`entitled` / `denied`），未配置与探测失败一律不显示 —— 见 `EntitlementSection.tsx`。
@@ -4336,7 +4336,7 @@ export const zhCN = {
   'mobile.profile.theme.system': '跟随系统',
   'mobile.profile.theme.light': '浅色',
   'mobile.profile.theme.dark': '深色',
-  'mobile.profile.section.lists': '清单',
+  'mobile.profile.section.lists': '清单管理',
   // 🔴 认证入口在这一屏的**顶部卡片**（一级可见）—— 规范 §3.1 的「前置」落点。
   //    底部标签必须保持 5 个（规范 §2-A8），所以它是入口卡片，不是第 6 个 tab。
   'mobile.profile.section.account': '账号',
@@ -4546,7 +4546,7 @@ export const zhCN = {
   // 移动端此前**没有**习惯屏（成长屏只读连续数字，连打卡都做不到），
   // 所以标签用「习惯」而不是「我的成长」—— 后者是回顾，这里是操作。
   // ⚠️ 入口放在「我的」的第二层、不加 tab（ADR-0015 §4 与 P10 的连带有判决）。
-  'mobile.habits.entry': '习惯',
+  'mobile.habits.entry': '习惯打卡',
   'mobile.habits.entry.hint': '打卡、连续天数与热力图',
   'mobile.growth.compare.note': '这里的数字只和过去的自己比，没有排行榜。',
 
@@ -4670,7 +4670,7 @@ export const zhCN = {
   //    web.inbox.* 同口径；服务端只存 kind + payload，话在这里说。
   'mobile.inbox.title': '通知中心',
   'mobile.inbox.back': '返回',
-  'mobile.inbox.trigger': '通知',
+  'mobile.inbox.trigger': '通知中心',
   'mobile.inbox.entry.hint': '系统消息与邀请好友活动',
   'mobile.inbox.badge.aria': '{count} 条未读',
   'mobile.inbox.tab.notifications': '通知',
@@ -5987,7 +5987,7 @@ export const zhCN = {
   // ⚠️ 与任务上的「备注」(`web.note.*` / `mobile.detail.field.note`) 是**两件事**：
   //    那是任务正文，这是独立的一条记录（可不挂清单、可钉到「今天」）。
   //    文案上刻意不叫「备注」，否则用户会以为它就是任务里那个。
-  'notes.title': '便签',
+  'notes.title': '便签记录',
   'notes.empty': '还没有便签',
   'notes.composer.placeholder': '写点什么…',
   'notes.add': '添加便签',
