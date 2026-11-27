@@ -164,10 +164,13 @@ function emitPng(svg, outPath, width, height, label, samples) {
   }
   for (const s of bindSamples(png, samples)) {
     const got = png.pixel(s.x, s.y);
-    const ok = s.light ? isLight(got) : near(got, s.rgba);
+    // 字形采样改为"窗口内存在亮字形"（与坐标/形状解耦，见 hasGlyphNear）；其余仍按 rgba 点对账。
+    const ok = s.light
+      ? hasGlyphNear(png, s.x, s.y, Math.max(3, Math.round(Math.min(width, wantH) * 0.12)))
+      : near(got, s.rgba);
     if (!ok) {
       drift.push(
-        `${label}：(${s.x},${s.y}) 期望 ${s.light ? '亮字形（每通道 ≥ 200）' : `rgba(${s.rgba.join(',')})`}，实得 rgba(${got.join(',')})` +
+        `${label}：(${s.x},${s.y}) 期望 ${s.light ? '附近有亮字形' : `rgba(${s.rgba.join(',')})`}，实得 rgba(${got.join(',')})` +
           (s.why ? ` —— ${s.why}` : ''),
       );
       return;
@@ -194,6 +197,29 @@ function near(a, b) {
  */
 function isLight(a) {
   return a[0] >= 200 && a[1] >= 200 && a[2] >= 200;
+}
+
+/**
+ * 窗口内是否存在"亮字形"像素（判据与具体字形坐标解耦）。
+ *
+ * 2026-11-27：logo 换成 D1「错位双柱·并行向上」后，正中心是蓝底空隙，
+ * 原先"这个点必须是亮字形"的写死坐标不再成立。这里改为"以该点为中心、
+ * 半径 radius 的窗口内存在亮字形像素"，对形状变化与抗锯齿混色都容忍；
+ * 纯底板（主蓝 r≈37/g≈99）窗口内没有任何 r,g,b 均 ≥140 的像素 ⇒ 仍会红，
+ * 判据没有失效（RN 青色模板图 r=0 同样过不了）。
+ */
+function hasGlyphNear(png, cx, cy, radius) {
+  const x0 = Math.max(0, cx - radius);
+  const x1 = Math.min(png.width - 1, cx + radius);
+  const y0 = Math.max(0, cy - radius);
+  const y1 = Math.min(png.height - 1, cy + radius);
+  for (let y = y0; y <= y1; y += 1) {
+    for (let x = x0; x <= x1; x += 1) {
+      const a = png.pixel(x, y);
+      if (a[0] >= 140 && a[1] >= 140 && a[2] >= 140) return true;
+    }
+  }
+  return false;
 }
 
 /* ──────────────────────────────────────────────────────────────────────
