@@ -40,7 +40,7 @@ import {
   type Task,
 } from '@heyta/domain';
 import { Quadrant } from '@heyta/domain';
-import { CalendarDays } from 'lucide';
+import { CalendarDays, Repeat } from 'lucide';
 
 import { EmptyState } from '../empty-state/EmptyState.js';
 import { HeytaIcon } from '../icon/Icon.js';
@@ -175,6 +175,41 @@ export interface CalendarBoardProps {
    * ⚠️ 默认不传 ⇒ 逐字节不变；逾期/完成仍优先（它们是状态，不是分类）。
    */
   readonly barAccentOf?: ((task: Task) => TokenName | undefined) | undefined;
+  /**
+   * 周次不占左侧独立竖槽，改为画在**每周第一格**的右上角（与日期数字同一行）。
+   *
+   * 🔴 默认 `false` = 保持既有"左侧一列"的滴答式排版（移动端在用）。
+   *   只有 `true` **且** `labels.weekNumber` 存在时才生效 —— 宿主没给文案时
+   *   两种排版都不该凭空多出一个空槽。
+   *
+   * 为什么需要另一档：Web 的月历卡比手机宽得多，左侧那一列会把 7 天挤窄；
+   * 而周次本身是低频信息，塞进第一格右上角仍然"在同一行里说同一件事"。
+   */
+  readonly inlineWeekNumber?: boolean | undefined;
+  /**
+   * 今天的日期数字怎么强调：`'text'`（默认，主色字）或 `'circle'`（主色实心圆 + 白字）。
+   *
+   * 🔴 默认 `'text'` 不是偏好，是**兼容**：现有四端的长相是"选中 = 实心圆、
+   *   今天 = 主色字"。`'circle'` 档把强标记让给**今天**（Apple 日历的形状），
+   *   此时非今天的选中日改用 `primary-subtle` 圆底 + 主色字，两者仍然分得清 ——
+   *   不能出现"今天与选中长得一样"。
+   */
+  readonly todayHighlight?: 'text' | 'circle' | undefined;
+  /**
+   * 过去的日子（`cell.date < today`）里的事件条整体淡化。默认 `false`（web/移动端不变）。
+   *
+   * 淡化用**外层 opacity**，不改条自己的状态色：逾期仍然是 danger，
+   * "过去"是时间维度、"逾期"是状态维度，两件事不能互相覆盖。
+   */
+  readonly fadePastDays?: boolean | undefined;
+  /**
+   * 事件条外观：`'classic'`（默认）或 `'modern'`。
+   *
+   * `'modern'` 在条子左侧加一根极细的强调色竖条、圆角更柔和（`radius.md`），
+   * 让"彩色日历"在浅底 chip 之外还有一条可扫读的色轴。默认 `'classic'`，
+   * 不传的调用点逐字节不变。
+   */
+  readonly displayStyle?: 'classic' | 'modern' | undefined;
   /** 月/周档是否隐藏重复的选中日清单（Web 使用格内任务条，移动端保留清单）。 */
   readonly showSelectedDayList?: boolean | undefined;
   /** 月档是否填满宿主传下来的可用高度。 */
@@ -253,6 +288,16 @@ export interface CalendarBoardProps {
 }
 
 /**
+ * `fadePastDays` 那一档的淡化强度。
+ *
+ * 🔴 设计系统没有"过去日期"的 opacity token（`state.*-opacity` 是交互态，
+ *   不是时间态），所以这里只能是**一个有名字的常量**，不许散落在样式里。
+ *   0.52 是产品口径：还能读清标题，但明显退到"这是已经过去的一天"。
+ *   要调只改这一处。
+ */
+const FADE_PAST_OPACITY = 0.52;
+
+/**
  * 月历里的一个格子。
  *
  * ⚠️ 单独提出来是为了不让它随主组件重渲染而重新挂载 ——
@@ -264,6 +309,7 @@ function DayCell({
   day,
   inMonth,
   isToday,
+  isPast = false,
   isSelected,
   isWeekend = false,
   showLunar = false,
@@ -276,11 +322,17 @@ function DayCell({
   onPress,
   fitHeight,
   renderBarWrapper,
+  todayHighlight = 'text',
+  fadePastDays = false,
+  displayStyle = 'classic',
+  inlineWeekNumber = false,
+  weekNumber,
 }: {
   date: LocalDate;
   day: number;
   inMonth: boolean;
   isToday: boolean;
+  isPast?: boolean;
   isSelected: boolean;
   isWeekend?: boolean;
   /** 数字下方显示农历日名（Apple 月格）。默认 false（web 不变）。 */
@@ -295,6 +347,16 @@ function DayCell({
   fitHeight: boolean;
   /** 把每根任务条包一层（Web 注入拖拽源；移动端不传 ⇒ 逐字节不变）。 */
   renderBarWrapper?: CalendarBoardProps['renderBarWrapper'];
+  /** 今天强调方式（默认 `'text'` = 改动前的长相）。 */
+  todayHighlight?: 'text' | 'circle';
+  /** 过去的日子里的条整体淡化（默认 false）。 */
+  fadePastDays?: boolean;
+  /** 条子外观（默认 `'classic'`）。 */
+  displayStyle?: 'classic' | 'modern';
+  /** 周次是否内联到第一格右上角（默认 false = 左侧独立列）。 */
+  inlineWeekNumber?: boolean;
+  /** 这一行是当周时，内联周次的文案（只有第一格拿得到）。 */
+  weekNumber?: string | undefined;
 }): React.JSX.Element {
   const tokens = useHeytaTokens();
   const text = useHeytaText();
@@ -307,14 +369,17 @@ function DayCell({
    * 点色说不清这一天整体是什么状态，数字色说的清。
    */
   /**
-   * 🔴 2026-11-15：选中（非今天）是**浅蓝底**，所以它的数字用主色，不能用白字。
-   * 今天仍是主色实心圆 + 白字（唯一强标记）；两者同时成立时按今天那一支走。
+   * 日期数字的颜色/底色分成两档，**默认那档必须等于改动前**：
+   *
+   *   · `'text'`（默认）—— 选中 = 实心主色圆 + 白字；今天 = 主色字。
+   *   · `'circle'`       —— 今天 = 实心主色圆 + 白字；非今天的选中日 =
+   *                        `primary-subtle` 圆底 + 主色字。今天永远比"选中"强一档，
+   *                        但两者都带圆底，不会退化成"看不出哪个是今天"。
+   *
+   * 其余日期继续吃 `calendarDayTone`：逾期红、完成灰、补白弱。
    */
-  const numberColor = isSelected
-    ? tokens['color.on-primary']
-    : isToday
-      ? tokens['color.primary']
-      : tone === 'danger'
+  const toneColor =
+    tone === 'danger'
       ? tokens['color.danger']
       : inMonth
         ? tone === 'subtle'
@@ -325,6 +390,28 @@ function DayCell({
         : // 补白格（上月/下月）视觉上次要，但**仍然可点** ——
           // "点上月 30 号"是合法意图，把它做成不可点才是意外。
           tokens['color.foreground-subtle'];
+
+  const circleToday = todayHighlight === 'circle';
+  const numberColor = circleToday
+    ? isToday
+      ? tokens['color.on-primary']
+      : isSelected
+        ? tokens['color.primary']
+        : toneColor
+    : isSelected
+      ? tokens['color.on-primary']
+      : isToday
+        ? tokens['color.primary']
+        : toneColor;
+  const numberBackground = circleToday
+    ? isToday
+      ? tokens['color.primary']
+      : isSelected
+        ? tokens['color.primary-subtle']
+        : 'transparent'
+    : isSelected
+      ? tokens['color.primary']
+      : 'transparent';
 
   // 读屏时一屏 42 个"数字"没有意义，必须念成一个完整的日期 + 有没有事。
   // 日期本身由宿主的 `dayTitle` 说成当前语言。
@@ -406,14 +493,14 @@ function DayCell({
         paddingHorizontal: tokens['space.1'],
         borderRadius: tokens['radius.full'],
         /**
-         * 🔴 2026-11-15（对照滴答实测后改）：选中 = **实心主色圆**，今天（未选中）= 主色字。
-         *
-         * 上一版是"今天实心 / 选中浅蓝"，真机对照滴答的周条：它选中的那一天就是
-         * 一颗实心蓝圆（白字），与 hepta 的"今天"同形。日历里**哪个是被选中的**
-         * 是比"哪天是今天"更强的当前位置信号，所以实心圆给选中；
-         * 今天退为主色数字（不抢选中那颗圆）。
+         * 🔴 `'text'` 档（默认）逐字节保持 2026-11-15 定下的形状：
+         * 选中 = **实心主色圆**，今天（未选中）= 主色字。
+         * `'circle'` 档把实心圆让给今天，并补足高度让圆是圆而不是胶囊。
          */
-        backgroundColor: isSelected ? tokens['color.primary'] : 'transparent',
+        ...(circleToday
+          ? { minHeight: tokens['space.6'], lineHeight: tokens['space.6'] }
+          : {}),
+        backgroundColor: numberBackground,
       }]}>{day}</Text>
       {showLunar ? (
         <Text style={[text.caption, { color: tokens['color.foreground-subtle'] }]} numberOfLines={1}>
@@ -430,6 +517,15 @@ function DayCell({
           {markerView.text}
         </Text>
       )}
+      {inlineWeekNumber && weekNumber !== undefined ? (
+        <Text
+          testID={`${testIDOf(date)}-week`}
+          numberOfLines={1}
+          style={[text.caption, { color: tokens['color.foreground-subtle'], marginStart: 'auto' }]}
+        >
+          {weekNumber}
+        </Text>
+      ) : null}
       </View>
       {/*
         任务条（R11 批一）。原来是 4px 圆点，**格子里没有一个字可读**。
@@ -452,6 +548,8 @@ function DayCell({
               ? tokens['color.primary']
               : (tokens[bar.accent] as string);
         /* 滴答式彩色块 chip：绝对定位的 strong 色层 + 低 opacity 做浅底，文字用同色。 */
+        const barRadius = displayStyle === 'modern' ? tokens['radius.md'] : tokens['radius.sm'];
+        const barTestID = `${testIDOf(date)}-${bar.event === true ? 'event' : 'bar'}`;
         const node = (
         <View
           key={bar.id}
@@ -459,7 +557,7 @@ function DayCell({
              "这格里有没有那个日子"。共用一个名字的话，"宿主没接第二个源"
              会被"任务条画出来了"读成通过 —— 那条"默认值等于原行为的可选 prop
              会把没接伪装成做完了"的教训（§9.1）就是这么个形状。 */
-          testID={`${testIDOf(date)}-${bar.event === true ? 'event' : 'bar'}`}
+          testID={barTestID}
           style={[
             styles.bar,
             {
@@ -468,29 +566,64 @@ function DayCell({
               // 否则选中日期里的任务条会与格子背景融合，只剩状态色条和文字。
               paddingHorizontal: tokens['space.1'],
               overflow: 'hidden',
-              borderRadius: tokens['radius.sm'],
+              borderRadius: barRadius,
+              /**
+               * 🔴 `fadePastDays` 只淡化**外层**（连标题一起），不改状态色：
+               * 逾期仍然是 danger —— "过去"是时间、"逾期"是状态，两件事不能互相覆盖。
+               */
+              ...(fadePastDays && isPast ? { opacity: FADE_PAST_OPACITY } : {}),
               marginLeft:
                 bar.span === 'middle' || bar.span === 'end' ? -tokens['space.1'] : undefined,
               marginRight:
                 bar.span === 'middle' || bar.span === 'start' ? -tokens['space.1'] : undefined,
               borderTopLeftRadius:
-                bar.span === 'middle' || bar.span === 'end' ? 0 : tokens['radius.sm'],
+                bar.span === 'middle' || bar.span === 'end' ? 0 : barRadius,
               borderBottomLeftRadius:
-                bar.span === 'middle' || bar.span === 'end' ? 0 : tokens['radius.sm'],
+                bar.span === 'middle' || bar.span === 'end' ? 0 : barRadius,
               borderTopRightRadius:
-                bar.span === 'middle' || bar.span === 'start' ? 0 : tokens['radius.sm'],
+                bar.span === 'middle' || bar.span === 'start' ? 0 : barRadius,
               borderBottomRightRadius:
-                bar.span === 'middle' || bar.span === 'start' ? 0 : tokens['radius.sm'],
+                bar.span === 'middle' || bar.span === 'start' ? 0 : barRadius,
             },
           ]}
         >
-          <View style={[styles.barTint, { backgroundColor: strong }]} pointerEvents="none" />
+          <View style={[styles.barTint, { backgroundColor: strong, borderRadius: barRadius }]} pointerEvents="none" />
+          {/*
+            `'modern'` 档左侧那根极细强调色竖条。色取自同一条 `strong` ——
+            所以"按清单上色 / 象限上色 / 逾期红"都会自动反映到这条色轴上，
+            不新增第二个配色判断。
+          */}
+          {displayStyle === 'modern' ? (
+            <View
+              testID={`${barTestID}-strip`}
+              pointerEvents="none"
+              style={{
+                width: tokens['border-width.thick'],
+                alignSelf: 'stretch',
+                borderRadius: tokens['radius.full'],
+                backgroundColor: strong,
+              }}
+            />
+          ) : null}
+          {/*
+            重复任务的小循环标识（2026-11-25）。`icon.xs` 是"极小"那一档：
+            它要和一行 12px 的标题同高，不能把条子撑高。纯装饰 ——
+            标题已经说了"这条是什么"，读屏再念一遍"循环"是噪声。
+          */}
+          {bar.kind === 'repeat' ? (
+            <HeytaIcon
+              data={Repeat}
+              size={tokens['icon.xs']}
+              color={strong}
+              testID={`${barTestID}-repeat`}
+            />
+          ) : null}
           <Text
             numberOfLines={1}
             /* 🔴 标题**自己带一个 testID**：RN-web 里 `Text` 和 `View` 都渲染成 `<div>`，
                判据要是靠"条里第一个 div"会正好抓到那根**没有字的色条**，
                量到的颜色跟"字读不读得出"毫无关系（这条真错过一次）。 */
-            testID={`${testIDOf(date)}-${bar.event === true ? 'event' : 'bar'}-title`}
+            testID={`${barTestID}-title`}
             style={[
               text['row-meta'],
               styles.barTitle,
@@ -565,6 +698,10 @@ export function CalendarBoard({
   hideToolbarTitle,
   colorByQuadrant = false,
   barAccentOf,
+  inlineWeekNumber = false,
+  todayHighlight = 'text',
+  fadePastDays = false,
+  displayStyle = 'classic',
   showSelectedDayList = true,
   fillMonth = false,
   habitEntries,
@@ -595,8 +732,15 @@ export function CalendarBoard({
     if (first === undefined || last === undefined) return new Map<LocalDate, Task[]>();
     return groupTasksByCalendarDate(tasks, first, last);
   }, [tasks, weeks]);
-  /** 周次列只在月视图有意义：那一列就是"第几周"，而周视图整屏只有**一个**周。 */
-  const showWeekNumber = view === 'month' && labels.weekNumber !== undefined;
+  /**
+   * 周次只在月视图有意义：那一列就是"第几周"，而周视图整屏只有**一个**周。
+   *
+   * 两档是互斥的：`inlineWeekNumber` 把周次从左侧竖槽挪进**每周第一格**右上角。
+   * 只有"要求内联 + 宿主真的给了文案"时竖槽才撤 —— 否则会撤掉一列却没有替代品。
+   */
+  const inlineWeek = view === 'month' && inlineWeekNumber && labels.weekNumber !== undefined;
+  const showWeekNumberColumn =
+    view === 'month' && labels.weekNumber !== undefined && !inlineWeek;
 
   /**
    * 倒数日摊到**这一屏看得见的区间**上（W6）。
@@ -765,7 +909,7 @@ export function CalendarBoard({
             写反了不会报错，只会让整个日历**整体错位一格**。
             今天所在的那一列，列头用主色 —— 滴答同款（"今天为蓝色，其余灰"）。 */}
         <View style={styles.weekRow}>
-          {showWeekNumber ? <View style={styles.weekNumCell} /> : null}
+          {showWeekNumberColumn ? <View style={styles.weekNumCell} /> : null}
           {labels.weekdays.map((label, i) => (
             <View key={`wd-${i}`} style={styles.weekCell}>
               <Text
@@ -802,13 +946,13 @@ export function CalendarBoard({
           >
             {/* 周次列（滴答式"31周"）：宿主给格式化，周一是网格开头，
                 同一行任何一天的 ISO 周数都相同 —— 取第一天的即可。 */}
-            {showWeekNumber ? (
+            {showWeekNumberColumn ? (
               <View style={styles.weekNumCell}>
                 <Text
                   style={[text.caption, { color: tokens['color.foreground-subtle'] }]}
                   numberOfLines={1}
                 >
-                  {/* `?.` 不是防御：`showWeekNumber` 这个**布尔**不会帮 TS 收窄
+                  {/* `?.` 不是防御：`showWeekNumberColumn` 这个**布尔**不会帮 TS 收窄
                       `labels.weekNumber`，写 `labels.weekNumber(...)` 编译不过。 */}
                   {labels.weekNumber?.(week[0]!.date)}
                 </Text>
@@ -850,6 +994,7 @@ export function CalendarBoard({
                   day={Number(cell.date.slice(8, 10))}
                   inMonth={cell.inMonth}
                   isToday={cell.date === today}
+                  isPast={cell.date < today}
                   isSelected={cell.date === selected}
                   isWeekend={weekendAccent === true && isoWeekday(cell.date) >= 6}
                   showLunar={showLunar === true}
@@ -880,6 +1025,15 @@ export function CalendarBoard({
                   dayMarkerLabels={dayMarkerLabels}
                   onPress={pickDay}
                   renderBarWrapper={renderBarWrapper}
+                  todayHighlight={todayHighlight}
+                  fadePastDays={fadePastDays}
+                  displayStyle={displayStyle}
+                  inlineWeekNumber={inlineWeek}
+                  weekNumber={
+                    inlineWeek && cell === week[0] && labels.weekNumber !== undefined
+                      ? labels.weekNumber(cell.date)
+                      : undefined
+                  }
                 />
               );
               // 宿主不传 ⇒ 直接返回原格子（移动端与任何未接拖拽的调用点不变）。
