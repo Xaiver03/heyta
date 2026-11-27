@@ -1,12 +1,18 @@
 {
-  "what": "电脑端（Web）登录对话框左栏的横向纸感插画（AuthPanel → AuthPlanScene）",
-  "why": "2026-11-27 产品负责人：电脑端登录界面也要插画形式；且'画显示不完整'——之前把 9:16 竖版首启漫画塞进横栏，cover 必然裁掉下半截。改为给桌面端专门画一张横版图。",
-  "generator": "本地 MOSS 文生图（ComfyUI，moss_image_sft_int8_convrot.safetensors）",
+  "what": "电脑端（Web）登录对话框左栏的**滚动 Banner**：4 张横向纸感插画（任务 / 日历 / 专注 / 统计），AuthPanel → AuthPlanScene 自动轮播",
+  "why": "2026-11-27 产品负责人：电脑端登录也要插画，并且要有故事性/功能展示、做成**滚动的 Banner**；画要足够大（大图能缩、小图不能放大）。此前把 9:16 竖版漫画塞进横栏 + cover 会裁掉下半截（'画显示不完整'）。",
+  "generator": "本地 MOSS 文生图（ComfyUI，moss_image_sft_int8_convrot.safetensors + qwen3.5_9b_w4a8_gptq.safetensors + flux2-vae_small）",
   "route": "本地 ComfyUI http://127.0.0.1:8188，工作流 /Volumes/RocaSSD/comfyui/workflows/moss_api_test.json；skill: ~/.dsh/skills/moss-image",
   "generatedAt": "2026-11-27",
-  "size": "1280x960（4:3 横版）→ JPEG q82",
-  "prompt": "Hand-drawn Japanese-style comic illustration on warm off-white paper (#FAF7F1), thin ink linework, flat soft color fills, light paper grain; a young adult with short dark hair, white tee, dark trousers sitting at a simple wooden desk holding a phone; abstract rounded task cards and a small calendar grid float around, one indigo card glows with a bent check; warm orange accent; generous calm negative space on the right; no text/letters/numbers/logos/watermark/realistic UI.",
-  "constraints": "无文字/字母/数字/logo/水印/真实 UI 截图；app 面画成抽象圆角卡。⚠️ 首版出图日历表头有极小字母，缩到面板尺寸基本不可见；如需彻底去除可就地重生成。",
+  "images": [
+    { "file": "banner-tasks.jpg", "size": "1280x960", "seed": 1234, "note": "任务：把想法收进清单" },
+    { "file": "banner-calendar.jpg", "size": "1536x1152", "seed": 7001, "note": "日历：一个月尽收眼底、哪些天已排" },
+    { "file": "banner-focus.jpg", "size": "1536x1152", "seed": 7002, "note": "专注：干扰退散、专心一件事" },
+    { "file": "banner-stats.jpg", "size": "1536x1152", "seed": 7003, "note": "统计：温和的成长/连续记录" }
+  ],
+  "prompts": "见 .local/auth-diag-20261126/prompts/（calendar/focus/stats）与 2026-11-27 提交信息；tasks 用早期那张（同风格）",
+  "postProcess": "sips 转 JPEG q78；1536×1152（大图，向下适配）",
+  "constraints": "要求无文字/字母/logo/水印/真实 UI。⚠️ MOSS 偶发自加内容：日历那张自动画了日期数字（视觉上更像日历，保留）；其余无文字。",
   "palette": "纸 #FAF7F1 · 墨 #1F2937 · 靛蓝 #2563EB · 暖橙 #E8833A · 雾灰蓝 #94A3B8 · 暖砂 #E4D8C3",
   "license": "本机以自有模型生成，随本仓库 MIT 分发；不含第三方素材。",
   "consumers": ["apps/web/src/features/auth/AuthPlanScene.tsx"]
