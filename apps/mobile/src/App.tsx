@@ -31,7 +31,7 @@
  */
 
 import React, { useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { Animated, AppState, StatusBar, useWindowDimensions, View } from 'react-native';
+import { Animated, AppState, Platform, StatusBar, useWindowDimensions, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ErrorBoundary } from './ui/error-boundary';
 import { I18nProvider, useI18n, type Locale } from '@heyta/i18n';
@@ -384,6 +384,21 @@ export default function App(): React.JSX.Element {
  * 也就是在这里，而不是更靠下的某个屏幕。`useState(resolveDeviceLocale)`
  * 传的是**初始化函数**：设备语言的读取只在挂载时发生一次，不是每帧。
  */
+/**
+ * 苹方（PingFang SC）—— iOS / macOS 的系统内置字体。
+ *
+ * 🔴 产品要求：「都要用苹方」。`@heyta/ui` 的 `native.fontSans` 只认**登记在
+ * `packagedFonts` 里的真实字体名**（见 `design-system/native-values.ts`）。iOS 上把
+ * 系统自带的 `PingFang SC` 登记进去，RN 就会对**全部文字（含数字 / 拉丁）**显式用苹方，
+ * 而不是默认的「SF Pro + 中文苹方」混排。
+ *
+ * ⚠️ 只在 iOS 登记：`PingFang SC` 是 Apple 的版权字体，Android / HarmonyOS 上没有、
+ * 也不允许随包分发（AGENTS §3.2 白名单没有 OFL，不能塞开源替代字体）。那两个平台
+ * 只能沿用各自系统字体（Noto Sans CJK / HarmonyOS Sans）—— 把 `PingFang SC` 传给
+ * Android 会画成条纹乱码（`native-values.ts` 实测）。
+ */
+const PLATFORM_PACKAGED_FONTS: readonly string[] = Platform.OS === 'ios' ? ['PingFang SC'] : [];
+
 function LocaleHost(): React.JSX.Element {
   const [locale, setLocale] = useState<Locale>(resolveDeviceLocale);
   /*
@@ -414,6 +429,7 @@ function LocaleHost(): React.JSX.Element {
         locale={locale}
         schemeOverride={scheme === 'system' ? null : scheme}
         screenWidth={windowWidth}
+        packagedFonts={PLATFORM_PACKAGED_FONTS}
       >
       <ThemePreferenceProvider scheme={scheme} setScheme={setScheme}>
       <LocalePreferenceProvider locale={locale} setLocale={setLocale}>
