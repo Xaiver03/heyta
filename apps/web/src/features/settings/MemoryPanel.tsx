@@ -131,7 +131,7 @@ function StatedMemorySection(props: {
 }): React.JSX.Element {
   const { t } = useI18n();
   const [draft, setDraft] = useState('');
-  const [editingId, setEditingId] = useState<string>();
+  const [editingRowId, setEditingRowId] = useState<string>();
   const [editDraft, setEditDraft] = useState('');
   const active = props.memories.filter((m) => m.status === 'active' && m.text.trim() !== '');
   const pending = props.memories.filter((m) => m.status === 'pending' && m.text.trim() !== '');
@@ -147,7 +147,7 @@ function StatedMemorySection(props: {
     const text = editDraft.trim();
     if (text === '' || props.onUpdate === undefined) return;
     props.onUpdate(id, text);
-    setEditingId(undefined);
+    setEditingRowId(undefined);
   };
 
   return (
@@ -180,7 +180,7 @@ function StatedMemorySection(props: {
         <ul className="ht-settings__list" data-testid="memory-stated">
           {active.map((m) => (
             <li className="ht-settings__item" key={m.id} data-testid={`memory-stated-${m.id}`}>
-              {editingId === m.id ? (
+              {editingRowId === m.id ? (
                 <>
                   <input
                     className="ht-input"
@@ -194,7 +194,7 @@ function StatedMemorySection(props: {
                         e.preventDefault();
                         saveEdit(m.id);
                       }
-                      if (e.key === 'Escape') setEditingId(undefined);
+                      if (e.key === 'Escape') setEditingRowId(undefined);
                     }}
                   />
                   <Button
@@ -209,7 +209,7 @@ function StatedMemorySection(props: {
                     tone="ghost"
                     data-testid={`memory-stated-cancel-${m.id}`}
                     aria-label={t('web.memory.stated.cancelEdit')}
-                    onClick={() => setEditingId(undefined)}
+                    onClick={() => setEditingRowId(undefined)}
                   >
                     <X size={ICON_SIZE.xs} aria-hidden="true" />
                   </Button>
@@ -217,7 +217,7 @@ function StatedMemorySection(props: {
               ) : (
                 <>
                   <span className="ht-settings__toggle-body">
-                    <span className="ht-settings__hint">{t(KIND_LABEL[m.kind])}</span>
+                    <span className="ht-settings__value">{t(KIND_LABEL[m.kind])}</span>
                     <span className="ht-settings__toggle-label">{m.text}</span>
                   </span>
                   <Button
@@ -225,7 +225,7 @@ function StatedMemorySection(props: {
                     data-testid={`memory-stated-edit-${m.id}`}
                     aria-label={t('web.memory.stated.editAria', { text: m.text })}
                     onClick={() => {
-                      setEditingId(m.id);
+                      setEditingRowId(m.id);
                       setEditDraft(m.text);
                     }}
                   >
@@ -278,7 +278,7 @@ function StatedMemorySection(props: {
             {pending.map((m) => (
               <li className="ht-settings__item" key={m.id}>
                 <span className="ht-settings__toggle-body">
-                  <span className="ht-settings__hint">{t(KIND_LABEL[m.kind])}</span>
+                  <span className="ht-settings__value">{t(KIND_LABEL[m.kind])}</span>
                   <span className="ht-settings__toggle-label">{m.text}</span>
                 </span>
                 <Button
@@ -473,11 +473,6 @@ export function MemoryPanel(props: MemoryPanelProps): React.JSX.Element {
         <>
           <h3 className="ht-settings__subtitle">
             {t('web.memory.gap.title')}
-            <SettingsInfoTip
-              testId="tip-memory-gap"
-              label={t('web.memory.gap.title')}
-              text={t('web.memory.gap.note')}
-            />
           </h3>
 
           {focusGaps === null ? (

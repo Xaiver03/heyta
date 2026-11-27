@@ -11,6 +11,38 @@
  * 移动端塌缩成单栏 + 底部导航。
  */
 
+/*
+ * 统一 RN-Web 共享组件的字体到设计令牌。
+ * --------------------------------------
+ * `@heyta/ui` 的共享组件（设置里的「桌面小组件」、各处空态「还没有清单 / 标签 / 通知」等）
+ * 在 web 端是 react-native-web 渲染的。它的 `Text` 自带一条默认字体栈
+ * `-apple-system, system-ui, Segoe UI, Roboto…`——**首项不是苹方**，于是这些文字会和
+ * 全站 `--ht-font-sans`（苹方）割裂，看上去"字体不对"。
+ *
+ * 这里只兜「没有显式指定字体」的文本：带 `r-fontFamily-*` 原子类（代码块 mono 等）
+ * 或写了内联 `font-family` 的，都不在匹配范围内，照旧。
+ */
+body [class*='css-text-']:not([class*='r-fontFamily-']) {
+  font-family: var(--ht-font-sans);
+}
+
+/*
+ * 共享 `SettingsSection`（`@heyta/ui`，RN-Web 渲染）在 web 上补成与老 `.ht-settings`
+ * 卡片**同一规格**:描边 + 圆角 + 白底 + 16px 内边距。
+ * --------------------------------------------------------------------
+ * 页面底色与卡片同为白（`color.surface` ≈ `color.background`），不描边时"这里是一张卡"
+ * 与"这里是一整块"在图上没有区别 —— 与老 `.ht-settings` 卡片 2026-10-24 补描边同一个理由。
+ * 老面板走 `.ht-settings` 已有整套卡片规格，迁到共享组件的新面板只有 gap（`variant` 未传），
+ * 于是同屏里一半是卡片、一半是裸文字，读起来"脏乱"。这条规则让两种实现外观一致。
+ * 选择器只命中「分组下、RN-Web `View` 直接子节点」这张卡片根，不碰老的 `.ht-settings` 段。
+ */
+.ht-settings__group > div[class*='css-view-'] {
+  border: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+  border-radius: var(--ht-radius-lg);
+  background: var(--ht-color-surface);
+  padding: var(--ht-space-4);
+}
+
 .ht-app {
   display: grid;
   /*
@@ -148,7 +180,7 @@ html.heyta-shell:not(.heyta-shell--active) .ht-rail__top {
      详情页里"到期复习/记录列表"这类区块会往下长，不该把整页推走。 */
   block-size: 100dvh;
   overflow-y: auto;
-  border-left: 0;
+  border-left: var(--ht-border-width-thin) solid var(--ht-color-border);
   background: var(--ht-color-surface);
   /* 这一栏从 2026-10-04 起**有内容**（任务视图里是 AI 面），所以左右必须有留白：
      `.ht-ai-panel` 自己不带 inline padding，挂在零留白的栏里会贴住左边那条
@@ -355,8 +387,21 @@ html.heyta-shell:not(.heyta-shell--active) .ht-rail__top {
  * 承重判据在 `e2e/tests/detail-pane-task.spec.ts`（逐控件 containment）。
  */
 .ht-app__detail-task {
+  display: flex;
+  flex-direction: column;
+  min-block-size: 100%;
   overflow-wrap: anywhere;
   padding: var(--ht-space-4);
+}
+
+.ht-app__detail-task .ht-compose textarea.ht-input {
+  min-block-size: calc(var(--ht-touch-target-min) * 2);
+  border-color: transparent;
+  background: var(--ht-color-surface-subtle);
+}
+
+.ht-app__detail-task .ht-compose textarea.ht-input:hover {
+  background: var(--ht-color-hover);
 }
 
 .ht-app__detail-heading {
@@ -368,41 +413,136 @@ html.heyta-shell:not(.heyta-shell--active) .ht-rail__top {
   color: var(--ht-color-foreground);
 }
 
-/* 专注页的次级入口：默认只显示当前配置摘要，详情按需展开。 */
+/* 专注页：单轴沉浸容器 + 环上方目标轻入口 + 按需展开的时长设置。 */
+.ht-app__focus {
+  padding: var(--ht-space-6);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ht-space-4);
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  box-sizing: border-box;
+}
+
+.ht-app__focus-target-wrap {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  max-width: var(--ht-layout-sidebar-width);
+}
+
+.ht-app__focus-target {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ht-space-1);
+  min-block-size: var(--ht-touch-target-min);
+  padding-inline: var(--ht-space-4);
+  border: 0;
+  border-radius: var(--ht-radius-full);
+  background: transparent;
+  color: var(--ht-color-foreground);
+  font: inherit;
+  cursor: pointer;
+  max-inline-size: 100%;
+  transition: background-color var(--ht-duration-fast) var(--ht-ease-standard);
+}
+
+.ht-app__focus-target:hover:not(:disabled) {
+  background: var(--ht-color-hover);
+}
+
+.ht-app__focus-target:disabled {
+  color: var(--ht-color-foreground-muted);
+  cursor: default;
+}
+
+.ht-app__focus-target-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ht-app__focus-target-menu {
+  position: absolute;
+  inset-block-start: calc(100% + var(--ht-space-1));
+  inset-inline-start: 50%;
+  transform: translateX(-50%);
+  z-index: var(--ht-z-popover);
+  min-inline-size: var(--ht-layout-sidebar-width);
+  max-block-size: calc(var(--ht-touch-target-min) * 6);
+  overflow-y: auto;
+  padding: var(--ht-space-1);
+  border-radius: var(--ht-radius-lg);
+  background: var(--ht-color-surface);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+  box-shadow: var(--ht-shadow-md);
+  display: flex;
+  flex-direction: column;
+}
+
+.ht-app__focus-target-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ht-space-2);
+  min-block-size: var(--ht-touch-target-min);
+  padding-inline: var(--ht-space-3);
+  border: 0;
+  border-radius: var(--ht-radius-md);
+  background: transparent;
+  color: var(--ht-color-foreground);
+  font: inherit;
+  font-size: var(--ht-font-size-sm);
+  text-align: start;
+  cursor: pointer;
+}
+
+.ht-app__focus-target-option:hover {
+  background: var(--ht-color-hover);
+}
+
+.ht-app__focus-target-option[aria-selected='true'] {
+  color: var(--ht-color-primary);
+  font-weight: var(--ht-font-weight-medium);
+}
+
+.ht-app__focus-target-option-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .ht-app__focus-settings {
   width: 100%;
   max-width: var(--ht-layout-sidebar-width);
   border-block-start: 0;
-  padding-block-start: var(--ht-space-2);
 }
 
 .ht-app__focus-settings-toggle {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--ht-space-3);
+  justify-content: center;
+  gap: var(--ht-space-2);
   min-block-size: var(--ht-touch-target-min);
-  padding-inline: var(--ht-space-1);
-  border-radius: var(--ht-radius-md);
-  color: var(--ht-color-foreground-muted);
+  padding-inline: var(--ht-space-3);
+  border-radius: var(--ht-radius-full);
+  color: var(--ht-color-foreground-subtle);
   cursor: pointer;
   list-style: none;
-  font-size: var(--ht-font-size-sm);
+  font-size: var(--ht-font-size-xs);
+}
+
+.ht-app__focus-settings-toggle:hover {
+  color: var(--ht-color-foreground-muted);
+  background: var(--ht-color-hover);
 }
 
 .ht-app__focus-settings-toggle::-webkit-details-marker {
   display: none;
-}
-
-.ht-app__focus-settings-toggle::after {
-  content: '+';
-  color: var(--ht-color-foreground-subtle);
-  font-size: var(--ht-font-size-lg);
-  line-height: var(--ht-line-height-tight);
-}
-
-.ht-app__focus-settings[open] .ht-app__focus-settings-toggle::after {
-  content: '−';
 }
 
 .ht-app__focus-settings-summary {
@@ -417,9 +557,15 @@ html.heyta-shell:not(.heyta-shell--active) .ht-rail__top {
   min-inline-size: 0;
   margin-block-start: var(--ht-space-2);
   padding: var(--ht-space-3);
-  border: 0;
-  border-radius: var(--ht-radius-md);
-  background: var(--ht-color-background);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+  border-radius: var(--ht-radius-lg);
+  background: var(--ht-color-surface);
+}
+
+.ht-app__focus-settings-locked {
+  margin: 0;
+  font-size: var(--ht-font-size-xs);
+  color: var(--ht-color-foreground-muted);
 }
 
 .ht-app__focus-settings-legend {
@@ -429,10 +575,6 @@ html.heyta-shell:not(.heyta-shell--active) .ht-rail__top {
   overflow: hidden;
   clip: rect(0 0 0 0);
   white-space: nowrap;
-}
-
-.ht-app__focus-task {
-  width: 100%;
 }
 
 .ht-app__detail-cards {

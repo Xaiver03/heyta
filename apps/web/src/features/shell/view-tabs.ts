@@ -74,48 +74,20 @@ export const QUADRANT_NAV: NavEntry[] = [
 ];
 
 /**
- * 第二列顶部的「智能清单」组。
- *
- * 🔴 **这里没有「收集箱」那一行**（2026-10-04 产品负责人：「已经有一个收集箱的
- * 标题了，为什么还要个收集箱？在信息架构上面是重复的」）。中间那一列的页头
- * 本来就按当前筛选显示「收集箱」，侧栏再放一行同名入口等于让同一个目的地
- * 有两个名字相近、高亮状态还各自独立的控件。
- * ⇒ `{ kind: 'all' }` 的入口搬到 **rail 的「任务」**：点它 = 进任务视图并把筛选
- * 重置到收集箱（见 `App.tsx` 视图 tab 的 `onClick`）。这条不是"顺手加的补丁"，
- * 而是删掉那一行之后**唯一**能回到收集箱的路径，所以它必须有判据（`tests/
- * app-mount.spec.tsx`）。
+ * 第二列顶部的「智能清单」组（今天 / 最近 7 天 / 收集箱），对齐滴答清单左上角三项智能视图。
+ * 「已完成」与「回收站」统一归入侧栏底部的归档工具段（`COMPLETED_NAV_ENTRY`）。
  */
 export const PRIMARY_NAV: NavEntry[] = [
   { filter: { kind: 'today' }, labelKey: 'web.shell.nav.today', icon: Sun },
-  /**
-   * 「最近 7 天」—— 滴答那三个智能清单里的中间一个（收集箱 / 今天 / 最近 7 天）。
-   *
-   * 🔴 这一行只是**入口**：窗口的定义（含今天的七个日历日、不含逾期、
-   * 不含无截止、不含已完成）全在领域层的 `filterTasks({kind:'next7Days'})`，
-   * 天数常数 `NEXT_SEVEN_DAYS` 也在那里。这里**不许**再算一遍日期，
-   * 也不许把 7 写成字面量 —— 侧栏标签上的数与该常数的同源关系钉在
-   * `tests/task-groups.spec.tsx`。
-   *
-   * 这两档（今天 / 最近 7 天）都属"按日期看的未完成"；
-   * 看全部（收集箱）走 rail 的「任务」，理由见上面 `PRIMARY_NAV` 的文件头。
-   */
   { filter: { kind: 'next7Days' }, labelKey: 'web.shell.nav.next7Days', icon: CalendarRange },
-  /**
-   * 「已完成」。
-   *
-   * 🔴 这个入口**曾经不存在**，而它缺的只是这一行 —— `TaskFilter` 里早有
-   * `{ kind: 'completed' }` 分支（`features/tasks/store.ts`）、
-   * `selectVisibleTasks` 早会筛它、标题逻辑早有 `f.kind === 'completed'`、
-   * 空态文案 `web.shell.empty.completed.*` 也早就在两种语言里。
-   * **零件全在，就是没有按钮能把 filter 切过去**，于是 Web 上已完成的任务
-   * 永远看不见。这是"最后一米"的典型形状（见
-   * `docs/research/dida365-feature-benchmark.md` §3）。
-   *
-   * 放在「今天」之后：收集箱 / 今天 / 已完成 是同一类"智能清单"，
-   * 前两个看未完成、第三个看已完成，语义上是一组。
-   */
-  { filter: { kind: 'completed' }, labelKey: 'web.shell.nav.completed', icon: CheckCircle2 },
+  { filter: { kind: 'all' }, labelKey: 'web.shell.nav.inbox', icon: Inbox },
 ];
+
+export const COMPLETED_NAV_ENTRY: NavEntry = {
+  filter: { kind: 'completed' },
+  labelKey: 'web.shell.nav.completed',
+  icon: CheckCircle2,
+};
 
 /**
  * 顶层视图。

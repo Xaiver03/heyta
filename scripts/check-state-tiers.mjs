@@ -61,8 +61,9 @@ const TIERS = new Map([
   ['apps/web/src/App.tsx', ['page']],
   ['apps/web/src/features/inbox/InboxBell.tsx', ['page', 'page']],
   ['apps/web/src/features/inbox/InviteActivityCard.tsx', ['page']],
-  ['apps/web/src/features/admin/AdminPanel.tsx', ['page']],
   // ── 卡片档（居中但紧凑、无插画）：面板 / 格子 / 卡片内的子列表
+  ['apps/web/src/components/hta/ListState.tsx', ['page']],
+  ['apps/web/src/features/admin/sections/shared.tsx', ['page']],
   ['packages/ui/src/calendar/CalendarBoard.tsx', ['line']],
   ['packages/ui/src/calendar/CalendarDayBoard.tsx', ['page']],
   ['packages/ui/src/timeline/GanttChart.tsx', ['page']],
@@ -81,6 +82,7 @@ const TIERS = new Map([
   ['apps/web/src/features/habits/HabitsView.tsx', ['page']],
   ['apps/web/src/features/focus/FocusDetailPane.tsx', ['section']],
   ['apps/mobile/src/screens/SessionsSection.tsx', ['section']],
+  ['apps/mobile/src/screens/FocusScreen.tsx', ['section', 'section']],
   ['apps/mobile/src/screens/SecurityScreen.tsx', ['section']],
   // ── 一行档（辅助信息，住在分组标签 / 设置行下面）
   ['apps/web/src/features/settings/InboundAutomationSettings.tsx', ['line', 'line']],

@@ -109,6 +109,10 @@ export interface AttachmentListProps {
   readonly onAdd: () => void;
   /** 移除某一个。确认已由宿主问过（见文件头）。 */
   readonly onRemove: (id: string) => void;
+  /**
+   * 是否渲染「添加附件」那一行。默认 `true`；宿主已有自己的入口时传 `false`。
+   */
+  readonly showAddButton?: boolean;
   readonly testID?: string;
 }
 
@@ -186,10 +190,10 @@ function makeStyles(tokens: HeytaNativeTokens) {
       minHeight: tokens['touch-target.min'],
       paddingHorizontal: tokens['size.field-padding-x'],
       borderRadius: tokens['radius.md'],
-      backgroundColor: tokens['color.primary'],
+      backgroundColor: tokens['color.surface-sunken'],
     },
     addText: {
-      color: tokens['color.on-primary'],
+      color: tokens['color.foreground'],
     },
   });
 }
@@ -200,6 +204,7 @@ export function AttachmentList({
   busy = false,
   onAdd,
   onRemove,
+  showAddButton = true,
   testID,
 }: AttachmentListProps): React.JSX.Element {
   const tokens = useHeytaTokens();
@@ -209,7 +214,9 @@ export function AttachmentList({
   return (
     <View style={styles.board} testID={testID}>
       {items.length === 0 ? (
-        <View style={styles.empty}>{labels.empty}</View>
+        labels.empty !== null && labels.empty !== undefined && labels.empty !== '' ? (
+          <View style={styles.empty}>{labels.empty}</View>
+        ) : null
       ) : (
         <View
           style={styles.list}
@@ -254,20 +261,22 @@ export function AttachmentList({
         </View>
       )}
 
-      <View style={styles.addRow}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={labels.add}
-          disabled={busy}
-          onPress={onAdd}
-          style={styles.addButton}
-          testID="attachment-add"
-        >
-          <HeytaIcon data={Plus} size={tokens['icon.xs']} color={tokens['color.on-primary']} />
-          {/* 上传中念「正在上传…」：与移动端同一个两态文案（`labels.uploading`）。 */}
-          <Text style={[text.caption, styles.addText]}>{busy ? labels.uploading : labels.add}</Text>
-        </Pressable>
-      </View>
+      {showAddButton !== false ? (
+        <View style={styles.addRow}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={labels.add}
+            disabled={busy}
+            onPress={onAdd}
+            style={styles.addButton}
+            testID="attachment-add"
+          >
+            <HeytaIcon data={Plus} size={tokens['icon.xs']} color={tokens['color.foreground-muted']} />
+            {/* 上传中念「正在上传…」：与移动端同一个两态文案（`labels.uploading`）。 */}
+            <Text style={[text.caption, styles.addText]}>{busy ? labels.uploading : labels.add}</Text>
+          </Pressable>
+        </View>
+      ) : null}
     </View>
   );
 }

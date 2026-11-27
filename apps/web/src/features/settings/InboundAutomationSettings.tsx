@@ -499,13 +499,15 @@ export function InboundAutomationSettings({ active = true, routing, consents, se
                   <span className="ht-settings__hint" role="status">{t('web.ai.inbound.credential.active', { keyId: credential.keyId })}</span>
                   <Button tone="ghost" disabled={busy !== undefined} onClick={() => void revokeCredential(credential)}>{t('web.ai.inbound.credential.revoke')}</Button>
                 </div>)}
-                <Button tone="ghost" disabled={busy !== undefined} onClick={() => void issueCredential(rule)}>{t('web.ai.inbound.credential.rotate')}</Button>
-                {/* 试发要用刚签发那一刻的 secret ⇒ 这句解释走 ⓘ（设置界面禁止内联说明段落）。 */}
-                <SettingsInfoTip
-                  testId="tip-inbound-test-send-once"
-                  label={t('web.ai.inbound.credential.rotate')}
-                  text={t('web.ai.inbound.credential.testSendOnce')}
-                />
+                <div className="ht-settings__actions">
+                  <Button tone="ghost" disabled={busy !== undefined} onClick={() => void issueCredential(rule)}>{t('web.ai.inbound.credential.rotate')}</Button>
+                  {/* 试发要用刚签发那一刻的 secret ⇒ 这句解释走 ⓘ（设置界面禁止内联说明段落）。 */}
+                  <SettingsInfoTip
+                    testId="tip-inbound-test-send-once"
+                    label={t('web.ai.inbound.credential.rotate')}
+                    text={t('web.ai.inbound.credential.testSendOnce')}
+                  />
+                </div>
               </div> : null}
               {oneTimeSecret?.ruleId === rule.id ? <aside className="ht-inbound__credential-secret" role="status" data-testid="inbound-credential-secret">
                 <p className="ht-settings__hint" role="status">{t('web.ai.inbound.credential.secretOnce', { keyId: oneTimeSecret.keyId })}</p>

@@ -1768,43 +1768,29 @@ export function ProfileScreen({ onNavigateTab }: { onNavigateTab?: (key: 'habits
       */}
       <SettingsSection
         variant="card"
-        testID="profile-group-modules"
-        rows={[tabBarCustomizeRow]}
-      />
-      <SettingsSection
-        variant="card"
-        testID="profile-group-preferences"
-        rows={[appearanceRow, notificationsRow, subscriptionRow]}
-      />
-      <SettingsSection
-        variant="card"
-        testID="profile-group-more"
-        rows={[settingsRow]}
+        testID="profile-group-settings"
+        rows={[tabBarCustomizeRow, appearanceRow, notificationsRow, subscriptionRow, settingsRow]}
       />
 
       {/*
         ── ④ 同步：**一行**（§5.2）────────────────────────────────────────
-        判据见 `syncDetailVisible`：`error` / `conflict` 才展开成今天的状态卡
-        （失败要说清是哪一种、冲突要给出口），其余状态一句话说完。
-        `StatusRow` 这时只画**细节**（`detailOnly`），标题已经在上面那一行里 ——
-        同一张卡里说两遍同一句话是本仓 §7 明令禁止的形状。
+        🔴 2026-11-27：同步摘要从「Card + SettingsRow」换成 `SettingsSection`（单行 44dp）。
+        之前 `Card` 的 `space.4` 上下内边距把这一条撑得比上面的设置行高一截（产品：
+        「同步那个条怎么那么高」）。异常（error/conflict）才在下面另起一张卡展开细节。
       */}
-      <Card shadow="card">
-        <SettingsRow row={syncSummaryRow} />
-        {syncDetailVisible ? (
-          <>
-            <Divider />
-            <StatusRow
-              status={status}
-              busy={busy}
-              detailOnly
-              onOpenConflicts={() => {
-                setConflictsOpen(true);
-              }}
-            />
-          </>
-        ) : null}
-      </Card>
+      <SettingsSection variant="card" testID="profile-sync" rows={[syncSummaryRow]} />
+      {syncDetailVisible ? (
+        <SettingsSection variant="card" testID="profile-sync-detail">
+          <StatusRow
+            status={status}
+            busy={busy}
+            detailOnly
+            onOpenConflicts={() => {
+              setConflictsOpen(true);
+            }}
+          />
+        </SettingsSection>
+      ) : null}
       {/*
         「立即同步」只在**有事可做**时出现（未同步 / 离线 / 出错 / 正在进行）。
         🔴 一切正常时这一块就只剩那一行 "已是最新 · 时间" —— §4「同屏一个主任务」：
@@ -1831,16 +1817,15 @@ export function ProfileScreen({ onNavigateTab }: { onNavigateTab?: (key: 'habits
       {/* 清单 / 标签 / 便签管理（⑥）。顺序是**清单在标签前**（与任务详情页一致），
           便签排最后（它读的是 NOTE，与任务的组织维度无关）。 */}
       <SectionHeader title={t('mobile.profile.tools')} />
-      <Card shadow="card">
-        <SettingsRow row={{ kind: 'action',
-      discloses: true, label: t('mobile.profile.section.lists'), testID: 'profile-entry-lists', leading: <Icon name="task.project" size="sm" color={tokens['color.foreground-muted']} />, onPress: () => { navigation.push('profile:lists'); } }} />
-        <Divider />
-        <SettingsRow row={{ kind: 'action',
-      discloses: true, label: t('mobile.profile.section.tags'), testID: 'profile-entry-tags', leading: <Icon name="task.tag" size="sm" color={tokens['color.foreground-muted']} />, onPress: () => { navigation.push('profile:tags'); } }} />
-        <Divider />
-        <SettingsRow row={{ kind: 'action',
-      discloses: true, label: t('notes.title'), testID: 'profile-entry-notes', leading: <Icon name="note.sticky" size="sm" color={tokens['color.foreground-muted']} />, onPress: () => { navigation.push('profile:notes'); } }} />
-      </Card>
+      <SettingsSection
+        variant="card"
+        testID="profile-group-tools"
+        rows={[
+          { kind: 'action', discloses: true, label: t('mobile.profile.section.lists'), testID: 'profile-entry-lists', leading: <Icon name="task.project" size="sm" color={tokens['color.foreground-muted']} />, onPress: () => { navigation.push('profile:lists'); } },
+          { kind: 'action', discloses: true, label: t('mobile.profile.section.tags'), testID: 'profile-entry-tags', leading: <Icon name="task.tag" size="sm" color={tokens['color.foreground-muted']} />, onPress: () => { navigation.push('profile:tags'); } },
+          { kind: 'action', discloses: true, label: t('notes.title'), testID: 'profile-entry-notes', leading: <Icon name="note.sticky" size="sm" color={tokens['color.foreground-muted']} />, onPress: () => { navigation.push('profile:notes'); } },
+        ]}
+      />
 
       <ConflictSheet
         visible={conflictsOpen}

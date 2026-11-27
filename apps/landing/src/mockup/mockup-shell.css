@@ -334,15 +334,15 @@ button.mk-nav__item:focus-visible {
 }
 
 /* 勾选框：尺寸 / 圆角 / 描边宽度 = `TASK_ROW_SHAPE` 的对应项。
-   这里原来抄的是 `--ht-icon-md`（20px）+ `--ht-radius-full`（圆），
-   而共享行是 22px 的圆角方 —— 那就是一处实测漂移。 */
+   共享行自 `c9cf0242`（R3a，对齐提醒事项）起勾选框是**圆形**（`radius.full`），
+   尺寸是 `size.checkbox`（22px）。这里原来抄的 `--ht-icon-md`（20px）那处漂移已收。 */
 .mk-task__check {
   inline-size: var(--ht-size-checkbox);
   block-size: var(--ht-size-checkbox);
   flex: none;
   border-style: solid;
   border-width: var(--ht-border-width-thin);
-  border-radius: var(--ht-radius-sm);
+  border-radius: var(--ht-radius-full);
   border-color: var(--ht-color-border-strong);
   display: grid;
   place-items: center;

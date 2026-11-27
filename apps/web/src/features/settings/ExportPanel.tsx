@@ -40,7 +40,6 @@ import { currentState, requireStore } from '../../lib/oplog.js';
 import { tasksCsvCopy, tasksMarkdownCopy } from './export-copy.js';
 import { downloadTextFile } from './export-download.js';
 import { SettingsNotice } from './SettingsNotice.js';
-import { SettingsInfoTip } from './SettingsInfoTip.js';
 
 export function ExportPanel({
   onlyJson = false,
@@ -103,11 +102,6 @@ export function ExportPanel({
       <section className="ht-settings__section">
         <h3 className="ht-settings__h3 ht-type-row-title">
           <FileJson size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.export.json.label')}
-          <SettingsInfoTip
-            testId="tip-export-json"
-            label={t('web.export.json.label')}
-            text={t('web.export.json.note')}
-          />
         </h3>
         <div className="ht-settings__actions">
           <Button
@@ -125,11 +119,6 @@ export function ExportPanel({
       {!onlyJson && <section className="ht-settings__section">
         <h3 className="ht-settings__h3 ht-type-row-title">
           <FileText size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.export.markdown.label')}
-          <SettingsInfoTip
-            testId="tip-export-markdown"
-            label={t('web.export.markdown.label')}
-            text={t('web.export.markdown.note')}
-          />
         </h3>
         <div className="ht-settings__actions">
           {/*
@@ -152,11 +141,6 @@ export function ExportPanel({
       {!onlyJson && <section className="ht-settings__section">
         <h3 className="ht-settings__h3 ht-type-row-title">
           <FileText size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.export.csv.label')}
-          <SettingsInfoTip
-            testId="tip-export-csv"
-            label={t('web.export.csv.label')}
-            text={t('web.export.csv.note')}
-          />
         </h3>
         <div className="ht-settings__actions">
           <Button

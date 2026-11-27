@@ -71,10 +71,22 @@ const FIELD_SPECS = [
  */
 const GESTURE_PATHS = [
   {
+    field: 'dueDate',
+    file: 'apps/web/src/features/calendar/CalendarView.tsx',
+    anchor: 'const onReschedule = useCallback(',
+    why: '日历拖拽改期：调的是同一个 store.setDueDate，属于输入通路不是第二个落点',
+  },
+  {
     field: 'project',
     file: 'apps/web/src/App.tsx',
     anchor: 'onMoveTask={(taskId, projectId)',
     why: '看板拖拽：调的是同一个 store.moveToProject，属于输入通路不是第二个落点',
+  },
+  {
+    field: 'title',
+    file: 'apps/web/src/App.tsx',
+    anchor: 'const commitInlineRowRename = useCallback(',
+    why: '任务行标题原位直输：调的是同一个 store.renameTask，属于输入通路不是第二个落点',
   },
 ];
 
@@ -206,10 +218,12 @@ function selfTest() {
       EDITOR,
       FIELD_SPECS.map((spec) => `void store.${spec.method}(id, x);`).join('\n') + '\n',
     );
-    files.set(
-      'apps/web/src/App.tsx',
-      'onMoveTask={(taskId, projectId) => { void store.moveToProject(taskId, projectId); }}\n',
-    );
+    // 每条白名单通路都要在夹具里出现：否则阳性对照会因为"锚点缺失"红在 R2，
+    // 那不是判据坏了，是夹具没有构造出白名单描述的那个世界。
+    for (const gesture of GESTURE_PATHS) {
+      const prev = files.get(gesture.file) ?? '';
+      files.set(gesture.file, `${prev}${gesture.anchor}\n`);
+    }
     return files;
   };
 

@@ -292,10 +292,10 @@ function makeStyles(tokens: HeytaNativeTokens) {
       minHeight: tokens['touch-target.min'],
       paddingHorizontal: tokens['size.field-padding-x'],
       borderRadius: tokens['radius.md'],
-      backgroundColor: tokens['color.primary'],
+      backgroundColor: tokens['color.surface-sunken'],
     },
     addText: {
-      color: tokens['color.on-primary'],
+      color: tokens['color.foreground'],
     },
   });
 }
@@ -340,11 +340,13 @@ export function ReminderList({
       </Text>
 
       {rows.length === 0 ? (
-        <View style={styles.empty}>
-          <Text style={[text.caption, { color: tokens['color.foreground-muted'] }]}>
-            {labels.empty}
-          </Text>
-        </View>
+        labels.empty.trim() === '' ? null : (
+          <View style={styles.empty}>
+            <Text style={[text.caption, { color: tokens['color.foreground-muted'] }]}>
+              {labels.empty}
+            </Text>
+          </View>
+        )
       ) : (
         <View
           style={styles.list}
@@ -491,7 +493,7 @@ export function ReminderList({
               style={styles.addButton}
               testID={`reminder-add-${String(index)}`}
             >
-              <HeytaIcon data={Plus} size={tokens['icon.xs']} color={tokens['color.on-primary']} />
+              <HeytaIcon data={Plus} size={tokens['icon.xs']} color={tokens['color.foreground-muted']} />
               <Text style={[text.caption, styles.addText]}>{label}</Text>
             </Pressable>
           );
@@ -510,7 +512,7 @@ export function ReminderList({
             style={styles.addButton}
             testID="reminder-add-absolute"
           >
-            <HeytaIcon data={Plus} size={tokens['icon.xs']} color={tokens['color.on-primary']} />
+            <HeytaIcon data={Plus} size={tokens['icon.xs']} color={tokens['color.foreground-muted']} />
             <Text style={[text.caption, styles.addText]}>{labels.absolute}</Text>
           </Pressable>
         )}

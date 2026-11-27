@@ -68,7 +68,7 @@ describe('移动端个人中心与设置的 IA 接线', () => {
 
   it('近期状态紧跟账号、位于各功能入口之前，资料编辑入口进入账号分组', () => {
     const home = between(profile, 'return (\n    <Screen', '<SettingsScreen');
-    const accountEnd = home.indexOf('testID="profile-group-preferences"');
+    const accountEnd = home.indexOf('testID="profile-group-settings"');
     const growthSummary = home.indexOf('<ProfileProgressSummary');
 
     expect(accountEnd).toBeGreaterThan(-1);
@@ -184,12 +184,11 @@ describe('移动端个人中心与设置的 IA 接线', () => {
   it('A1 首屏主要设置按三组前置（功能模块 / 偏好 / 更多设置），行高交给 SettingsSection', () => {
     const home = between(profile, 'return (\n    <Screen', '<SettingsScreen');
 
-    // 2026-11-27 改版：主要设置改用共享 `SettingsSection variant="card"` ——
-    // 行高压到触控下限 44dp，替代原来 `Card + 逐行 Divider` 把每行撑到 ~60dp 的形状。
-    // 因此首屏不再是一串裸 `<SettingsRow>`，而是三个具名分组。
-    expect(home, '功能模块分组不见了').toContain('testID="profile-group-modules"');
-    expect(home, '偏好分组不见了').toContain('testID="profile-group-preferences"');
-    expect(home, '更多设置分组不见了').toContain('testID="profile-group-more"');
+    // 2026-11-27 二次改版：不再把设置拆成「功能模块 / 偏好 / 更多设置」三张卡
+    // （1 行 / 3 行 / 1 行、条数极不均衡），合并成**一张**设置卡。
+    expect(home, '设置分组不见了').toContain('testID="profile-group-settings"');
+    expect(home, '设置又被打散成多张卡了').not.toContain('testID="profile-group-modules"');
+    expect(home, '设置又被打散成多张卡了').not.toContain('testID="profile-group-more"');
 
     // 首屏各行成分（名字写死，防止"分组在、行错位"）。
     for (const row of [
@@ -202,7 +201,7 @@ describe('移动端个人中心与设置的 IA 接线', () => {
       expect(home, `首屏少了 ${row} 那一行`).toContain(row);
     }
     // 同步摘要仍是首屏的一行（A3 再细判）。
-    expect(home).toContain('<SettingsRow row={syncSummaryRow} />');
+    expect(home).toContain('syncSummaryRow');
     // 🔴 「统计与回顾」不再是独立入口：统计从「近期状态」进。
     expect(profile, '`profile-entry-stats` 又冒出来了').not.toContain("testID: 'profile-entry-stats'");
 
@@ -261,7 +260,7 @@ describe('移动端个人中心与设置的 IA 接线', () => {
     const home = between(profile, 'return (\n    <Screen', '<SettingsScreen');
 
     expect(profile).toContain("valueTestID: 'profile-sync-summary'");
-    expect(home).toContain('<SettingsRow row={syncSummaryRow} />');
+    expect(home).toContain('syncSummaryRow');
     // 🔴 展开是有条件的：`error` / `conflict` 才画细节。
     expect(home).toContain('syncDetailVisible ?');
     expect(profile).toContain("status.kind === 'error' || status.kind === 'conflict'");

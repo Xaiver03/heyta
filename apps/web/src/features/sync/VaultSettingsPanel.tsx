@@ -743,11 +743,6 @@ export function VaultSettingsPanel({ active = true }: { active?: boolean }): Rea
                   />
                 )}
               </FormField>
-              <SettingsInfoTip
-                testId="tip-vault-legacy"
-                label={t('web.sync.vault.legacyPassphrase')}
-                text={t('web.sync.vault.legacyPassphraseHint')}
-              />
             </>
           ) : null}
           {migrationProgress !== undefined ? (

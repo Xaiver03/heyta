@@ -56,9 +56,11 @@ export const EXPECTED_ORDER = [
   'danger-confirm.css',
   'admin.css',
   'habits.css',
+  'projects-settings.css',
   'narrow.css',
   'assistant-layout.css',
   'scope-drawer.css',
+  'ai-chat-direction-a.css',
   'borderless-controls.css',
 ];
 

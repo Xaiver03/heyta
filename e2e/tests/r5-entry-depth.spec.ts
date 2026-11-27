@@ -267,6 +267,7 @@ test.describe('R5 · 三条基线链路的点击与层数（现量）', () => {
       .first()
       .click(); // 点击 1
     const pane = page.locator('[data-testid="detail-column"]');
+    await pane.getByTestId('task-detail-subtask-trigger').click(); // 点击 2
     const subtask = pane.locator('[data-testid^="subtask-select-"]').first();
     await expect(subtask, '详情面里没有子任务那一格 ⇒ 链路②没有那个动作').toBeVisible();
     const atPane = await surfacesNow(page);
@@ -276,7 +277,7 @@ test.describe('R5 · 三条基线链路的点击与层数（现量）', () => {
     const clicks = await readClicks(page);
     // eslint-disable-next-line no-console
     console.info(
-      `[R5] 链路②：点击 ${String(clicks)} 次（点行开详情 1；原生 select 不计 —— `
+      `[R5] 链路②：点击 ${String(clicks)} 次（点行开详情 1 / 点子任务触发器 1；原生 select 不计 —— `
       + `按取证 §4 计数法算上"选一档"是 ${String(clicks + 1)} 次）`,
     );
     await parkCursor(page);

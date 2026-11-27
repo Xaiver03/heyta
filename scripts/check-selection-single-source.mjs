@@ -514,9 +514,21 @@ const ROW_ID_EXEMPT = [
   ['apps/web/src/features/kanban/KanbanView.tsx', 'overColumnId', 'dragging'],
   ['apps/web/src/features/settings/PasskeyPanel.tsx', 'confirmingId', 'confirm-gate'],
   ['apps/web/src/features/settings/PasskeyPanel.tsx', 'editingRowId', 'inline-rename'],
+  ['apps/web/src/features/settings/MemoryPanel.tsx', 'editingRowId', 'inline-rename'],
+  // 桌面任务列表的**行内原地重命名**：它记的是"哪一行的标题此刻变成了输入框"，
+  // 是五类瞬态里的 `inline-rename`（与 PasskeyPanel/MemoryPanel 的 editingRowId 同形），
+  // 不是"当前看的是哪一条"——后者走 `useSelected('task')`（`selectedTaskId`）。
+  ['apps/web/src/App.tsx', 'editingRowTaskId', 'inline-rename'],
+  ['apps/web/src/features/admin/sections/AnnouncementsSection.tsx', 'pendingWithdrawId', 'confirm-gate'],
+  ['apps/web/src/features/admin/sections/RefundsSection.tsx', 'pendingApproveId', 'confirm-gate'],
+  ['apps/web/src/features/calendar/CalendarDnd.tsx', 'activeId', 'dragging'],
+  ['apps/web/src/features/calendar/CalendarHubPanel.tsx', 'tagBusyId', 'in-flight'],
+  ['apps/web/src/features/categories/CategoryCreateDialog.tsx', 'parentId', 'form-draft'],
+  ['apps/web/src/features/settings/CalendarSubscriptionsCard.tsx', 'busyId', 'in-flight'],
+  ['apps/mobile/src/ai/session-list.tsx', 'renamingId', 'inline-rename'],
+  ['apps/mobile/src/screens/CalendarScreen.tsx', 'busyHabitId', 'in-flight'],
   // 后台退款那两枚按钮是**两步式批准**：第一下记下"待批准的是哪一条"，第二下（确认框里那枚）才发请求。
   // 类别按那处代码自己的注释归（`AdminPanel.tsx`：「待确认的那一条退款 id（两步式"批准"）」）。
-  ['apps/web/src/features/admin/AdminPanel.tsx', 'pendingApproveId', 'confirm-gate'],
   ['apps/web/src/features/trash/TrashView.tsx', 'busyId', 'in-flight'],
   ['apps/web/src/features/trash/TrashView.tsx', 'confirmingId', 'confirm-gate'],
   ['apps/mobile/src/screens/CalendarScreen.tsx', 'busyId', 'in-flight'],
@@ -560,7 +572,6 @@ const ROW_ID_EXEMPT = [
   // ── 2026-10-24 补登 3 处（都是 G 报的"没有语义登记"，逐处读代码归类）──────────
   // 运营公告的「撤回」是**两步式**：第一下记下"待撤回的是哪一条"，行内原地换成
   // 「确认撤回 / 取消」两枚按钮，第二下才发请求、取消只清它 —— 与 `pendingApproveId` 同形。
-  ['apps/web/src/features/admin/AdminPanel.tsx', 'pendingWithdrawId', 'confirm-gate'],
   // 订阅页两个端的**套餐选择**：它是结账表单的草稿字段（`DEFAULT_CHECKOUT_TIER_ID` 初值、
   // 提交时读它决定买哪一档），不是"当前看的是哪一条"。
   ['apps/web/src/features/subscription/RenewPanel.tsx', 'tierId', 'form-draft'],
@@ -1169,7 +1180,7 @@ const VIEW_STANCES = [
     stance: 'filters',
     entity: 'tag',
     locus: 'apps/web/src/features/projects/ProjectsPanel.tsx',
-    needle: 'toOrganizerNodes(toTagItems(projects.tags))',
+    needle: 'toTagTree(projects.tags)',
     because: '标签行与清单行走同一条 onFilterWith 通道，语义同上（C1 #14）。',
   },
 ];

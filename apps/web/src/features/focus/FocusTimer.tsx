@@ -1,67 +1,39 @@
 /**
- * 番茄钟（Web 壳）
- * ==================
+ * 番茄钟（Web 壳 · 单轴沉浸布局）
+ * ================================
  *
- * 🔴 M3 第二刀之后，这个文件**只剩接线**。
- *
- * 计时核心（进度环、倒计时、阶段、主按钮 / 中止按钮、无障碍）已经从两端
- * 收进 `@heyta/ui` 的 `FocusPanel` —— 与 mobile 是**同一份实现**。
- * 这里只回答 web 自己的两个问题：
- *
- *   1. 计时状态从哪来 → `./store.js`（状态机与落盘都在 `packages/`）
- *   2. 页面周边挂什么 → 关联任务下拉 + 时长设置（这两个是 web 特有的入口）
- *
- * 计时状态与剩余量**全部来自 @heyta/domain**（`remainingMs` 每次重算）。
- * 组件只负责画。
+ * 计时核心来自 `@heyta/ui` 的共享 `FocusPanel`。
+ * Web 侧与移动端保持同一套呼吸感与交互解剖：
+ *   1. 环正上方居中唯一轻入口 `专注 ›`（已关联时显示 `{任务标题} ›`），点开浮层选择任务，
+ *      不再在圆环底下堆「关联任务（可选）」表单标签与灰底下拉框；
+ *   2. 去掉与右栏概览卡重复的「今日已完成 N 个专注」文字；
+ *   3. 空闲倒计时态点击中央大数字 `25:00`（或下方轻收起项）即可展开时长设置。
  */
 
-import { useEffect, useState } from 'react';
-import { FormField } from '../../lib/form/FormField.js';
-import { cssVar, ICON_SIZE } from '@heyta/design-system';
-import { ChevronDown } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { ICON_SIZE } from '@heyta/design-system';
+import { Check, ChevronRight } from 'lucide-react';
 import { useI18n, type MessageKey } from '@heyta/i18n';
 import { FocusPanel, focusLogFailureMessageKey } from '@heyta/ui';
 
+import { FormField } from '../../lib/form/FormField.js';
 import { useTaskStore } from '../tasks/store.js';
 import {
   FOCUS_CONFIG_BOUNDS,
-  focusConfigToDraft,
   draftToFocusConfig,
+  focusConfigToDraft,
   type FocusConfigDraft,
 } from '../../lib/focus-config.js';
 import { selection, useSelected } from '../../lib/selection.js';
 import { useFocusStore } from './store.js';
 
-/**
- * 时长设置
- * ==========
- *
- * 🔴 **它修的是一个"控件存在、入口不存在"的洞**：`useFocusStore.setConfig`
- * 一直有实现，但**零调用点** —— 于是时长永远 25/5/15，用户改不了。
- *
- * ## 为什么只在 idle 时可改
- *
- * 本轮的计划时长在 `start()` 那一刻就冻结进了 `state.plannedMs`（进度环与
- * 落盘的 `FocusSession.plannedMs` 都用它）。进行中改只有两种结果：本轮不变
- * （用户以为改了）或本轮跟着变（进度环跳一下、落盘的计划时长与实际不符）。
- * 两种都比"暂时不让改"更坏。store 侧也拦了一道（`setConfig` 返回 `false`），
- * **不靠这个 `disabled` 属性当唯一防线**。
- *
- * ## 为什么失焦才写回
- *
- * 受控输入在打字过程中**必然**经过空串与中间态（想把 25 改成 180，中途会有
- * `1`、`18`）。每次 `onChange` 就夹取并写 store 的话，用户会看到光标乱跳、
- * 数字被改成他没打的东西。所以这里持一份字符串草稿，**失焦时**才夹取落库 ——
- * 夹取结果因此是**看得见**的（用户能看到自己被打到哪个值）。
- *
- * 上限/下限的取值与理由在 `lib/focus-config.ts`。
- *
- * ⚠️ 它**没有**搬进共享层：时长是设备本地的偏好（`localStorage`），
- * mobile 现在没有这个入口，配置用的是领域默认值。等手机端也做时长设置时，
- * 应当把"字段 + 夹取 + 无障碍名"这部分提进 `packages/ui`，
- * 而不是把这一整段抄过去。
- */
-function DurationSettings() {
+function DurationSettings({
+  open,
+  onToggle,
+}: {
+  readonly open: boolean;
+  readonly onToggle: (next: boolean) => void;
+}) {
   const { t } = useI18n();
   const focus = useFocusStore();
   const locked = focus.state.phase !== 'idle';
@@ -82,13 +54,10 @@ function DurationSettings() {
 
   function commit(key: keyof FocusConfigDraft, raw: string): void {
     const parsed = Number.parseInt(raw, 10);
-    // 空串 / 打不出数字时**保留原值**，不要回落成默认值 ——
-    // 那会让"清空输入框"顺手把这一项重置成 25。
     const candidate = {
       ...current,
       [key]: Number.isNaN(parsed) ? current[key] : parsed,
     };
-    // store 侧在非 idle 时会拒绝；这里不重复判断，避免两处判据漂移。
     focus.setConfig(draftToFocusConfig(candidate));
     setDraft((d) => {
       const { [key]: _dropped, ...rest } = d;
@@ -97,71 +66,57 @@ function DurationSettings() {
   }
 
   return (
-    <details className="ht-app__focus-settings" data-testid="focus-config">
+    <details
+      className="ht-app__focus-settings"
+      data-testid="focus-config"
+      open={open}
+      onToggle={(e) => {
+        onToggle(e.currentTarget.open);
+      }}
+    >
       <summary className="ht-app__focus-settings-toggle" data-testid="focus-config-toggle">
         <span>{t('web.focus.config.title')}</span>
         <span className="ht-app__focus-settings-summary" aria-hidden="true">
           {t('web.focus.config.minutes', { minutes: current.workMinutes })}
         </span>
       </summary>
-      <fieldset
-        disabled={locked}
-        className="ht-app__focus-settings-fields"
-      >
-        <legend className="ht-app__focus-settings-legend">
-          {t('web.focus.config.title')}
-        </legend>
+      <fieldset disabled={locked} className="ht-app__focus-settings-fields">
+        <legend className="ht-app__focus-settings-legend">{t('web.focus.config.title')}</legend>
 
-      {fields.map((f) => {
-        const bounds = FOCUS_CONFIG_BOUNDS[f.key];
-        const label = t(f.labelKey);
-        return (
-          <FormField
-            key={f.key}
-            id={`focus-config-${f.key}`}
-            label={label}
-            layout="inline"
-          >
-            {(field) => (
-              <input
-                {...field}
-                type="number"
-                // `inputMode` 让移动端弹数字键盘；`min`/`max` 是**给浏览器与
-                // 读屏软件的提示**，不是防线 —— 真正的防线是 store 前的夹取。
-                inputMode="numeric"
-                min={bounds.min}
-                max={bounds.max}
-                step={1}
-                value={draft[f.key] ?? String(current[f.key])}
-                aria-label={
-                  f.unit === 'minutes'
-                    ? t('web.focus.config.a11y.minutes', { label })
-                    : t('web.focus.config.a11y.sessions', { label })
-                }
-                onChange={(e) => {
-                  setDraft((d) => ({ ...d, [f.key]: e.target.value }));
-                }}
-                onBlur={(e) => {
-                  commit(f.key, e.target.value);
-                }}
-              />
-            )}
-          </FormField>
-        );
-      })}
+        {fields.map((f) => {
+          const bounds = FOCUS_CONFIG_BOUNDS[f.key];
+          const label = t(f.labelKey);
+          return (
+            <FormField key={f.key} id={`focus-config-${f.key}`} label={label} layout="inline">
+              {(field) => (
+                <input
+                  {...field}
+                  type="number"
+                  inputMode="numeric"
+                  min={bounds.min}
+                  max={bounds.max}
+                  step={1}
+                  value={draft[f.key] ?? String(current[f.key])}
+                  aria-label={
+                    f.unit === 'minutes'
+                      ? t('web.focus.config.a11y.minutes', { label })
+                      : t('web.focus.config.a11y.sessions', { label })
+                  }
+                  onChange={(e) => {
+                    setDraft((d) => ({ ...d, [f.key]: e.target.value }));
+                  }}
+                  onBlur={(e) => {
+                    commit(f.key, e.target.value);
+                  }}
+                />
+              )}
+            </FormField>
+          );
+        })}
 
-      {/* 🔴 锁住时必须说明原因。灰掉一个控件却不解释，用户只会以为界面坏了。 */}
-      {locked && (
-        <p
-          style={{
-            margin: 0,
-            fontSize: cssVar('font-size.2xs'),
-            color: cssVar('color.foreground-muted'),
-          }}
-        >
-          {t('web.focus.config.locked')}
-        </p>
-      )}
+        {locked && (
+          <p className="ht-app__focus-settings-locked">{t('web.focus.config.locked')}</p>
+        )}
       </fieldset>
     </details>
   );
@@ -172,28 +127,11 @@ export function FocusTimer() {
   const focus = useFocusStore();
   const tasks = useTaskStore();
   const [now, setNow] = useState(() => Date.now());
-  /**
-   * 关联任务 = **共享选中里那一条任务**（`../../lib/selection.js`），
-   * 不是这个组件的第二份 `useState`。
-   *
-   * 🔴 这一行以前是 `const [selectedTaskId, setSelectedTaskId] = useState(…)`，
-   * 被 `check:selection-single-source` 的断言 B 点名（"宿主里不许再长出本地选中态"）。
-   * 它答的恰好就是那条判据最在意的那个问题 ——「选中的实体没了怎么办」：
-   * 被关联的那条任务在别处删掉之后，本地那份值还停在原来的 id 上，
-   * `<select>` 找不到对应项就把第一项（「不关联」）画出来，于是**界面说没关联、
-   * 按开始却仍把这一段记到那条已经不存在的任务上**。共享选中由
-   * `pruneSelectionFromEntities` 在实体消失时清掉 —— 这份回落只有一处。
-   *
-   * 🔴 中途不换：计时进行中下拉是灰的，而且显示的是**这一轮的归属**
-   * （领域状态里的 `taskId`，`start()` 那一刻就冻结了）。跟着共享选中走会让
-   * "跑着的这一段记在谁头上"在界面上变脸，而落盘读的始终是领域状态。
-   *
-   * 选择本身不启动计时（与 mobile 的"选中即开始"不同）：只有点共享面板的开始
-   * 按钮时才把这份值交给领域状态机。
-   */
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [configOpen, setConfigOpen] = useState(false);
+  const pickerRef = useRef<HTMLDivElement | null>(null);
   const selectedTaskId = useSelected('task');
 
-  // 本地重绘节拍。**不参与计时计算** —— 剩余量永远由领域层重算。
   useEffect(() => {
     if (focus.state.phase !== 'running') return;
     const h = setInterval(() => {
@@ -204,49 +142,122 @@ export function FocusTimer() {
     };
   }, [focus.state.phase, focus.tick]);
 
-  // 关联任务：只列未完成的，避免选到一个已经做完的任务。
-  const aliveTasks = Object.values(tasks.entities.tasks).filter(
-    (task) => task.deletedAt === undefined && task.completedAt === undefined,
+  useEffect(() => {
+    if (focus.state.phase !== 'idle') setPickerOpen(false);
+  }, [focus.state.phase]);
+
+  useEffect(() => {
+    if (!pickerOpen) return;
+    const onPointerDown = (e: MouseEvent) => {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
+        setPickerOpen(false);
+      }
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setPickerOpen(false);
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [pickerOpen]);
+
+  const allAliveTasks = Object.values(tasks.entities.tasks).filter(
+    (task) => task.deletedAt === undefined,
   );
+  const pendingTasks = allAliveTasks.filter((task) => task.completedAt === undefined);
 
-  // 🔴 词条表没有 ICU：1 个专注时英文必须走单数兄弟词条（"1 focus sessions" 是坏句子）。
-  const completedText =
-    focus.overview.todayCount === 1
-      ? t('web.focus.completedTodayOne', { count: focus.overview.todayCount })
-      : t('web.focus.completedToday', { count: focus.overview.todayCount });
+  const activeTaskId =
+    (focus.state.phase === 'idle' ? selectedTaskId : focus.state.taskId) ?? '';
+  const linkedTask =
+    activeTaskId === '' ? undefined : allAliveTasks.find((task) => task.id === activeTaskId);
 
-  /**
-   * 落盘失败要说的句子。
-   *
-   * `focus-actions` 的三条校验失败各有自己的**共用词条**（"类型不认识" /
-   * "计划时长必须大于 0" / "缺少产生时间"），它们自成一句话说清了原因，
-   * 所以不再把内部诊断串（`unknown-kind: nap`）摆给用户看。
-   * 认不出来的异常（派发失败、库写不进去）没有码，只能落到那句带 `{reason}` 的
-   * 通用句 —— 那种情况下原始文本是唯一线索，留着比编一句假话好。
-   */
+  const idle = focus.state.phase === 'idle';
+  const defaultPhaseTitle =
+    focus.state.kind === 'work' ? t('web.focus.phase.work') : t('web.focus.phase.break');
+  const targetTitle = linkedTask?.title ?? defaultPhaseTitle;
+
   const saveFailedKey =
     focusLogFailureMessageKey(focus.error?.code) ?? 'web.focus.error.saveFailed';
 
+  const selectTask = (nextId: string): void => {
+    if (!idle) return;
+    const next = nextId === '' ? null : nextId;
+    selection.select('task', next);
+    if (next === null) focus.clearLinkedTask();
+    setPickerOpen(false);
+  };
+
+  const targetHeader = (
+    <div className="ht-app__focus-target-wrap" ref={pickerRef}>
+      <button
+        type="button"
+        className="ht-app__focus-target ht-type-row-title"
+        data-testid="focus-linked-task"
+        disabled={!idle}
+        aria-haspopup="listbox"
+        aria-expanded={pickerOpen}
+        onClick={() => {
+          if (idle) setPickerOpen((prev) => !prev);
+        }}
+      >
+        <span className="ht-app__focus-target-label">{targetTitle}</span>
+        {idle ? <ChevronRight size={ICON_SIZE.sm} aria-hidden="true" /> : null}
+      </button>
+
+      {pickerOpen && idle ? (
+        <div
+          className="ht-app__focus-target-menu"
+          role="listbox"
+          aria-label={t('web.focus.task.label')}
+          data-testid="focus-linked-task-menu"
+        >
+          <button
+            type="button"
+            role="option"
+            aria-selected={activeTaskId === ''}
+            className="ht-app__focus-target-option"
+            data-testid="focus-linked-task-none"
+            onClick={() => selectTask('')}
+          >
+            <span className="ht-app__focus-target-option-text">{t('web.focus.task.none')}</span>
+            {activeTaskId === '' ? <Check size={ICON_SIZE.sm} aria-hidden="true" /> : null}
+          </button>
+          {pendingTasks.map((task) => {
+            const isSelected = activeTaskId === task.id;
+            return (
+              <button
+                key={task.id}
+                type="button"
+                role="option"
+                aria-selected={isSelected}
+                className="ht-app__focus-target-option"
+                data-value={task.id}
+                onClick={() => selectTask(task.id)}
+              >
+                <span className="ht-app__focus-target-option-text">{task.title}</span>
+                {isSelected ? <Check size={ICON_SIZE.sm} aria-hidden="true" /> : null}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
+  );
+
   return (
-    <div
-      className="ht-app__focus"
-      style={{
-        padding: cssVar('space.6'),
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: cssVar('space.4'),
-        width: '100%',
-        flex: 1,
-        minHeight: 0,
-        boxSizing: 'border-box',
-      }}
-    >
+    <div className="ht-app__focus">
       <FocusPanel
         state={focus.state}
         now={now}
         fill
+        header={targetHeader}
+        onTimePress={() => {
+          setConfigOpen((prev) => !prev);
+        }}
+        timePressA11y={t('web.focus.config.title')}
         modeLabels={{
           group: t('web.focus.mode.group'),
           countdown: t('web.focus.mode.countdown'),
@@ -256,9 +267,12 @@ export function FocusTimer() {
           focus.selectMode(mode);
         }}
         labels={{
-          // web 的阶段行只区分工作段 / 休息段（手机端更细，见那边的 labels）——
-          // 文案归属词条表，所以由这一侧注入。
-          phase: (state) => (state.kind === 'work' ? t('web.focus.phase.work') : t('web.focus.phase.break')),
+          phase: (state) =>
+            state.phase === 'paused'
+              ? t('web.focus.pause')
+              : state.phase === 'running' && state.kind !== 'work'
+                ? t('web.focus.phase.break')
+                : undefined,
           primary: (action) =>
             action === 'pause'
               ? t('web.focus.pause')
@@ -273,7 +287,6 @@ export function FocusTimer() {
                 : t('web.focus.a11y.start'),
           abort: t('web.focus.stop'),
           ring: (percent) => t('web.focus.a11y.progress', { percent }),
-          completed: completedText,
           ...(focus.error === undefined
             ? {}
             : { error: t(saveFailedKey, { reason: focus.error.reason }) }),
@@ -288,42 +301,7 @@ export function FocusTimer() {
           void focus.abort();
         }}
       >
-        <FormField
-          id="focus-linked-task"
-          label={t('web.focus.task.label')}
-          layout="stacked"
-        >
-          {(field) => (
-            <div className="ht-input-field__select">
-              <select
-                {...field}
-                data-testid="focus-linked-task"
-                /* idle 时显示"下一轮要关联哪条"（共享选中）；跑起来之后显示**这一轮的**
-                   归属（领域状态），那一轮开始时就冻结了。 */
-                value={(focus.state.phase === 'idle' ? selectedTaskId : focus.state.taskId) ?? ''}
-                disabled={focus.state.phase !== 'idle'}
-                onChange={(e) => {
-                  const next = e.target.value === '' ? null : e.target.value;
-                  selection.select('task', next);
-                  /* 「不关联」必须真的解除：领域层的 `start()` 是 `taskId ?? state.taskId`
-                     （保留上一轮的归属），只传 undefined 清不掉它 —— 不在这里调
-                     `clearLinkedTask()`，下拉说"没关联"而落盘仍记在旧任务上，就是界面在说谎。 */
-                  if (next === null) focus.clearLinkedTask();
-                }}
-              >
-                <option value="">{t('web.focus.task.none')}</option>
-                {aliveTasks.map((task) => (
-                  <option key={task.id} value={task.id}>
-                    {task.title}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown size={ICON_SIZE.sm} aria-hidden="true" />
-            </div>
-          )}
-        </FormField>
-
-        <DurationSettings />
+        <DurationSettings open={configOpen} onToggle={setConfigOpen} />
       </FocusPanel>
     </div>
   );

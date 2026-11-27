@@ -135,6 +135,16 @@ export function selectMode(state: FocusState, mode: FocusMode): FocusState {
 }
 
 /**
+ * 预先关联下一轮要专注的任务（不启动计时）。
+ *
+ * 与 `clearTask` 同样是 **idle 限定**：已开始的专注轮归属已冻结，不允许中途换任务。
+ */
+export function linkTask(state: FocusState, taskId: string | undefined): FocusState {
+  if (state.phase !== 'idle') return state;
+  return { ...state, taskId };
+}
+
+/**
  * 清除关联任务。
  *
  * ⚠️ 与 `selectKind` 同样是 **idle 限定**：已经开始的这一轮，它的归属已经定了。

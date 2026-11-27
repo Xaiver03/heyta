@@ -1142,17 +1142,6 @@ export function AiSettings({
           >
             <h3 className="ht-settings__h3 ht-type-row-title">
               {t('web.ai.settings.features.title')}
-              <SettingsInfoTip
-                testId="tip-ai-features"
-                label={t('web.ai.settings.features.title')}
-                text={
-                  <>
-                    {t('web.ai.settings.features.hintLead')}
-                    <strong>{t('web.ai.settings.features.hintStrong')}</strong>
-                    {t('web.ai.settings.features.hintTail')}
-                  </>
-                }
-              />
             </h3>
 
             {FEATURE_ORDER.map((feature) => {
@@ -1314,16 +1303,6 @@ export function AiSettings({
           <div>
             <h3 className="ht-settings__h3 ht-type-row-title" id="local-api-heading">
               {t('web.ai.settings.localApi.title')}
-              <SettingsInfoTip
-                testId="tip-local-api"
-                label={t('web.ai.settings.localApi.title')}
-                text={
-                  <>
-                    {t('web.ai.settings.localApi.hintLead')}
-                    <strong>{t('web.ai.settings.localApi.hintStrong')}</strong>
-                  </>
-                }
-              />
             </h3>
           </div>
           <span className="ht-ai-settings__scope-badge">

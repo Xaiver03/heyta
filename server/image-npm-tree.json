@@ -1,6 +1,6 @@
 {
   "_what": "镜像生产阶段（`server/Dockerfile` 的 FROM … AS production）会装的那棵依赖树，**由提交物锁 `server/package-lock.json` 导出**。不是清单、不是许可判定 —— 判定在 research/tools/check-image-license-coverage.mjs。",
-  "generatedAt": "2026-10-25T03:14:57Z",
+  "generatedAt": "2026-11-26T13:46:54Z",
   "generator": "research/tools/gen-image-npm-tree.mjs",
   "inputs": {
     "targetPlatform": {
@@ -18,7 +18,7 @@
       "@heyta/sync-core"
     ],
     "packedPackageJsonSha256": {
-      "packages/domain/package.json": "4850bf55b5c40bb37f183f238fdfbf7cddad19b802fd41c9c211b8b1ac7809e7",
+      "packages/domain/package.json": "c4492110980ae6c2db347a0e9b8b57985f4266da179e393a1f7f6a8a42dc07e4",
       "packages/inbound-core/package.json": "3c1c28d70c6c7fe7ad40adce5085eb23a827c2bbb41d040511e25b50d8413647",
       "packages/shared-schema/package.json": "3f21a18ae57c4ba63d7db591af29d7fb99a3a8784cfddb049661cf37f7821e69",
       "packages/sync-core/package.json": "fcb6c2dbe1a0f2abf03923510a2a656fdf588646392f8f6f9b4b24aaa3f8a149"
@@ -30,7 +30,7 @@
       "./domain.tgz",
       "./inbound-core.tgz"
     ],
-    "registryResolvedDeps": 25,
+    "registryResolvedDeps": 26,
     "skippedForOtherPlatform": 12
   },
   "packages": [

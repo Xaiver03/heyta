@@ -1,5 +1,4 @@
 import { ICON_SIZE } from '@heyta/design-system';
-import { SettingsInfoTip } from './SettingsInfoTip.js';
 /**
  * 通行密钥自助管理面板（设置页）
  * ==============================
@@ -189,11 +188,6 @@ export function PasskeyPanel({ active = true }: { active?: boolean }): React.JSX
     <div className="ht-settings" data-testid="passkeys-panel">
       <h2 className="ht-settings__title ht-type-section-title">
         {t('web.passkeys.title')}
-        <SettingsInfoTip
-          testId="tip-passkeys"
-          label={t('web.passkeys.title')}
-          text={t('web.passkeys.lead')}
-        />
       </h2>
 
       {!signedIn ? (

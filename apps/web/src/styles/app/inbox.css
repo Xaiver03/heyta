@@ -391,7 +391,7 @@
   align-items: center;
   gap: var(--ht-space-3);
   padding: var(--ht-space-3) var(--ht-space-2);
-  border-right: 0;
+  border-right: var(--ht-border-width-thin) solid var(--ht-color-border);
   background: var(--ht-color-surface-sunken);
   /*
    * 🔴 2026-10-06（工单 H9）：rail 现在**自己就是视口那一高**，滚动区是 `.ht-rail__tabs`。

@@ -107,17 +107,22 @@ function blur(el: HTMLInputElement): void {
   });
 }
 
-function chooseTask(el: HTMLElement, taskId: string): HTMLSelectElement {
-  // 🔴 2026-10-24：选择器从样式类 `.ht-app__focus-task select` 换成 `data-testid`。
-  //    那一行改走共享 `FormField` 之后，类名不再存在（它本来只是**样式**挂钩）；
-  //    而"关联任务选择框"是**行为契约**，该用 testID 钉，不是用样式类钉。
-  const select = el.querySelector<HTMLSelectElement>('[data-testid="focus-linked-task"]');
-  expect(select, '没找到关联任务选择框').not.toBeNull();
+function chooseTask(el: HTMLElement, taskId: string): HTMLButtonElement {
+  const trigger = el.querySelector<HTMLButtonElement>('[data-testid="focus-linked-task"]');
+  expect(trigger, '没找到关联任务轻入口').not.toBeNull();
   act(() => {
-    select!.value = taskId;
-    select!.dispatchEvent(new Event('change', { bubbles: true }));
+    trigger!.click();
   });
-  return select!;
+  const selector =
+    taskId === ''
+      ? '[data-testid="focus-linked-task-none"]'
+      : `[data-testid="focus-linked-task-menu"] [data-value="${taskId}"]`;
+  const option = el.querySelector<HTMLButtonElement>(selector);
+  expect(option, `任务选择浮层里没找到选项 "${taskId}"`).not.toBeNull();
+  act(() => {
+    option!.click();
+  });
+  return trigger!;
 }
 
 describe('番茄钟时长设置', () => {
@@ -209,9 +214,9 @@ describe('番茄钟关联任务交互', () => {
   it('选择关联任务只更新草稿，不会启动计时', async () => {
     const el = await mount();
 
-    const select = chooseTask(el, 'task-1');
+    const trigger = chooseTask(el, 'task-1');
 
-    expect(select.value).toBe('task-1');
+    expect(trigger.textContent).toContain('写交互说明');
     expect(useFocusStore.getState().state.phase).toBe('idle');
     expect(useFocusStore.getState().state.taskId).toBeUndefined();
   });
@@ -236,12 +241,12 @@ describe('番茄钟关联任务交互', () => {
       el.querySelector<HTMLElement>('[data-testid="focus-primary"]')?.click();
     });
 
-    const select = el.querySelector<HTMLSelectElement>('[data-testid="focus-linked-task"]');
-    expect(select?.matches(':disabled')).toBe(true);
+    const trigger = el.querySelector<HTMLButtonElement>('[data-testid="focus-linked-task"]');
+    expect(trigger?.matches(':disabled')).toBe(true);
     act(() => {
-      select!.value = '';
-      select!.dispatchEvent(new Event('change', { bubbles: true }));
+      trigger?.click();
     });
+    expect(el.querySelector('[data-testid="focus-linked-task-menu"]')).toBeNull();
     expect(useFocusStore.getState().state.taskId).toBe('task-1');
   });
 });

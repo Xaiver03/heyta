@@ -162,6 +162,127 @@
   max-inline-size: 40%;
 }
 
+/* ── 任务行：圆角悬停选中态、三档离散高度副行与 I 字输入光标 ────────────── */
+.ht-content [data-testid^='task-item-'] {
+  padding-inline: var(--ht-space-2);
+  border-radius: var(--ht-radius-md);
+  transition: background-color var(--ht-duration-fast) var(--ht-ease-standard);
+}
+
+.ht-content [data-testid^='task-item-']:not([aria-current='true']):hover {
+  background-color: var(--ht-color-hover);
+}
+
+/* 可直接输入的文本面统一使用 I 字输入光标（cursor: text）。 */
+.ht-content [data-testid^='task-title-'],
+[data-testid='capture-compose'],
+[data-testid='capture-input'],
+[data-testid='task-detail-title'],
+.ht-note-preview,
+[data-testid='task-note-input'] {
+  cursor: text;
+}
+
+/* 离散副行（与标题左边缘对齐）：仅由固定 20px 的单行摘要与单行胶囊组合成固定档高。 */
+.ht-row__subline {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+  margin-block-start: calc(var(--ht-space-1) * -1);
+  padding-block-end: var(--ht-space-2);
+  min-inline-size: 0;
+}
+
+.ht-row__note-preview {
+  display: block;
+  block-size: var(--ht-space-5);
+  line-height: var(--ht-space-5);
+  font-size: var(--ht-font-size-xs);
+  color: var(--ht-color-foreground-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ht-row__tags {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+  block-size: var(--ht-space-5);
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+
+.ht-row__tag {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  block-size: var(--ht-space-5);
+  padding-inline: var(--ht-space-2);
+  border-radius: var(--ht-radius-full);
+  font-size: var(--ht-font-size-xs);
+  line-height: var(--ht-line-height-tight);
+  white-space: nowrap;
+}
+
+.ht-row__tag--1 {
+  background: var(--ht-color-danger-subtle);
+  color: var(--ht-color-danger);
+}
+
+.ht-row__tag--2 {
+  background: var(--ht-color-warning-subtle);
+  color: var(--ht-color-quadrant-3);
+}
+
+.ht-row__tag--3 {
+  background: var(--ht-color-success-subtle);
+  color: var(--ht-color-success);
+}
+
+.ht-row__tag--4 {
+  background: var(--ht-color-info-subtle);
+  color: var(--ht-color-info);
+}
+
+.ht-row__tag--5 {
+  background: var(--ht-color-primary-subtle);
+  color: var(--ht-color-primary);
+}
+
+.ht-row__tag-icon--1 {
+  color: var(--ht-color-danger);
+}
+
+.ht-row__tag-icon--2 {
+  color: var(--ht-color-quadrant-3);
+}
+
+.ht-row__tag-icon--3 {
+  color: var(--ht-color-success);
+}
+
+.ht-row__tag-icon--4 {
+  color: var(--ht-color-info);
+}
+
+.ht-row__tag-icon--5 {
+  color: var(--ht-color-primary);
+}
+
+.ht-row__title-input {
+  inline-size: 100%;
+  min-inline-size: 0;
+  padding: 0 var(--ht-space-1);
+  margin-inline-start: calc(var(--ht-space-1) * -1);
+  border: var(--ht-border-width-thin) solid transparent;
+  border-radius: var(--ht-radius-sm);
+  background: transparent;
+  color: var(--ht-color-foreground);
+  font: inherit;
+  line-height: var(--ht-line-height-normal);
+}
+
 /*
  * 子菜单（优先级 / 移动到 / 标签）
  * ================================
@@ -281,29 +402,269 @@
  * 三个快捷入口按钮横排：收集箱（移动清单）、文本格式（备注）、更多。
  * 贴在详情面底部，与上方内容用分隔线隔开。
  */
-.ht-detail-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: var(--ht-space-2);
-  margin-block-start: var(--ht-space-4);
-  padding-block-start: var(--ht-space-3);
-  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border);
+/* 主列表顶部快速采集条与下方首个分组头之间留出呼吸间距（`.ht-content` 自身 gap 为 0）。 */
+.ht-content > :has([data-testid='capture-compose']) {
+  margin-block-end: var(--ht-space-3);
 }
 
-.ht-detail-toolbar__btn {
-  display: grid;
-  place-items: center;
-  inline-size: var(--ht-touch-target-min);
+.ht-detail-header {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+  padding-block-end: var(--ht-space-2);
+  margin-block-end: var(--ht-space-3);
+  border-block-end: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+}
+
+.ht-detail-header__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ht-space-1);
+  min-inline-size: var(--ht-touch-target-min);
   block-size: var(--ht-touch-target-min);
-  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  padding-inline: var(--ht-space-2);
+  border: var(--ht-border-width-thin) solid transparent;
   border-radius: var(--ht-radius-md);
-  background: var(--ht-color-surface);
+  background: transparent;
   color: var(--ht-color-foreground-muted);
+  font: inherit;
+  font-size: var(--ht-font-size-xs);
+  white-space: nowrap;
   cursor: pointer;
 }
 
+.ht-detail-header__btn:hover {
+  background: var(--ht-color-hover);
+  color: var(--ht-color-foreground);
+}
+
+.ht-detail-header__btn--active,
+.ht-detail-header__btn[aria-pressed='true'] {
+  background: transparent;
+  color: var(--ht-color-primary);
+}
+
+.ht-detail-header__btn--late {
+  background: transparent;
+  color: var(--ht-color-danger);
+}
+
+.ht-detail-header__priority {
+  margin-inline-start: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+  block-size: var(--ht-touch-target-min);
+  padding-inline: var(--ht-space-2);
+  border-radius: var(--ht-radius-md);
+  color: var(--ht-color-foreground-muted);
+}
+
+.ht-detail-header__priority:hover {
+  background: var(--ht-color-hover);
+}
+
+.ht-detail-header__priority--1 {
+  color: var(--ht-color-primary);
+}
+
+.ht-detail-header__priority--2 {
+  color: var(--ht-color-warning);
+}
+
+.ht-detail-header__priority--3 {
+  color: var(--ht-color-danger);
+}
+
+.ht-detail-header__priority-select {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--ht-color-foreground);
+  font: inherit;
+  font-size: var(--ht-font-size-xs);
+  block-size: var(--ht-touch-target-min);
+  padding-inline-end: var(--ht-space-1);
+  cursor: pointer;
+}
+
+/* 22rem 栏内左右内边距各 space-4（剩 320px），外扩 space-2 后可用 318px ≥ 7×44px（308px），日历格绝不溢出 */
+.ht-detail-popover {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+  margin-inline: calc(var(--ht-space-2) * -1);
+  margin-block-end: var(--ht-space-3);
+  padding: var(--ht-space-2);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-lg);
+  background: var(--ht-color-surface);
+  box-shadow: var(--ht-shadow-md);
+}
+
+.ht-detail-popover--bottom {
+  margin-block-start: var(--ht-space-2);
+  margin-block-end: var(--ht-space-2);
+}
+
+.ht-detail-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+  flex: 1;
+}
+
+.ht-detail-parent-chip {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: var(--ht-space-1);
+  padding-block: var(--ht-space-1);
+  padding-inline: var(--ht-space-2);
+  border: none;
+  border-radius: var(--ht-radius-full);
+  background: var(--ht-color-surface-subtle);
+  color: var(--ht-color-foreground-muted);
+  font: inherit;
+  font-size: var(--ht-font-size-xs);
+  cursor: pointer;
+}
+
+.ht-detail-parent-chip:hover {
+  background: var(--ht-color-hover);
+  color: var(--ht-color-foreground);
+}
+
+.ht-detail-tags-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ht-space-1);
+  padding: var(--ht-space-1) 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.ht-detail-section-title {
+  /* 排版四件套来自语义档位类 `ht-type-caption`（JSX 与本类成对出现）。 */
+  margin: var(--ht-space-3) 0 var(--ht-space-1);
+  color: var(--ht-color-foreground-muted);
+}
+
+.ht-detail-body .ht-compose > .ht-input {
+  border-color: transparent;
+  background: transparent;
+}
+
+.ht-detail-body .ht-compose > .ht-input:hover {
+  background: var(--ht-color-hover);
+}
+
+.ht-detail-body .ht-compose > .ht-input:focus-visible {
+  border-color: var(--ht-color-border-strong);
+  background: var(--ht-color-surface);
+}
+
+.ht-detail-toolbar {
+  position: sticky;
+  inset-block-end: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ht-space-1);
+  margin-block-start: auto;
+  padding-block-start: var(--ht-space-2);
+  padding-block-end: var(--ht-space-1);
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+  background: var(--ht-color-surface);
+}
+
+.ht-detail-toolbar__list-picker {
+  flex: 1 1 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+  min-inline-size: 0;
+  padding-inline: var(--ht-space-1);
+  border-radius: var(--ht-radius-md);
+  color: var(--ht-color-foreground-muted);
+}
+
+.ht-detail-toolbar__list-picker:hover {
+  background: var(--ht-color-hover);
+  color: var(--ht-color-foreground);
+}
+
+.ht-detail-toolbar__list-select {
+  appearance: none;
+  min-inline-size: var(--ht-touch-target-min);
+  max-inline-size: 100%;
+  block-size: var(--ht-touch-target-min);
+  border: none;
+  background: transparent;
+  color: var(--ht-color-foreground);
+  font: inherit;
+  font-size: var(--ht-font-size-xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.ht-detail-toolbar__list-select:disabled {
+  color: var(--ht-color-foreground-subtle);
+  cursor: not-allowed;
+}
+
+.ht-detail-toolbar__actions {
+  flex: 0 0 auto;
+  margin-inline-start: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+}
+
+.ht-btn.ht-detail-toolbar__btn,
+.ht-detail-toolbar__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: var(--ht-space-8);
+  min-inline-size: var(--ht-space-8);
+  block-size: var(--ht-touch-target-min);
+  padding: 0;
+  border: var(--ht-border-width-thin) solid transparent;
+  border-radius: var(--ht-radius-md);
+  background: transparent;
+  color: var(--ht-color-foreground-muted);
+  font: inherit;
+  font-size: var(--ht-font-size-xs);
+  cursor: pointer;
+}
+
+.ht-btn.ht-detail-toolbar__btn > svg,
+.ht-detail-toolbar__btn > svg,
+.ht-btn.ht-detail-header__btn > svg,
+.ht-detail-header__btn > svg {
+  flex-shrink: 0;
+}
+
+.ht-btn.ht-detail-toolbar__btn[aria-pressed='true'],
+.ht-detail-toolbar__btn[aria-pressed='true'] {
+  background: transparent;
+  color: var(--ht-color-primary);
+}
+
+.ht-btn.ht-detail-toolbar__btn:hover,
 .ht-detail-toolbar__btn:hover {
   background: var(--ht-color-hover);
   color: var(--ht-color-foreground);
+}
+
+.ht-detail-toolbar__blocked {
+  margin: var(--ht-space-1) 0;
+  font-size: var(--ht-font-size-xs);
+  color: var(--ht-color-foreground-muted);
 }

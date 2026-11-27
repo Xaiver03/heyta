@@ -376,6 +376,9 @@ async function openRepeatAdvanced(page: import('@playwright/test').Page): Promis
     const pane = paneInColumn(page);
     await expect(pane, '栏里没画面单').toHaveCount(1);
 
+    // 紧凑面单里重复收在顶栏触发器后面：点开才长出编辑本体。
+    await pane.getByTestId('task-detail-repeat-trigger').click();
+
     // 🔴 编辑本体**整页只有一份**，而且它在栏里：行尾那颗 `<summary>` 必须整个不渲染。
     // "行尾只剩徽标"如果只量"徽标在"，就把"两处都能编辑"读成了对 —— 所以两半都要量。
     await expect(page.getByTestId('task-repeat-custom-input')).toHaveCount(1);
@@ -393,6 +396,8 @@ async function openRepeatAdvanced(page: import('@playwright/test').Page): Promis
     await openApp(page, '/?lang=zh-CN');
     await switchView(page, '任务');
     await page.locator('[data-testid^="task-row-"]').first().click();
+    // 重开面单后重新点开重复浮层，才能再看到那只编辑本体。
+    await pane.getByTestId('task-detail-repeat-trigger').click();
 
     const badge = page.getByTestId('task-chip-repeat');
     await expect(badge, '写过重复规则而列表上没有痕迹 ⇒ 搬进栏里把这件事弄丢了').toHaveCount(1);
@@ -424,6 +429,8 @@ async function openRepeatAdvanced(page: import('@playwright/test').Page): Promis
        同一件事现在是：**点行 ⇒ 对话框开 ⇒ 重复的编辑本体在面单里、真画得出来**。
        实测（900×600）：面单 590 宽，自定义 RRULE 那只框 558×44。 */
     const pane = await openNarrowTaskPane(page, '窄档重复甲');
+    // 紧凑面单里重复收在顶栏触发器后面：点开才长出编辑本体。
+    await pane.getByTestId('task-detail-repeat-trigger').click();
     const paneBox = await paintedBox(page, pane);
     await expect(pane.getByTestId('task-repeat-custom-input'), '面单里没有重复的编辑本体').toHaveCount(1);
     // ⚠️ 原始 RRULE 框收在「高级」里（W6），默认折叠 ⇒ 判"写不写得进去"必须先展开。
@@ -460,7 +467,9 @@ async function openRepeatAdvanced(page: import('@playwright/test').Page): Promis
     await page.getByTestId('task-chip-repeat').first().scrollIntoViewIfNeeded();
     await page.screenshot({ path: SHOT('t7-narrow-repeat-chip-on-row') });
     // 再补一张面单里的那一格（判据量的是"它在面单里"，行上那张图看不见它）。
-    await openNarrowTaskPane(page, '窄档重复甲');
+    const paneAgain = await openNarrowTaskPane(page, '窄档重复甲');
+    // 重开面单后重新点开重复浮层，才能拍到那只编辑本体。
+    await paneAgain.getByTestId('task-detail-repeat-trigger').click();
     await openRepeatAdvanced(page);
     await page.screenshot({ path: SHOT('t7-narrow-repeat-in-dialog') });
     await parkCursor(page);
@@ -508,6 +517,9 @@ async function openRepeatAdvanced(page: import('@playwright/test').Page): Promis
     const pane = paneInColumn(page);
     await expect(pane, '栏里没画面单').toHaveCount(1);
 
+    // 紧凑面单里子任务收在底栏触发器后面：点开才长出那只 select。
+    await pane.getByTestId('task-detail-subtask-trigger').click();
+
     // 🔴 整页只有一只 `<select>`，且它在栏里。只量"栏里有"会把"两处都能编辑"读成对。
     const selectEverywhere = page.locator('[data-testid^="subtask-select-"]');
     await expect(selectEverywhere, '子任务的 select 不止一只 ⇒ 两处可编辑（两套写入语义迟早漂）').toHaveCount(1);
@@ -529,6 +541,8 @@ async function openRepeatAdvanced(page: import('@playwright/test').Page): Promis
     await openApp(page, '/?lang=zh-CN');
     await switchView(page, '任务');
     await rowOf(page, '子任务子乙').click();
+    // 重开面单后重新点开子任务浮层，才能再看到那只 select。
+    await pane.getByTestId('task-detail-subtask-trigger').click();
 
     const badge = page.locator('[data-testid^="task-subtask-badge-"]');
     await expect(badge, '改过父而列表上没有痕迹 ⇒ 搬进栏里把这件事弄丢了').toHaveCount(1);
@@ -546,6 +560,8 @@ async function openRepeatAdvanced(page: import('@playwright/test').Page): Promis
       没有这一段，S5 在真浏览器层是盲区（jsdom 有它的用例，浏览器这一层今天也得有）。
     */
     await rowOf(page, '子任务父甲').click();
+    // 换选中之后浮层状态可能重置：再点一次触发器，才能读父任务的候选。
+    await pane.getByTestId('task-detail-subtask-trigger').click();
     const parentOptions = await pane
       .locator('[data-testid^="subtask-select-"]')
       .first()
@@ -582,6 +598,8 @@ async function openRepeatAdvanced(page: import('@playwright/test').Page): Promis
        实测（900×600）：面单 590 宽，那只 select 558×44，候选是
        `["（顶级任务）","窄档子任务父"]`。 */
     const pane = await openNarrowTaskPane(page, '窄档子任务子');
+    // 紧凑面单里子任务收在底栏触发器后面：点开才长出那只 select。
+    await pane.getByTestId('task-detail-subtask-trigger').click();
     const paneBox = await paintedBox(page, pane);
     const select = pane.locator('[data-testid^="subtask-select-"]').first();
     const box = await paintedBox(page, select);
@@ -613,6 +631,8 @@ async function openRepeatAdvanced(page: import('@playwright/test').Page): Promis
     await badge.scrollIntoViewIfNeeded();
     await page.screenshot({ path: SHOT('t9-narrow-subtask-chip-on-row') });
     const paneAfter = await openNarrowTaskPane(page, '窄档子任务子');
+    // 重开面单后重新点开子任务浮层，才能读到那只 select。
+    await paneAfter.getByTestId('task-detail-subtask-trigger').click();
     await expect(
       paneAfter.locator('[data-testid^="subtask-select-"]').first().locator('option:checked'),
       '刷新后面单里选中的不是那个父任务（这一格读回来是空的）',
@@ -635,6 +655,9 @@ async function openRepeatAdvanced(page: import('@playwright/test').Page): Promis
     await rowOf(page, '提醒甲').click();
     const pane = paneInColumn(page);
     await expect(pane, '栏里没画面单').toHaveCount(1);
+
+    // 紧凑面单里提醒收在顶栏触发器后面：点开才长出提醒列表。
+    await pane.getByTestId('task-detail-reminder-trigger').click();
 
     // 🔴 整页只有一份提醒列表，且它在栏里。只量"栏里有"会把"两处都能编辑"读成对。
     const listEverywhere = page.locator('[data-testid^="reminder-list-"]');
@@ -675,6 +698,8 @@ async function openRepeatAdvanced(page: import('@playwright/test').Page): Promis
     //   "行尾此刻画的是 chip 而不是徽标"，不是"op 没落"。下面那句"整页一份列表"本来
     //   就要求先选中（它自己的注释写着），两件事现在共用同一个前提。
     await rowOf(page, '提醒甲').click();
+    // 重开面单后重新点开提醒浮层，才能再看到那份列表。
+    await pane.getByTestId('task-detail-reminder-trigger').click();
     await expect(
       page.locator('[data-testid^="task-reminder-badge-"]'),
       '那次点击没落成 op（重新选中之后行上仍没有提醒徽标）',
@@ -713,6 +738,8 @@ async function openRepeatAdvanced(page: import('@playwright/test').Page): Promis
        保留下来的三条实质判据一条没改口径：**入口在不在、值写没写进去、刷新后行上读得到**。
        实测（900×600）：面单 590 宽，「1 小时后提醒」那枚按钮 111×44。 */
     const pane = await openNarrowTaskPane(page, '窄档提醒乙');
+    // 紧凑面单里提醒收在顶栏触发器后面：点开才长出提醒列表。
+    await pane.getByTestId('task-detail-reminder-trigger').click();
     await expect(
       pane.locator('[data-testid^="reminder-list-"]').first(),
       '面单里没有提醒列表 ⇒ 这一档建不了提醒',
@@ -767,6 +794,9 @@ async function openRepeatAdvanced(page: import('@playwright/test').Page): Promis
     const pane = paneInColumn(page);
     await expect(pane, '栏里没画面单').toHaveCount(1);
 
+    // 紧凑面单里截止收在顶栏触发器后面：点开才长出月历。
+    await pane.getByTestId('task-detail-due-trigger').click();
+
     // 🔴 整页只有一份月历，且它在栏里。只量"栏里有"会把"两处都能编辑"读成对。
     // ⚠️ 不用 `toBeContainedIn`：这台套件的**类型**里有那枚匹配器、**跑起来的这份**没有
     //    （`TypeError: expect(...).toBeContainedIn is not a function`，而 `tsc -p
@@ -775,8 +805,6 @@ async function openRepeatAdvanced(page: import('@playwright/test').Page): Promis
     const picker = page.getByTestId('date-picker');
     await expect(picker, '月历不止一份 ⇒ 截止两处可编辑').toHaveCount(1);
     await expect(pane.locator('[data-testid="date-picker"]'), '栏里没有那份月历').toHaveCount(1);
-    // 这一格**要**宿主给区块头（与提醒那一格相反：`ReminderList` 自带，共享 `DatePicker` 不带）。
-    await expect(pane.getByText('截止', { exact: true }), '「截止」区块头不止一处，或整个没有').toHaveCount(1);
 
     // 这一格与前四格**不同形**：宽档行尾不留徽标，整块不画。
     // 截止的显示另有其人（共享行的元信息条 `task-meta`），下面第 ③ 段量的就是它。
@@ -817,7 +845,7 @@ async function openRepeatAdvanced(page: import('@playwright/test').Page): Promis
     const md = /(\d+)月(\d+)日/.exec(dayLabel)!;
     const compact = `${md[1]!.padStart(2, '0')}-${md[2]!.padStart(2, '0')}`;
     await cell.click();
-    const meta = rowOf(page, '截止甲').getByTestId('task-meta');
+    const meta = rowItemOf(page, '截止甲').getByTestId('task-meta');
     await expect(meta, `栏里点了 ${dayLabel} 而行上没写着 ${compact}`).toContainText(compact);
 
     await parkCursor(page);
@@ -836,12 +864,16 @@ async function openRepeatAdvanced(page: import('@playwright/test').Page): Promis
       '翻月没生效：本月 18 日还在格子里',
     ).toHaveCount(0);
     await rowOf(page, '截止乙·不选日期').click();
+    // 换选中之后浮层重置：再点一次截止触发器，才能读到新任务的月历。
+    await pane.getByTestId('task-detail-due-trigger').click();
     await expect(
       pane.locator(`[role="button"][aria-label="${dayLabel}"]`),
       '换选中后栏里还停在上一条浏览到的那个月 ⇒ `DueField` 少了 key',
     ).toHaveCount(1);
     // 换回甲（它自己定在 `dayLabel` 那个月）⇒ 月历落在它自己那个月，不是上一条看的那个月。
     await rowOf(page, '截止甲').click();
+    // 再换回甲，同样先点开截止浮层。
+    await pane.getByTestId('task-detail-due-trigger').click();
     await expect(
       pane.locator(`[role="button"][aria-label="${dayLabel}"]`),
       '换回甲之后月历没落在它自己那个月',
@@ -851,7 +883,7 @@ async function openRepeatAdvanced(page: import('@playwright/test').Page): Promis
     await openApp(page, '/?lang=zh-CN');
     await switchView(page, '任务');
     await expect(
-      rowOf(page, '截止甲').getByTestId('task-meta'),
+      rowItemOf(page, '截止甲').getByTestId('task-meta'),
       '那次点击没落成 op（刷新后行上读不到日期）',
     ).toContainText(compact);
     expect(errors, `界面里有控制台错误：\n${errors.join('\n')}`).toEqual([]);
@@ -875,6 +907,8 @@ async function openRepeatAdvanced(page: import('@playwright/test').Page): Promis
        面单里的月历是流内内容（与 T12 宽档同一份 `DatePicker`），没有 Portal、不会"一滚就关"。
        实测（900×600）：面单 590 宽，月历 558×487。 */
     const pane = await openNarrowTaskPane(page, '窄档截止乙');
+    // 紧凑面单里截止收在顶栏触发器后面：点开才长出月历。
+    await pane.getByTestId('task-detail-due-trigger').click();
     const paneBox = await paintedBox(page, pane);
     const picker = pane.getByTestId('date-picker');
     await expect(picker, '面单里没有月历 ⇒ 这一档改不了截止').toHaveCount(1);
@@ -895,7 +929,7 @@ async function openRepeatAdvanced(page: import('@playwright/test').Page): Promis
     const compact = `${md[1]!.padStart(2, '0')}-${md[2]!.padStart(2, '0')}`;
     await cell.click();
     await expect(
-      rowOf(page, '窄档截止乙').getByTestId('task-meta'),
+      rowItemOf(page, '窄档截止乙').getByTestId('task-meta'),
       `窄档点了 ${dayLabel} 而行上没写着 ${compact}`,
     ).toContainText(compact);
     /* 🔴 拍之前把那一行**滚进视野中间**：这一趟没有行尾面板需要收起，但 900×600 下
@@ -913,7 +947,7 @@ async function openRepeatAdvanced(page: import('@playwright/test').Page): Promis
        而那颗触发器已经不存在了 —— 截止的**显示**一直在共享元信息条 `task-meta` 上
        （`TaskDetailCard` 与 `DueEditor` 文件头那张表的第三行），刷新后从那里读同一件事。 */
     await expect(
-      rowOf(page, '窄档截止乙').getByTestId('task-meta'),
+      rowItemOf(page, '窄档截止乙').getByTestId('task-meta'),
       '窄档那次点击没落成 op（刷新后行上读不到日期）',
     ).toContainText(compact);
     expect(errors, `界面里有控制台错误：\n${errors.join('\n')}`).toEqual([]);
@@ -985,10 +1019,6 @@ async function openRepeatAdvanced(page: import('@playwright/test').Page): Promis
     const select = page.getByTestId('organize-project-select');
     await expect(select, '清单下拉不止一份 ⇒ 整理两处可编辑').toHaveCount(1);
     await expect(pane.getByTestId('organize-project-select'), '栏里没有那份清单下拉').toHaveCount(1);
-    // 🔴 这一格**自带两个区块头** ⇒ 宿主不许再叠：数的是"那个词出现几次"，
-    //    写成"标题在不在"永远抓不到多写（§8.145 的 M2 同一把尺）。
-    await expect(pane.getByText('清单', { exact: true }), '「清单」区块头不止一处，或整个没有').toHaveCount(1);
-    await expect(pane.getByText('标签', { exact: true }), '「标签」区块头不止一处，或整个没有').toHaveCount(1);
     // 行尾那支整块不画（宽档）：触发器一只都不许有。
     await expect(
       page.getByTestId('task-organize-summary'),
@@ -996,12 +1026,12 @@ async function openRepeatAdvanced(page: import('@playwright/test').Page): Promis
     ).toHaveCount(0);
 
     // ── 承重 ①：在栏里选清单 ⇒ **行的元信息槽**写着那条清单 ──────────────
-    await expect(rowOf(page, '整理甲').getByTestId('task-meta'), '起始态就带着清单名 ⇒ 后面的断言永真').not.toContainText(
+    await expect(rowItemOf(page, '整理甲').getByTestId('task-meta'), '起始态就带着清单名 ⇒ 后面的断言永真').not.toContainText(
       '整理清单一',
     );
     await select.selectOption({ label: '整理清单一' });
     await expect(
-      rowOf(page, '整理甲').getByTestId('task-meta'),
+      rowItemOf(page, '整理甲').getByTestId('task-meta'),
       '栏里选了清单，行上的元信息槽却没写',
     ).toContainText('整理清单一');
 
@@ -1018,6 +1048,7 @@ async function openRepeatAdvanced(page: import('@playwright/test').Page): Promis
        点击那一刻 React 手上仍是旧 `tagIds`，重渲染把 DOM 勾选态按回去 ⇒
        Playwright 报 `Clicking the checkbox did not change its state`（**假红**：op 已派发）。
        判据要看的是**结果**（行上真长出了 chip），不是控件此刻的勾选态。 */
+    await pane.getByTestId('task-detail-tag-trigger').click();
     await pane
       .getByRole('checkbox', { name: '给任务「整理甲」加上或去掉标签「整理标签一」' })
       .click();
@@ -1037,7 +1068,7 @@ async function openRepeatAdvanced(page: import('@playwright/test').Page): Promis
     // ⚠️ 选中态**不跨刷新**：不重新点那一行，栏里什么都没有，"没有第二处"会被读成"没有重复"。
     await rowOf(page, '整理甲').click();
     await expect(
-      rowOf(page, '整理甲').getByTestId('task-meta'),
+      rowItemOf(page, '整理甲').getByTestId('task-meta'),
       '刷新后归属没了 ⇒ 栏里那次选择没落成 op',
     ).toContainText('整理清单一');
     await expect(
@@ -1079,14 +1110,17 @@ async function openRepeatAdvanced(page: import('@playwright/test').Page): Promis
        同一件事现在是：**点行 ⇒ 对话框开 ⇒ 清单下拉与标签勾选框在面单里、真画得出来**。
        实测（900×600）：面单 590 宽，清单下拉 558×44。 */
     const pane = await openNarrowTaskPane(page, '整理窄档乙');
-    const paneBox = await paintedBox(page, pane);
     const select = pane.getByTestId('organize-project-select');
     await expect(select, '面单里没有清单下拉 ⇒ 这一档归不了类').toHaveCount(1);
     const box = await paintedBox(page, select);
     expect(
       box.width,
-      `面单里那只清单下拉只有 ${String(box.width)}px 宽（面单 ${String(paneBox.width)}px）—— 画不出来`,
-    ).toBeGreaterThan(paneBox.width * 0.6);
+      `面单底栏里那只清单下拉只有 ${String(box.width)}px 宽 —— 缩成了不可点碎条`,
+    ).toBeGreaterThanOrEqual(44);
+    expect(
+      box.height,
+      `面单底栏里那只清单下拉只有 ${String(box.height)}px 高 —— 不足触控目标档位`,
+    ).toBeGreaterThanOrEqual(44);
     // 🔴 窄档整页也只许一份编辑本体（只量"面单里有"会把"两处都能编辑"读成对）。
     await expect(
       page.getByTestId('organize-project-select'),
@@ -1095,12 +1129,12 @@ async function openRepeatAdvanced(page: import('@playwright/test').Page): Promis
 
     // ── 承重 ①：在面单里选清单 ⇒ **行的元信息槽**写着那条清单 ──────────────
     await expect(
-      rowOf(page, '整理窄档乙').getByTestId('task-meta'),
+      rowItemOf(page, '整理窄档乙').getByTestId('task-meta'),
       '起始态就带着清单名 ⇒ 后面的断言永真',
     ).not.toContainText('整理清单乙');
     await select.selectOption({ label: '整理清单乙' });
     await expect(
-      rowOf(page, '整理窄档乙').getByTestId('task-meta'),
+      rowItemOf(page, '整理窄档乙').getByTestId('task-meta'),
       '窄档选了清单而行上没写',
     ).toContainText('整理清单乙');
 
@@ -1112,6 +1146,7 @@ async function openRepeatAdvanced(page: import('@playwright/test').Page): Promis
     // 🔴 用 `click()` 不用 `check()`：受控复选框 + async `dispatchIntent`
     //    ⇒ Playwright 会报 `Clicking the checkbox did not change its state`（假红，op 已派发）。
     //    判据看的是**结果**（行上真长出了 chip），不是控件此刻的勾选态。
+    await pane.getByTestId('task-detail-tag-trigger').click();
     await pane
       .getByRole('checkbox', { name: '给任务「整理窄档乙」加上或去掉标签「整理标签乙」' })
       .click();
@@ -1130,7 +1165,7 @@ async function openRepeatAdvanced(page: import('@playwright/test').Page): Promis
     await openApp(page, '/?lang=zh-CN');
     await switchView(page, '任务');
     await expect(
-      rowOf(page, '整理窄档乙').getByTestId('task-meta'),
+      rowItemOf(page, '整理窄档乙').getByTestId('task-meta'),
       '窄档那次选择没落成（刷新后行上读不到归属）',
     ).toContainText('整理清单乙');
     await expect(

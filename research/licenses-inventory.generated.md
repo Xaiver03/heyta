@@ -4,12 +4,12 @@
 > 重新生成：`node research/tools/render-license-inventory.mjs`
 > 数据来源：**实际安装的依赖树**（pnpm store），不是 lockfile 的声明。
 > 去重口径：`包名@版本`（同名多版本分别登记）。
-> lockfile 指纹：`36b9f0d3f1a2c73c`（清单在这把指纹下渲染；对账：`node research/tools/render-license-inventory.mjs --check-stamp`）
-> 渲染输入集：pnpm store 去重后 **1099** 枚，逐枚都能在当前 lockfile 里查到（对账：`node research/tools/license-inventory.mjs`，它同时是 `pnpm check:licenses`）。
+> lockfile 指纹：`71d7ec7916eb848d`（清单在这把指纹下渲染；对账：`node research/tools/render-license-inventory.mjs --check-stamp`）
+> 渲染输入集：pnpm store 去重后 **1104** 枚，逐枚都能在当前 lockfile 里查到（对账：`node research/tools/license-inventory.mjs`，它同时是 `pnpm check:licenses`）。
 
-生成时间：2026-11-23
+生成时间：2026-11-26
 
-**总计 1099 个包** —— 宽松许可 1097，受限 0，无许可证 0，白名单外已登记 2。
+**总计 1104 个包** —— 宽松许可 1102，受限 0，无许可证 0，白名单外已登记 2。
 
 准入门槛（见 THIRD_PARTY_LICENSES.md）：许可允许闭源商用；且 2021 年后仍在更新。
 
@@ -30,7 +30,7 @@
 - **PSF-2.0**（`argparse@3.0.4`）：argparse@3.0.4：markdown-it 的传递依赖（仅用于其 CLI 入口），PSF-2.0 是 Python 软件基金会许可证，语义等同 BSD-2-Clause（宽松、仅要求保留版权声明），不在禁止名单内。
 - **CC-BY-4.0**（`caniuse-lite@1.0.30001812`）：caniuse-lite@1.0.30001812：browserslist 的**构建期数据包**，不进入运行时产物；CC-BY 是署名许可（不是禁用的 CC-BY-NC），归属已在 THIRD_PARTY_LICENSES.md §2 登记。
 
-### 📋 全部依赖（1099 个）
+### 📋 全部依赖（1104 个）
 
 这一段是**全量底稿**：上面两节的所有结论都能在这里逐行核到。严格按包名排序（`localeCompare`），同名多版本分行列出。
 
@@ -934,11 +934,13 @@
 | `react-native-safe-area-context` | 5.10.0 | MIT |
 | `react-native-svg` | 15.15.5 | MIT |
 | `react-native-web` | 0.21.3 | MIT |
+| `react-native-webview` | 14.0.1 | MIT |
 | `react-refresh` | 0.14.2 | MIT |
 | `react-refresh` | 0.18.0 | MIT |
 | `react-remove-scroll` | 2.7.2 | MIT |
 | `react-remove-scroll-bar` | 2.3.8 | MIT |
 | `react-style-singleton` | 2.2.3 | MIT |
+| `read-excel-file` | 9.3.20 | MIT |
 | `readable-stream` | 3.6.2 | MIT |
 | `readdirp` | 3.6.0 | MIT |
 | `readdirp` | 4.1.2 | MIT |
@@ -972,6 +974,7 @@
 | `safe-regex2` | 5.1.1 | MIT |
 | `safe-stable-stringify` | 2.5.0 | MIT |
 | `safer-buffer` | 2.1.2 | MIT |
+| `saxen` | 11.2.0 | MIT |
 | `saxes` | 6.0.0 | ISC |
 | `scheduler` | 0.28.0 | MIT |
 | `scheduler` | 0.27.0 | MIT |
@@ -1083,6 +1086,7 @@
 | `unicode-property-aliases-ecmascript` | 2.2.0 | MIT |
 | `universalify` | 0.1.2 | MIT |
 | `unpipe` | 1.0.0 | MIT |
+| `unzipper-esm` | 0.13.3 | MIT |
 | `update-browserslist-db` | 1.3.3 | MIT |
 | `use-callback-ref` | 1.3.3 | MIT |
 | `use-sidecar` | 1.1.3 | MIT |
@@ -1111,6 +1115,7 @@
 | `which` | 2.0.2 | ISC |
 | `which-module` | 2.0.1 | ISC |
 | `why-is-node-running` | 2.3.0 | MIT |
+| `worker-f` | 0.1.25 | MIT |
 | `wrap-ansi` | 6.2.0 | MIT |
 | `wrap-ansi` | 7.0.0 | MIT |
 | `wrappy` | 1.0.2 | ISC |

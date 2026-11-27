@@ -133,6 +133,7 @@ heyta 是一个**本地优先**的任务管理应用，目标是做一个功能�
 | [`docs/agents/entry-layers.md`](docs/agents/entry-layers.md) | **入口分层**：一个动作该从哪一层出来（全局 / 视图 / 对象 / 字段）+ 六条可判红的放置规则 | 加任何按钮、菜单项、快捷键、设置项之前 |
 | [`docs/agents/environment-traps-index.md`](docs/agents/environment-traps-index.md) | **环境陷阱索引**：号段 → 主题；三条元规则 | 排查"本地过、容器不过" |
 | [`docs/agents/workflow-rules.md`](docs/agents/workflow-rules.md) | **工作流 26 条**：对账 / 安全判据 / 同步语义 / 提醒回执 / iOS 验收纪律 / **§26 隐私合规不当否决理由** | 做任何实质改动 |
+| [`docs/agents/ai-generated-code-review.md`](docs/agents/ai-generated-code-review.md) | **AI 生成代码检视规则**：幻觉依赖 / 越权 / 硬编码密钥-ID / 空断言 / 只测正常流 / 顺序依赖；附[用例可用性清单](docs/agents/ai-generated-test-usability-checklist.md)与机械校验 `pnpm check:ai-case-usability` | 检视 AI 产出的代码或用例、收 AI 生成用例进回归前 |
 | [`docs/agents/progress-log.md`](docs/agents/progress-log.md) | **当前进度**：阶段表 / 并行轨道 / 已知边界 | 知道做到哪了、下一步做什么 |
 | [`docs/agents/key-decisions.md`](docs/agents/key-decisions.md) | **已定的关键决策**：ADR 摘要 + 每条的红线 | 改架构、改产品边界前 |
 | [`docs/agents/history-a-2026-10-03.md`](docs/agents/history-a-2026-10-03.md) | **历史交付记录 · 上半**（2026-10-03 倒数纪念日批次二）：逐批交付与判据 | 考古、找"这事以前怎么做的" |

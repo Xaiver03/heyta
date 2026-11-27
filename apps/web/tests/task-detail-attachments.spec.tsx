@@ -168,27 +168,23 @@ afterEach(() => {
 });
 
 describe('附件区挂载在详情面上（判据 ②：去掉挂载点 ⇒ 这一族必须红）', () => {
-  it('🔴 选中一条任务 ⇒ 栏里有「附件」区、空态与「添加附件」入口', async () => {
+  it('🔴 无附件时不画附件区（底栏仍有「添加附件」入口），加一个后附件区才出现', async () => {
     const id = await addTask('附件挂载点');
     selection.select('task', id);
     mount();
 
     const box = pane();
-    // 区域头借的是移动端那条词条（`packages/i18n` 是黑名单，不许新起 web 词条）。
-    expect(box.querySelector('[data-testid="task-detail-attachments"]')?.textContent).toContain(
-      zhCN['mobile.detail.attachments.title'],
-    );
-    expect(
-      box.querySelector('[data-testid="task-attachments"]'),
-      '附件区没画出来 —— 判据 ② 的形态：把 TaskDetailCard 里那行 <AttachmentField/> 删掉，这里会当场红',
-    ).not.toBeNull();
-    // 空态走的是**共享** EmptyState（`check:empty-state` 的唯一修法），它的 testID 由宿主传进去。
-    expect(box.querySelector('[data-testid="task-attachments-empty"]')?.textContent).toBe(
-      zhCN['mobile.detail.attachments.empty'],
-    );
-    expect(box.querySelector('[data-testid="attachment-add"]')?.textContent).toContain(
-      zhCN['mobile.detail.attachments.add'],
-    );
+    // 底栏的添加入口常驻：还没有附件时也能从这里加。
+    expect(box.querySelector('[data-testid="attachment-add"]'), '底栏的「添加附件」入口没画出来').not.toBeNull();
+    // 正文不渲染空态，也不渲染附件区本身 —— 没有内容就不占版面。
+    expect(box.querySelector('[data-testid="task-attachments-empty"]'), '无附件时不该渲染空态').toBeNull();
+    expect(box.querySelector('[data-testid="task-detail-attachments"]'), '无附件时不该渲染附件区').toBeNull();
+
+    await chooseFile('测试.pdf', 'abc');
+
+    // 加进来之后附件区与列表才出现（判据 ② 的形态：删掉挂载点这里会红）。
+    expect(box.querySelector('[data-testid="task-detail-attachments"]'), '加附件后附件区没出现').not.toBeNull();
+    expect(box.querySelector('[data-testid="task-attachments"]'), '加附件后附件列表没出现').not.toBeNull();
   });
 
   it('🔴 判据 ② 的源码钉子：面单里那一行挂载点还在（挪走/注释掉即红）', async () => {

@@ -39,6 +39,7 @@ import { hasShareSignalSink } from '../src/lib/share-signal-sink.js';
 import { openSettingsViaAvatar } from './open-settings-via-avatar.js';
 import { LocaleHost } from '../src/lib/locale-host.js';
 import { emptyState } from '@heyta/op-log';
+import { Quadrant } from '@heyta/domain';
 
 import { useTaskStore } from '../src/features/tasks/store.js';
 import { useProjectStore } from '../src/features/projects/store.js';
@@ -307,11 +308,10 @@ describe('侧栏导航', () => {
     });
     expect(titleEl(), '点「今天」之后标题应当跟着筛选走').toBe('今天');
 
-    // ① 侧栏里那行重复的「收集箱」必须不在（不是"渲染了但看不见"）。
-    expect(
-      navEntry(container!, '收集箱'),
-      '侧栏不该再有「收集箱」那一行 —— 与页头同名，是同一个目的地的两个入口',
-    ).toBeUndefined();
+    // ① 侧栏左上角智能清单含「收集箱」入口，与「今天 / 最近 7 天」同组。
+    const inbox = navEntry(container!, '收集箱');
+    expect(inbox, '侧栏左上角缺少「收集箱」智能清单入口').toBeDefined();
+    expect(inbox!.getAttribute('aria-current'), '停在「今天」时「收集箱」不应高亮').toBe('false');
 
     // 离开任务视图。
     await act(async () => {
@@ -373,11 +373,11 @@ describe('侧栏导航', () => {
         (b) => b.textContent?.trim() === name,
       );
 
-    // ① 先钉住**该保留**的那一半：任务视图里点象限，标题就该是象限名。
-    const q2 = navEntry(container!, '重要不紧急');
-    expect(q2, '侧栏缺少「重要不紧急」入口').toBeDefined();
+    // ① 先钉住**该保留**的那一半：任务视图里按象限筛选，标题就该是象限名。
+    //    2026-11-27：侧栏那组「四象限」入口已移除（四象限只在四象限视图里看），
+    //    所以这里不再点侧栏按钮，改为直接落一个象限筛选。
     await act(async () => {
-      q2!.click();
+      useTaskStore.getState().setFilter({ kind: 'quadrant', quadrant: Quadrant.ImportantNotUrgent });
     });
     expect(titleEl()).toBe('重要不紧急');
 
@@ -1053,18 +1053,16 @@ describe('信息架构：rail / sidebar / header 的分工', () => {
     ).toBeNull();
   });
 
-  it('侧栏那一节叫「四象限」，且四个象限都在（产品负责人 2026-09-29 定的名字）', async () => {
+  it('侧栏不再列「四象限」那组筛选（2026-11-27：四象限只在四象限视图里看）', async () => {
     const { container } = await mountApp();
     const sidebar = container.querySelector('.ht-sidebar');
     const text = sidebar!.textContent ?? '';
-    // 🔴 名字就应该是「四象限」—— 侧栏列的就是那四个象限，名字直说。
-    //
-    // ⚠️ 我一度改成「按象限筛选」（理由是它与 rail 里的**四象限视图**同名，
-    //    而点它其实会 `setView('tasks')`）。产品负责人否掉了那个改法：
-    //    **同名冲突是真的，但解法不是把用户认得的词从侧栏拿掉。**
-    expect(text, '侧栏那节应当叫「四象限」').toContain('四象限');
+    // 🔴 2026-11-27 产品负责人：「四象限视图只需要在四象限当中显示，不需要单独在这个收集箱当中显示」。
+    //    任务视图（收集箱/今天/最近 7 天）的侧栏不再承载象限筛选 —— 象限只在
+    //    rail 的「四象限」视图里看。这条取代了 2026-09-29「侧栏就叫四象限、四个都在」那版。
+    expect(text, '任务侧栏不该再有「四象限」分组标题').not.toContain('四象限');
     for (const q of ['重要且紧急', '重要不紧急', '紧急不重要', '不重要不紧急']) {
-      expect(text, `缺少象限「${q}」`).toContain(q);
+      expect(text, `任务侧栏不该再出现象限「${q}」`).not.toContain(q);
     }
   });
 

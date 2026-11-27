@@ -236,11 +236,6 @@ export function SyncSettingsPanel({
         <fieldset className="sync-settings__fieldset" aria-labelledby="sync-account-title">
           <legend id="sync-account-title" className="sync-settings__legend">
             {t('web.settings.syncUx.accountTitle')}
-            <SettingsInfoTip
-              testId="tip-sync-account"
-              label={t('web.settings.syncUx.accountTitle')}
-              text={t('web.settings.syncUx.accountHint')}
-            />
           </legend>
           <FormField id="sync-server-url" label={t('web.sync.serverUrl.label')}>
             {(field) => (
@@ -265,11 +260,6 @@ export function SyncSettingsPanel({
               />
             )}
           </FormField>
-          <SettingsInfoTip
-            testId="tip-sync-token"
-            label={t('web.sync.token.label')}
-            text={t('web.auth.tokenHint')}
-          />
           <Button tone="ghost" className="sync-settings__fit-button" onClick={() => sync.openSignIn()}>
             {t('web.auth.open')}
           </Button>

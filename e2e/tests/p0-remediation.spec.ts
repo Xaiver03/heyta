@@ -151,25 +151,23 @@ test.describe('P0 整改视觉基线', () => {
     await expect(page.locator('[data-testid="quadrant-help"]')).toHaveCount(0);
   });
 
-  test('W6+W7：详情列四分组 + 可改标题与优先级（1440）', async ({ page }) => {
+  test('W6+W7：详情列紧凑三段结构 + 可改标题与优先级（1440）', async ({ page }) => {
     problems = watchConsole(page);
     await page.setViewportSize({ width: 1440, height: 900 });
     await openApp(page);
-    await showDetailColumnContent(page, '四分组判据甲');
+    await showDetailColumnContent(page, '紧凑详情判据甲');
 
     await page.screenshot({ path: `${SHOTS}/w6w7-detail-groups.png` });
-    for (const key of ['basic', 'time', 'organize', 'automation']) {
-      // 词条文字在 e2e 里按中文断言（zh 由 pinChineseUi 钉住）。
-      const label = { basic: '基本信息', time: '时间', organize: '组织', automation: '自动化' }[
-        key
-      ] as string;
-      await expect(
-        page.locator('h3[data-testid="task-detail-group"]', { hasText: label }),
-        `四分组的「${label}」组头必须可见`,
-      ).toBeVisible();
-    }
-    await expect(page.locator('[data-testid="task-priority-select"]')).toBeVisible();
-    // 「高级」折叠默认收起（W6）。
+    await expect(page.locator('h3[data-testid="task-detail-group"]')).toHaveCount(0);
+    await expect(page.getByTestId('task-detail-header')).toBeVisible();
+    await expect(page.getByTestId('task-detail-due-trigger')).toBeVisible();
+    await expect(page.getByTestId('task-detail-reminder-trigger')).toBeVisible();
+    await expect(page.getByTestId('task-detail-repeat-trigger')).toBeVisible();
+    await expect(page.getByTestId('task-priority-select')).toBeVisible();
+    await expect(page.getByTestId('task-detail-toolbar')).toBeVisible();
+    await expect(page.getByTestId('organize-project-select')).toBeVisible();
+    // 展开重复浮层后，「高级」折叠仍默认收起（W6）。
+    await page.getByTestId('task-detail-repeat-trigger').click();
     const advanced = page.locator('[data-testid="task-repeat-advanced"]');
     await expect(advanced).toHaveJSProperty('open', false);
   });

@@ -701,7 +701,15 @@ export function CaptureComposer({
       <View
         style={[styles.compose, focused ? styles.composeFocused : null]}
         testID="capture-compose"
-        {...({ dataSet: { inputShell: 'true' } } as unknown as ViewProps)}
+        onStartShouldSetResponder={() => false}
+        {...({
+          dataSet: { inputShell: 'true' },
+          onClick: (event: { target?: EventTarget | null }) => {
+            const el = event.target as HTMLElement | null;
+            if (el?.closest?.('[data-testid="capture-due-capsule"]')) return;
+            inputRef.current?.focus?.();
+          },
+        } as unknown as ViewProps)}
       >
         <View style={styles.leadingIcon} aria-hidden>
           <HeytaIcon

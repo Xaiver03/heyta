@@ -19,7 +19,6 @@ import './data-settings.css';
  * remains a fourth, permission-gated card; AdminPanel owns its own title and
  * renders nothing until the server confirms administrator access.
  */
-import { SettingsInfoTip } from './SettingsInfoTip.js';
 
 export function DataSettingsPanel({ active = true }: { active?: boolean }): React.JSX.Element {
   const { t } = useI18n();
@@ -54,11 +53,6 @@ export function DataSettingsPanel({ active = true }: { active?: boolean }): Reac
             <h3 className="ht-settings__data-card-title ht-type-headline">
               <ArchiveRestore size={ICON_SIZE.sm} aria-hidden="true" />
               {t('web.settings.dataUx.migrationTitle')}
-              <SettingsInfoTip
-                testId="tip-data-migration"
-                label={t('web.settings.dataUx.migrationTitle')}
-                text={t('web.settings.dataUx.migrationLead')}
-              />
             </h3>
 
           </div>

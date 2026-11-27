@@ -58,49 +58,90 @@ import { cssVar, ICON_SIZE } from '@heyta/design-system';
 
 import { FormField } from '../../lib/form/FormField.js';
 import { useI18n } from '@heyta/i18n';
-import { indexTags, isLive, resolveTagIds, resolveTags, type Task } from '@heyta/domain';
-import { ChevronDown, SlidersHorizontal, Tag as TagIcon } from 'lucide-react';
+import {
+  indexTags,
+  isLive,
+  parseCategorySlot,
+  resolveTagIds,
+  resolveTags,
+  type Tag,
+  type Task,
+} from '@heyta/domain';
+import { ChevronDown, SlidersHorizontal } from 'lucide-react';
 
 import { selectChildProjects, selectTopLevelProjects, useProjectStore } from '../projects/store.js';
 import { moveBlockedForTask } from '../share/share-move-guards.js';
 
-/** chip 与图标的统一尺寸。**不许在 JSX 里散落字面量。** */
-const CHIP_ICON_SIZE = 12;
 const TRIGGER_ICON_SIZE = 14;
 
-const chipStyle: React.CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: cssVar('space.1'),
-  padding: `${cssVar('space.1')} ${cssVar('space.2')}`,
-  borderRadius: cssVar('radius.full'),
+const emptyTagsTextStyle: React.CSSProperties = {
+  margin: 0,
+  fontSize: cssVar('font-size.xs'),
+  color: cssVar('color.foreground-subtle'),
+};
+
+const tagFieldsetStyle: React.CSSProperties = {
+  margin: 0,
+  padding: 0,
+  border: 'none',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: cssVar('space.2'),
+};
+
+const tagLegendStyle: React.CSSProperties = {
+  padding: 0,
+  marginBottom: cssVar('space.1'),
   fontSize: cssVar('font-size.xs'),
   color: cssVar('color.foreground-muted'),
-  whiteSpace: 'nowrap',
+};
+
+const tagOptionRowStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: cssVar('space.2'),
+};
+
+const summaryResetStyle: React.CSSProperties = {
+  listStyle: 'none',
+};
+
+const organizerShellStyle: React.CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: cssVar('space.2'),
+  position: 'relative',
 };
 
 /**
- * 只读显示：这条任务挂了哪几个标签。**两档都要画**（宽档行上只剩它）。
- *
- * ⚠️ `tagIds` 里可能有**查不到的 id**（标签在另一台设备上被删了，而这条 op
- * 还没同步过来）。`filter` 掉它们，而不是渲染一个名字为空的 chip ——
- * 后者看起来像界面坏了。数据仍然在 `tagIds` 里，等同步回来就会重新出现。
+ * 标签胶囊的五档语义配色槽位（1..5，亮暗双主题对比度全部 ≥ AA）。
+ * 显式设过 `tag.color` 则映射其槽位；未设则按标签名确定性散列，同名同色。
  */
+export function tagToneOf(tag: Pick<Tag, 'name' | 'color'>): 1 | 2 | 3 | 4 | 5 {
+  const explicit = parseCategorySlot(tag.color);
+  if (explicit !== undefined) {
+    return (((explicit - 1) % 5) + 1) as 1 | 2 | 3 | 4 | 5;
+  }
+  let hash = 0;
+  for (let i = 0; i < tag.name.length; i += 1) {
+    hash = (hash * 31 + tag.name.charCodeAt(i)) | 0;
+  }
+  return ((Math.abs(hash) % 5) + 1) as 1 | 2 | 3 | 4 | 5;
+}
+
 export function TagChips({ task }: { task: Task }): React.JSX.Element | null {
   const projectState = useProjectStore();
-  /**
-   * 🔴 走 `resolveTags`（B 包 R8）：标签合并之后 `task.tagIds` 里**仍然留着**被合并掉的 id，
-   * 只有解析才能把它变成"用户真正看到的那几个标签"。直接 `filter(tags, includes)` 会让
-   * 合并掉的那条 chip 静默消失（而目标标签也不出现）—— 不报错，只是少了一个。
-   */
   const assignedTags = resolveTags(task.tagIds, indexTags(projectState.tags));
   if (assignedTags.length === 0) return null;
 
   return (
     <>
       {assignedTags.map((tag) => (
-        <span key={tag.id} style={chipStyle} data-testid="task-chip-tag">
-          <TagIcon size={CHIP_ICON_SIZE} aria-hidden="true" />
+        <span
+          key={tag.id}
+          className={`ht-row__tag ht-row__tag--${String(tagToneOf(tag))}`}
+          data-testid="task-chip-tag"
+        >
           {tag.name}
         </span>
       ))}
@@ -108,25 +149,77 @@ export function TagChips({ task }: { task: Task }): React.JSX.Element | null {
   );
 }
 
+export interface ProjectMoveOption {
+  readonly id: string;
+  readonly label: string;
+  readonly blocked: boolean;
+}
+
+export interface ProjectMoveModel {
+  readonly options: readonly ProjectMoveOption[];
+  readonly inboxBlocked: boolean;
+  readonly moveUnavailable: boolean;
+}
+
 /**
- * 编辑本体：清单归属下拉 + 标签复选框。**不带 `<details>`，也不带 `.ht-material`** ——
- * 那两件是"这一格在哪儿画"的细节，属于行尾那一支。
- *
- * 🔴 它**自带两个区块头**（`<label>` 里那句「清单」与 `<fieldset>` 的 `<legend>`「标签」），
- * 所以宿主不许再叠 `<h3>`：两处同一个词说两遍，读到的是"有两个区块"
- * （§8.141 的 R4 与 §8.145 的 M2 钉的就是这一档）。
- * 🔴 它**全程零 `useState`**（两个控件都是受控于 store），所以搬进栏里**不需要** `key` ——
- * §8.145 那条纪律（"有本地 state 才要 key"）在这一格落在"不挂"那一侧，
- * 与截止那一格（`DatePicker` 带 `useState(month)` ⇒ **必须**挂）正好相反。
+ * 「整理」里那颗清单下拉的全部判据：目的地、收集箱是否可达、整颗下拉是否该灰掉。
+ * 抽成钩子是为了让编辑本体与宿主读同一份数据，不把 `moveBlockedForTask` 的逻辑抄两遍。
  */
-export function OrganizerField({
+export function useProjectMoveModel(task: Task): ProjectMoveModel {
+  const projectState = useProjectStore();
+  const tops = selectTopLevelProjects(projectState);
+
+  /** 清单下拉的选项：顶层 + 其子清单（领域层只支持一层）。 */
+  const projectOptions = tops.flatMap((top) => [
+    { id: top.id, label: top.name },
+    ...selectChildProjects(projectState, top.id).map((child) => ({
+      id: child.id,
+      // 缩进表示层级。用全角空格而不是 `padding` —— `<option>` 的 padding
+      // 在各浏览器上表现不一致，而"子清单看起来和顶层一样"会让人选错。
+      label: `　${child.name}`,
+    })),
+  ]);
+
+  /*
+   * 🔴 ADR-0067 补二的**界面那一半**：跨共享边界的"换清单"在 M2 期间不提供。
+   * 判据不在这份文件里（`moveBlockedForTask` → app-host 的 `crossesShareBoundary`，
+   * 与派发器抛错用的是同一句），这里只做一件事：把做不到的目的地标成 `disabled`。
+   *
+   * ⚠️ 为什么是**灰掉**而不是从菜单里删掉：删掉的话用户看到的是"我的共享清单不见了"，
+   * 那是另一种"界面坏了"。灰掉 + 一句为什么，才是"这件事现在不能做"。
+   * 反过来，只把错误文案改对（"这一步没保存成功，可以重试"）也不够 —— 那句话在这里
+   * 是假的：重试多少次都不会成功。
+   */
+  const inboxBlocked = moveBlockedForTask(task.id, undefined);
+  const options = projectOptions.map((option) => ({
+    ...option,
+    blocked: moveBlockedForTask(task.id, option.id),
+  }));
+
+  /*
+   * "没有可去的目的地"判的是**去掉它现在所在那一格之后**还剩不剩得去的地方：
+   * 一条共享清单里的任务，它自己那条清单仍然"不跨边界"（原地不动当然合法），
+   * 所以只看"有没有灰的"会永远算不出"没地方可去"，那一枚下拉就会一直亮着、
+   * 而里面除了当前值什么都没有 —— 用户点开它看到的是一个只有一项的下拉框。
+   *
+   * 🔴 2026-10-25 修：判据写成"**除了它现在待的那一格以外**，还有没有能去的地方"。
+   * 收集箱本身被阻断、且所有清单都不可去（或就是当前清单）⇒ 整颗下拉才灰掉。
+   */
+  const moveUnavailable =
+    inboxBlocked && options.every((option) => option.blocked || option.id === task.projectId);
+
+  return { options, inboxBlocked, moveUnavailable };
+}
+
+/**
+ * 标签选择本体：只画「标签」这一组复选框（`<fieldset>` + `<legend>`）。
+ * 空标签时说明去哪建；只显示活着的标签（别名已解析）。
+ */
+export function TagPickerField({
   task,
-  onMoveToProject,
   onSetTags,
 }: {
   task: Task;
-  /** 传 `undefined` 表示移出清单（收集箱）。 */
-  onMoveToProject: (projectId: string | undefined) => void;
   /** 传**整组**。算"用户想要哪一组"是本组件的责任。 */
   onSetTags: (tagIds: string[]) => void;
 }): React.JSX.Element {
@@ -159,54 +252,65 @@ export function OrganizerField({
     if (tag.parentId !== undefined && !liveById.has(tag.parentId)) tagRows.push({ tag, depth: 0 });
   }
 
-  const tops = selectTopLevelProjects(projectState);
+  if (liveTags.length === 0) {
+    // 一个标签都没有时**说明去哪建**。留一片空白会让人以为这功能坏了。
+    return <p style={emptyTagsTextStyle}>{t('web.organize.noTags')}</p>;
+  }
 
-  /** 清单下拉的选项：顶层 + 其子清单（领域层只支持一层）。 */
-  const projectOptions = tops.flatMap((top) => [
-    { id: top.id, label: top.name },
-    ...selectChildProjects(projectState, top.id).map((child) => ({
-      id: child.id,
-      // 缩进表示层级。用全角空格而不是 `padding` —— `<option>` 的 padding
-      // 在各浏览器上表现不一致，而"子清单看起来和顶层一样"会让人选错。
-      label: `　${child.name}`,
-    })),
-  ]);
+  return (
+    <fieldset style={tagFieldsetStyle}>
+      <legend style={tagLegendStyle}>{t('web.organize.tagsLegend')}</legend>
+      {tagRows.map(({ tag, depth }) => {
+        const checked = effectiveTagIds.includes(tag.id);
+        return (
+          <label key={tag.id} style={tagOptionRowStyle}>
+            <input
+              type="checkbox"
+              checked={checked}
+              aria-label={t('web.organize.tagToggle', { name: tag.name, title: task.title })}
+              onChange={() => {
+                // 🔴 用**有效**标签算下一组：这样一次勾选会把别名顺手"化实"
+                //（载荷里写的是目标标签的 id），而下一次读不再依赖解析。
+                // 去重与"空数组写 null"仍由 `app-host` 的 `setTags` 决定。
+                onSetTags(
+                  checked
+                    ? effectiveTagIds.filter((id) => id !== tag.id)
+                    : [...effectiveTagIds, tag.id],
+                );
+              }}
+            />
+            {depth === 0 ? tag.name : `　${tag.name}`}
+          </label>
+        );
+      })}
+    </fieldset>
+  );
+}
 
-  /*
-   * 🔴 ADR-0067 补二的**界面那一半**：跨共享边界的"换清单"在 M2 期间不提供。
-   * 判据不在这份文件里（`moveBlockedForTask` → app-host 的 `crossesShareBoundary`，
-   * 与派发器抛错用的是同一句），这里只做一件事：把做不到的目的地标成 `disabled`。
-   *
-   * ⚠️ 为什么是**灰掉**而不是从菜单里删掉：删掉的话用户看到的是"我的共享清单不见了"，
-   * 那是另一种"界面坏了"。灰掉 + 一句为什么，才是"这件事现在不能做"。
-   * 反过来，只把错误文案改对（"这一步没保存成功，可以重试"）也不够 —— 那句话在这里
-   * 是假的：重试多少次都不会成功。
-   */
-  const inboxBlocked = moveBlockedForTask(task.id, undefined);
-  const options = projectOptions.map((option) => ({
-    ...option,
-    blocked: moveBlockedForTask(task.id, option.id),
-  }));
-  /*
-   * "没有可去的目的地"判的是**去掉它现在所在那一格之后**还剩不剩得去的地方：
-   * 一条共享清单里的任务，它自己那条清单仍然"不跨边界"（原地不动当然合法），
-   * 所以只看"有没有灰的"会永远算不出"没地方可去"，那一枚下拉就会一直亮着、
-   * 而里面除了当前值什么都没有 —— 用户点开它看到的是一个只有一项的下拉框。
-   */
-  /*
-   * 🔴 2026-10-25 修：判据写成"**除了它现在待的那一格以外**，还有没有能去的地方"。
-   *
-   * 上一版是 `inboxBlocked === false ? task.projectId === undefined : …`，也就是说
-   * **收集箱里的任务一律被灰掉** —— 而那恰好是"整理"这个动作最常见的主体
-   * （新任务先落收集箱，再归到清单里）。两条 e2e 就是这么红的：
-   * `detail-pane-task` 的 T14/T15 造了一条在收集箱的任务，然后 `selectOption` 一直等
-   * "visible and enabled"，报出来像"下拉坏了"，实际是它被这条判据关掉了。
-   * 单元判据当时**没有覆盖收集箱那一档**（只有共享任务与"个人任务在清单里"两档），
-   * 所以这个洞一路绿着过去了 —— 这一笔同时补上那一档。
-   */
-  const moveUnavailable =
-    options.every((option) => option.blocked || option.id === task.projectId) &&
-    (inboxBlocked || task.projectId === undefined);
+/**
+ * 编辑本体：清单归属下拉 + 标签复选框。**不带 `<details>`，也不带 `.ht-material`** ——
+ * 那两件是"这一格在哪儿画"的细节，属于行尾那一支。
+ *
+ * 🔴 它**自带两个区块头**（`<label>` 里那句「清单」与 `<fieldset>` 的 `<legend>`「标签」），
+ * 所以宿主不许再叠 `<h3>`：两处同一个词说两遍，读到的是"有两个区块"
+ * （§8.141 的 R4 与 §8.145 的 M2 钉的就是这一档）。
+ * 🔴 它**全程零 `useState`**（两个控件都是受控于 store），所以搬进栏里**不需要** `key` ——
+ * §8.145 那条纪律（"有本地 state 才要 key"）在这一格落在"不挂"那一侧，
+ * 与截止那一格（`DatePicker` 带 `useState(month)` ⇒ **必须**挂）正好相反。
+ */
+export function OrganizerField({
+  task,
+  onMoveToProject,
+  onSetTags,
+}: {
+  task: Task;
+  /** 传 `undefined` 表示移出清单（收集箱）。 */
+  onMoveToProject: (projectId: string | undefined) => void;
+  /** 传**整组**。算"用户想要哪一组"是本组件的责任。 */
+  onSetTags: (tagIds: string[]) => void;
+}): React.JSX.Element {
+  const { t } = useI18n();
+  const { options, inboxBlocked, moveUnavailable } = useProjectMoveModel(task);
 
   return (
     <>
@@ -266,68 +370,7 @@ export function OrganizerField({
         )}
       </FormField>
 
-      {projectState.tags.length === 0 ? (
-        // 一个标签都没有时**说明去哪建**。留一片空白会让人以为这功能坏了。
-        <p style={{ margin: 0, fontSize: cssVar('font-size.xs'), color: cssVar('color.foreground-subtle') }}>
-          {t('web.organize.noTags')}
-        </p>
-      ) : (
-        <fieldset
-          style={{
-            margin: 0,
-            padding: 0,
-            border: 'none',
-            display: 'flex',
-            flexDirection: 'column',
-            // 🔴 一行标签 = 一枚**独立**的复选框（各自可勾），所以这一列用的是
-            //    "控件↔控件"的节奏，不是"控件内部"的 4px。2026-10-26 用户报登录面板
-            //    「记住密码」贴脸之后同族排查到这里：实测两行复选框之间只有 **4px**
-            //    （行高 24px、盒子紧贴墨迹）。仓内其余复选/单选组一律 space.2 起
-            //    （`.ht-settings__sub-plans`=space.2、`.ht-settings__caps`=space.3），
-            //    这两处是唯一的例外。
-            gap: cssVar('space.2'),
-          }}
-        >
-          <legend
-            style={{
-              padding: 0,
-              // `legend` 在 flex 容器里**不是 flex item**，上面那个 gap 管不到它 ——
-              // 不写这一句，分组标题与第一行复选框实测 **0px**（贴在一起）。
-              marginBottom: cssVar('space.1'),
-              fontSize: cssVar('font-size.xs'),
-              color: cssVar('color.foreground-muted'),
-            }}
-          >
-            {t('web.organize.tagsLegend')}
-          </legend>
-          {tagRows.map(({ tag, depth }) => {
-            const checked = effectiveTagIds.includes(tag.id);
-            return (
-              <label
-                key={tag.id}
-                style={{ display: 'flex', alignItems: 'center', gap: cssVar('space.2') }}
-              >
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  aria-label={t('web.organize.tagToggle', { name: tag.name, title: task.title })}
-                  onChange={() => {
-                    // 🔴 用**有效**标签算下一组：这样一次勾选会把别名顺手"化实"
-                    //（载荷里写的是目标标签的 id），而下一次读不再依赖解析。
-                    // 去重与"空数组写 null"仍由 `app-host` 的 `setTags` 决定。
-                    onSetTags(
-                      checked
-                        ? effectiveTagIds.filter((id) => id !== tag.id)
-                        : [...effectiveTagIds, tag.id],
-                    );
-                  }}
-                />
-                {depth === 0 ? tag.name : `　${tag.name}`}
-              </label>
-            );
-          })}
-        </fieldset>
-      )}
+      <TagPickerField task={task} onSetTags={onSetTags} />
     </>
   );
 }
@@ -352,14 +395,7 @@ export function TaskOrganizer({
   const { t } = useI18n();
 
   return (
-    <span
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: cssVar('space.2'),
-        position: 'relative',
-      }}
-    >
+    <span style={organizerShellStyle}>
       {/*
         🔴 这里**不再显示清单归属** —— 归属由共享 `TaskBadges` 的那一槽负责
         （两端同一份）。此前它在这里也画一枚 chip，于是归属进了元信息槽之后
@@ -383,6 +419,7 @@ export function TaskOrganizer({
             给它一个稳定的钩子，测试就不再依赖"这一行里有几个 summary"。
           */
           data-testid="task-organize-summary"
+          style={summaryResetStyle}
         >
           <SlidersHorizontal size={TRIGGER_ICON_SIZE} aria-hidden="true" />
         </summary>

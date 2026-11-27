@@ -120,44 +120,50 @@ afterEach(() => {
 });
 
 describe('底部工具条（滴答对齐 C2）：按钮说的事必须真做得到', () => {
-  it('🔴 「移动到」把焦点交给**清单下拉**，「备注」交给正文框（不是画个图标就完事）', async () => {
+  it('🔴 清单下拉直接住在底栏；「检查项」按下去展开输入框并把焦点交过去', async () => {
     await useProjectStore.getState().addProject('工具条清单');
     const id = await addTask('工具条判据', '备注正文');
     selection.select('task', id);
     mount();
-    const pane = container!.querySelector('[data-testid="task-pane"]')!;
+    const toolbar = container!.querySelector('[data-testid="task-detail-toolbar"]');
+    expect(toolbar, '底部工具条没画出来').not.toBeNull();
+    // 三段式紧凑之后，「移动到」不再需要先点一枚导航按钮 —— 清单下拉就在底栏里。
+    expect(
+      toolbar!.querySelector('[data-testid="organize-project-select"]'),
+      '底栏没有直接给出清单下拉 ⇒「移动到」又要多点一枚按钮',
+    ).not.toBeNull();
 
-    act(() => {
-      pane.querySelector<HTMLButtonElement>('[data-testid="task-detail-goto-list"]')!.click();
+    await act(async () => {
+      toolbar!.querySelector<HTMLButtonElement>('[data-testid="task-detail-checklist-trigger"]')!.click();
+      await flush();
     });
     expect(
-      document.activeElement?.getAttribute('data-testid'),
-      '点「移动到」之后焦点不在清单下拉上',
-    ).toBe('organize-project-select');
-
-    act(() => {
-      pane.querySelector<HTMLButtonElement>('[data-testid="task-detail-goto-note"]')!.click();
-    });
+      container!.querySelector('[data-testid="task-checklist-add-input"]'),
+      '点「检查项」之后没有展开输入框',
+    ).not.toBeNull();
     expect(
       document.activeElement?.getAttribute('data-testid'),
-      '点「备注」之后焦点不在备注正文框上',
-    ).toBe('task-note-input');
+      '展开检查项之后焦点不在输入框上',
+    ).toBe('task-checklist-add-input');
   });
 
   /**
-   * 🔴 第三枚「更多」补的是**可达性**，不是装饰：行操作菜单（置顶 / 优先级 / 标签 /
+   * 🔴 第五枚「更多」补的是**可达性**，不是装饰：行操作菜单（置顶 / 优先级 / 标签 /
    * 移动到 / 删除）此前只有右键与 Shift+F10 两个入口，界面上没有任何可见把手
    * —— 那一路历史上住在行尾那枚「⋯ 更多」里，行尾编辑器被收走时它没有跟着搬家。
-   * 宿主没接回调的落点仍然只画两枚：不许有按下去没反应的按钮。
+   * 宿主没接回调的落点仍然只画四枚：不许有按下去没反应的按钮。
    */
-  it('🔴 宿主接了 `onShowActions` ⇒ 三枚，第三枚把**这一条的 id + 锚点**交出去', async () => {
-    const id = await addTask('三枚工具条', undefined);
+  it('🔴 宿主接了 `onShowActions` ⇒ 五枚，第五枚把**这一条的 id + 锚点**交出去', async () => {
+    const id = await addTask('五枚工具条', undefined);
     selection.select('task', id);
     const calls: [string, { x: number; y: number }][] = [];
     mount({ onShowActions: (taskId, anchor) => calls.push([taskId, anchor]) });
     const toolbar = container!.querySelector('[data-testid="task-detail-toolbar"]');
     expect(toolbar, '底部工具条没画出来').not.toBeNull();
-    expect(toolbar!.querySelectorAll('button'), '接了回调就该有三枚（移动到 / 备注 / 更多）').toHaveLength(3);
+    expect(
+      toolbar!.querySelectorAll('button'),
+      '接了回调就该有五枚（检查项 / 标签 / 子任务 / 附件 / 更多）',
+    ).toHaveLength(5);
 
     act(() => {
       toolbar!.querySelector<HTMLButtonElement>('[data-testid="task-detail-more"]')!.click();
@@ -167,15 +173,15 @@ describe('底部工具条（滴答对齐 C2）：按钮说的事必须真做得�
     expect(typeof calls[0]![1].x + typeof calls[0]![1].y, '锚点坐标没交给宿主').toBe('numbernumber');
   });
 
-  it('🔴 没接回调 ⇒ 只画两枚；「文本格式」那一枚等 C1 富文本，不做假控件', async () => {
-    const id = await addTask('只有两枚', undefined);
+  it('🔴 没接回调 ⇒ 只画四枚；「更多」不画，不做假控件', async () => {
+    const id = await addTask('只有四枚', undefined);
     selection.select('task', id);
     mount();
     const toolbar = container!.querySelector('[data-testid="task-detail-toolbar"]');
     expect(
       toolbar!.querySelectorAll('button'),
       '没有可发的意图就不该多画一枚按下去没反应的按钮',
-    ).toHaveLength(2);
+    ).toHaveLength(4);
     expect(
       toolbar!.querySelector('[data-testid="task-detail-more"]'),
       '没接 onShowActions 却画了「更多」',
@@ -366,16 +372,22 @@ describe('栏里那一格的外壳形状（pane 级不变量，五格共用一�
    *   e2e 侧同族判据（`detail-pane-task.spec.ts` 的 T10）钉的是
    *   `details.ht-compose--popover` 那一档，不受这枚 classless 折叠影响。
    */
-  it('🔴 栏里的折叠机关只许是收起的「高级」：浮层仍禁入、默认收起、主编辑器不许藏进折叠', async () => {
+  it('🔴 浮层外壳仍禁入；重复浮层里的折叠只许是收起的「高级」：默认收起、主编辑器不许藏进折叠', async () => {
     const id = await addTask('外壳甲');
     selection.select('task', id);
     mount();
-    const box = document.querySelector('[data-testid="task-pane"]');
+    const box = document.querySelector<HTMLElement>('[data-testid="task-pane"]');
     if (box === null) throw new Error('栏里没画面单 ⇒ 这一条判据在空转');
     // ① 行尾的浮层外壳不许进栏：一栏里漂一块 `position:absolute` 的板子，
     //    用户读到的是"这格里浮着一块不属于这格的板子"。
     expect(box.querySelector('.ht-material'), '拿到了行尾的浮层外壳').toBeNull();
+
+    // 重复这一格默认只剩一枚触发器，编辑本体在那个浮层里；点开才进 DOM。
+    act(() => {
+      box.querySelector<HTMLButtonElement>('[data-testid="task-detail-repeat-trigger"]')?.click();
+    });
     const disclosures = [...box.querySelectorAll('details')];
+    expect(disclosures.length, '重复浮层里的「高级」折叠没画出来').toBeGreaterThan(0);
     for (const d of disclosures) {
       // ② 折叠默认收起。
       expect(d.open, '折叠机关默认就是展开的').toBe(false);
@@ -414,12 +426,16 @@ describe('重复这一字段此刻归谁（§8.141）', () => {
 
   const pane = () => document.querySelector<HTMLElement>('[data-testid="task-pane"]');
 
-  it('🔴 栏里那一格画着重复的**编辑本体**，且整栏只有一份', async () => {
+  it('🔴 点开重复 ⇒ 栏里画的是重复的**编辑本体**，且整栏只有一份', async () => {
     const a = await addTask('重复甲');
     selection.select('task', a);
     mount();
     const box = pane();
     if (box === null) throw new Error('栏里没画面单 ⇒ 这一族判据在空转');
+    // 三段式紧凑之后，重复的编辑本体住在触发器打开的浮层里 —— 点开才进 DOM。
+    act(() => {
+      box.querySelector<HTMLButtonElement>('[data-testid="task-detail-repeat-trigger"]')?.click();
+    });
     expect(box.querySelectorAll('[data-testid="task-repeat-custom-input"]').length).toBe(1);
     expect(box.querySelectorAll('input[type="radio"]').length, '预设单选没画出来').toBeGreaterThan(2);
     // ⚠️ "栏里不许有行尾的浮层外壳"这一档**不住在这一格**：它量的是整个 pane，
@@ -431,6 +447,9 @@ describe('重复这一字段此刻归谁（§8.141）', () => {
     const b = await addTask('草稿乙');
     selection.select('task', a);
     mount();
+    act(() => {
+      pane()?.querySelector<HTMLButtonElement>('[data-testid="task-detail-repeat-trigger"]')?.click();
+    });
     const input = document.querySelector<HTMLInputElement>('[data-testid="task-repeat-custom-input"]');
     if (input === null) throw new Error('自定义 RRULE 输入框没画出来 ⇒ 判据在空转');
     await act(async () => {
@@ -441,6 +460,10 @@ describe('重复这一字段此刻归谁（§8.141）', () => {
     await act(async () => {
       selection.select('task', b);
     });
+    // 换选中 ⇒ 重复浮层自动收起；先再点开一次，才读得到这一条自己的草稿框。
+    act(() => {
+      pane()?.querySelector<HTMLButtonElement>('[data-testid="task-detail-repeat-trigger"]')?.click();
+    });
     const after = document.querySelector<HTMLInputElement>('[data-testid="task-repeat-custom-input"]');
     expect(after?.value, '上一条没提交的规则串跟着换到了这一条名下').toBe('');
   });
@@ -450,6 +473,9 @@ describe('重复这一字段此刻归谁（§8.141）', () => {
     await setRepeatOf(a, 'FREQ=WEEKLY;INTERVAL=2;BYDAY=TU');
     selection.select('task', a);
     mount();
+    act(() => {
+      pane()?.querySelector<HTMLButtonElement>('[data-testid="task-detail-repeat-trigger"]')?.click();
+    });
     const box = pane();
     expect(box?.textContent ?? '', '栏里没显示这条规则').toContain('FREQ=WEEKLY;INTERVAL=2;BYDAY=TU');
     const host = mountNode(<RepeatChip task={useTaskStore.getState().entities.tasks[a]!} now={useTaskStore.getState().now} />);
@@ -511,12 +537,15 @@ describe('子任务这一字段此刻归谁（§8.144）', () => {
 
   const pane = () => document.querySelector<HTMLElement>('[data-testid="task-pane"]');
 
-  it('🔴 栏里画的是子任务的**编辑本体**，且整栏只有一只 `<select>`', async () => {
+  it('🔴 点开子任务 ⇒ 栏里画的是子任务的**编辑本体**，且整栏只有一只 `<select>`', async () => {
     const { a } = await makeChain();
     selection.select('task', a);
     mount();
     const box = pane();
     if (box === null) throw new Error('栏里没画面单 ⇒ 这一族判据在空转');
+    act(() => {
+      box.querySelector<HTMLButtonElement>('[data-testid="task-detail-subtask-trigger"]')?.click();
+    });
     expect(box.querySelectorAll('[data-testid^="subtask-select-"]').length).toBe(1);
     // ⚠️ "栏里不许有 `<details>`"住在 pane 级那一条（理由见那里），不在这一格重复。
   });
@@ -525,6 +554,9 @@ describe('子任务这一字段此刻归谁（§8.144）', () => {
     const { a, b, c } = await makeChain();
     selection.select('task', a);
     mount();
+    act(() => {
+      pane()?.querySelector<HTMLButtonElement>('[data-testid="task-detail-subtask-trigger"]')?.click();
+    });
     const select = pane()?.querySelector(`[data-testid="subtask-select-${a}"]`);
     if (select == null) throw new Error('栏里没有那只 select ⇒ 判据在空转');
     const values = Array.from(select.querySelectorAll('option')).map((o) => o.getAttribute('value') ?? '');
@@ -538,6 +570,9 @@ describe('子任务这一字段此刻归谁（§8.144）', () => {
     const { a, c } = await makeChain();
     selection.select('task', c);
     mount();
+    act(() => {
+      pane()?.querySelector<HTMLButtonElement>('[data-testid="task-detail-subtask-trigger"]')?.click();
+    });
     const select = pane()?.querySelector<HTMLSelectElement>(`[data-testid="subtask-select-${c}"]`);
     if (select == null) throw new Error('栏里没有那只 select ⇒ 判据在空转');
     await act(async () => {
@@ -618,12 +653,15 @@ describe('提醒这一字段此刻归谁（§8.145）', () => {
   //    回来的是 `Element` —— 合流之后这两半第一次被并到同一个 describe 里。
   const pane = () => document.querySelector<HTMLElement>('[data-testid="task-pane"]');
 
-  it('🔴 栏里画的是提醒的**编辑本体**（共享 `ReminderList`），整栏只有一份', async () => {
+  it('🔴 点开提醒 ⇒ 栏里画的是提醒的**编辑本体**（共享 `ReminderList`），整栏只有一份', async () => {
     const id = await addTask('提醒甲');
     selection.select('task', id);
     mount();
     const box = pane();
     if (box === null) throw new Error('栏里没画面单 ⇒ 这一族判据在空转');
+    act(() => {
+      box.querySelector<HTMLButtonElement>('[data-testid="task-detail-reminder-trigger"]')?.click();
+    });
     expect(box.querySelectorAll(`[data-testid="reminder-list-${id}"]`).length, '栏里的提醒列表不是一份').toBe(1);
     // 无截止时间 ⇒ 只有绝对时刻那一颗按钮，且它必须说清"为什么没有提前量预设"。
     expect(box.querySelector('[data-testid="reminder-add-absolute"]'), '栏里没有绝对时刻入口').not.toBeNull();
@@ -637,6 +675,9 @@ describe('提醒这一字段此刻归谁（§8.145）', () => {
     mount();
     const box = pane();
     if (box === null) throw new Error('栏里没画面单 ⇒ 这一族判据在空转');
+    act(() => {
+      box.querySelector<HTMLButtonElement>('[data-testid="task-detail-reminder-trigger"]')?.click();
+    });
     // 两处同一个词说两遍，读到的是"有两个区块"（§8.141 里重复那一格同一条纪律）。
     expect(headerLeaves(box, zhCN['reminder.title']), '「提醒」区块头不止一处').toBe(1);
   });
@@ -645,6 +686,9 @@ describe('提醒这一字段此刻归谁（§8.145）', () => {
     const id = await addTask('提醒丙');
     selection.select('task', id);
     mount();
+    act(() => {
+      pane()?.querySelector<HTMLButtonElement>('[data-testid="task-detail-reminder-trigger"]')?.click();
+    });
     const button = pane()?.querySelector<HTMLButtonElement>('[data-testid="reminder-add-absolute"]');
     if (button == null) throw new Error('栏里没有那颗按钮 ⇒ 判据在空转');
     const before = Date.now() + 60 * 60 * 1000;
@@ -734,26 +778,32 @@ describe('截止这一字段此刻归谁（§8.146）', () => {
   const monthNum = (d: string): number => Number(d.slice(5, 7));
   const dayLabel = (d: string): string => `${String(monthNum(d))}月18日`;
 
-  it('🔴 栏里画的是截止的编辑本体（共享月历），整页只有一份', async () => {
+  it('🔴 点开截止 ⇒ 栏里画的是截止的编辑本体（共享月历），整页只有一份', async () => {
     const id = await addTask('截止甲');
     selection.select('task', id);
     mount();
+    act(() => {
+      pane()?.querySelector<HTMLButtonElement>('[data-testid="task-detail-due-trigger"]')?.click();
+    });
     const pickers = document.querySelectorAll('[data-testid="date-picker"]');
     expect(pickers.length, `整页应有且只有一份月历，实到 ${String(pickers.length)}`).toBe(1);
     expect(pane()?.contains(pickers[0]!), '那一份月历不在栏里 ⇒ 编辑本体没搬进来').toBe(true);
     // "是编辑器不是痕迹"的证据：快捷项与清除都在场（只读徽标长不出按钮）。
     expect(pane()?.textContent ?? '', '栏里那一格没有快捷项 ⇒ 画的不是编辑器').toContain('今天');
-    // 这一格**要**宿主给区块头（共享 `DatePicker` 自己不带，与 `ReminderList` 相反）。
-    const dueHeads = [...(pane()?.querySelectorAll('h3') ?? [])].filter(
-      (h) => h.textContent === '截止',
-    );
-    expect(dueHeads.length, '「截止」区块头在栏里不是恰好一处').toBe(1);
+    // 顶栏那颗截止触发器是这一格的入口（普通任务不再常驻一块「截止」区块头）。
+    expect(
+      pane()?.querySelector('[data-testid="task-detail-due-trigger"]'),
+      '顶栏没有截止触发器 ⇒ 截止这一格没有入口',
+    ).not.toBeNull();
   });
 
   it('🔴 在栏里点日子 ⇒ 真的写进物化状态（不是只改内存里那一条）', async () => {
     const id = await addTask('截止乙');
     selection.select('task', id);
     mount();
+    act(() => {
+      pane()?.querySelector<HTMLButtonElement>('[data-testid="task-detail-due-trigger"]')?.click();
+    });
     const today = thisMonthDate();
     const cell = pane()?.querySelector<HTMLDivElement>(dayCell(dayLabel(today)));
     if (cell == null) throw new Error(`栏里那个月历里没有 ${dayLabel(today)} 这格 ⇒ 判据在空转`);
@@ -772,6 +822,9 @@ describe('截止这一字段此刻归谁（§8.146）', () => {
     const b = await addTask('截止丁');
     selection.select('task', a);
     mount();
+    act(() => {
+      pane()?.querySelector<HTMLButtonElement>('[data-testid="task-detail-due-trigger"]')?.click();
+    });
     const here = dayCell(dayLabel(thisMonthDate()));
     expect(pane()?.querySelector(here), '初始月里应有 18 日').not.toBeNull();
 
@@ -793,6 +846,10 @@ describe('截止这一字段此刻归谁（§8.146）', () => {
     // 与 §8.138 的 A2 同一族，那条事故就记在上面那个 describe 里）。
     act(() => {
       selection.select('task', b);
+    });
+    // 换选中 ⇒ 截止浮层自动收起；先再点开一次，才读得到这一条自己的月历。
+    act(() => {
+      pane()?.querySelector<HTMLButtonElement>('[data-testid="task-detail-due-trigger"]')?.click();
     });
     expect(container?.querySelector('h2')?.textContent, '标题换了').toBe('截止丁');
     expect(
@@ -885,6 +942,10 @@ describe('清单 + 标签这一字段此刻归谁（§8.147）', () => {
       '清单下拉里没有那条清单 ⇒ 画的不是编辑器',
     ).toBe(true);
     // 🔴 勾着的那个标签的复选框在栏里（不是行上），且整页只有一只。
+    // 三段式紧凑之后标签编辑本体住在触发器打开的浮层里 —— 点开才进 DOM。
+    act(() => {
+      pane()?.querySelector<HTMLButtonElement>('[data-testid="task-detail-tag-trigger"]')?.click();
+    });
     const boxes = document.querySelectorAll<HTMLInputElement>('input[type="checkbox"][aria-label]');
     const inPane = [...boxes].filter((b) => pane()?.contains(b));
     expect(boxes.length, `整页应有且只有一只标签复选框，实到 ${String(boxes.length)}`).toBe(1);
@@ -893,19 +954,15 @@ describe('清单 + 标签这一字段此刻归谁（§8.147）', () => {
     void projectId;
   });
 
-  it('🔴 区块头：「清单」「标签」各恰好一处，而宿主没有再叠 h3（这一格自带两个）', async () => {
+  it('🔴 展开标签浮层 ⇒ `<legend>`「标签」恰好一处，且宿主没有再叠 h3', async () => {
     await addTag('整理标签乙');
     const id = await addTask('整理乙');
     selection.select('task', id);
     mount();
-    // 🔴 2026-10-24：视图从 `<span>` 换成 `FormField` 之后，区块头变成了
-    // **真正的 `<label>`**（它点一下就该聚焦到那枚下拉 —— 那才是 `<label>` 的语义，
-    // `<span>` 从来没有这个能力）。判据跟着**收紧**：不再只数一种标签，
-    // 而是数「清单」这个词在 span / label / h3 里一共几处 —— 恰好 1 处。
-    const headerCount = (word: string): number =>
-      countText(pane(), 'span', word) + countText(pane(), 'label', word) + countText(pane(), 'h3', word);
-    expect(headerCount('清单'), '「清单」区块头在栏里不是恰好一处').toBe(1);
-    expect(countText(pane(), 'label', '清单'), '「清单」现在必须是真正的 <label>（点它要能聚焦下拉）').toBe(1);
+    // 清单下拉常驻底栏直接可读；标签的区块头在浮层里，点开才进 DOM。
+    act(() => {
+      pane()?.querySelector<HTMLButtonElement>('[data-testid="task-detail-tag-trigger"]')?.click();
+    });
     expect(countText(pane(), 'legend', '标签'), '「标签」区块头在栏里不是恰好一处').toBe(1);
     expect(
       countText(pane(), 'h3', '清单') + countText(pane(), 'h3', '标签'),
@@ -937,6 +994,9 @@ describe('清单 + 标签这一字段此刻归谁（§8.147）', () => {
     const id = await addTask('整理丁');
     selection.select('task', id);
     mount();
+    act(() => {
+      pane()?.querySelector<HTMLButtonElement>('[data-testid="task-detail-tag-trigger"]')?.click();
+    });
     const box = [...(pane()?.querySelectorAll<HTMLInputElement>('input[type="checkbox"]') ?? [])].find(
       (b) => b.getAttribute('aria-label')?.includes('整理标签丁'),
     );
@@ -971,6 +1031,10 @@ describe('清单 + 标签这一字段此刻归谁（§8.147）', () => {
     });
     await flush();
     expect(selectIn(pane())?.value, '换选中后栏里还停在上一条的清单上 ⇒ 那份 state 不是受控的').toBe('');
+    // 换选中 ⇒ 标签浮层自动收起；先再点开一次，才读得到这一条自己的勾选态。
+    act(() => {
+      pane()?.querySelector<HTMLButtonElement>('[data-testid="task-detail-tag-trigger"]')?.click();
+    });
     const stillChecked = [...(pane()?.querySelectorAll<HTMLInputElement>('input[type="checkbox"]') ?? [])].filter(
       (box) => box.checked,
     );
@@ -1073,7 +1137,7 @@ describe('完成态在栏里那句话（§8.150）', () => {
     expect(status.closest('button'), '状态句被包进按钮 ⇒ 同一件事两颗编辑器').toBeNull();
   });
 
-  it('🔴 那句话与区块头**不同档**（同档会被读成"一个叫已完成的区块"，看图照出来的）', async () => {
+  it('🔴 那句话与标题**不同档**（同档会被读成"一个叫已完成的区块"，看图照出来的）', async () => {
     const id = await addTask('档位丁');
     selection.select('task', id);
     mount();
@@ -1081,11 +1145,12 @@ describe('完成态在栏里那句话（§8.150）', () => {
       await useTaskStore.getState().toggleComplete(id);
     });
     const status = document.querySelector<HTMLElement>('[data-testid="task-pane-status"]');
-    const blockHeader = document.querySelector<HTMLElement>('[data-testid="task-pane"] h3');
-    if (status === null || blockHeader === null) {
-      throw new Error('状态句或区块头没画出来 ⇒ 这一条在空转');
+    // 普通任务不再常驻 h3 区块头；面单的统领元素是那只标题 h2，比它才对得上"层级"。
+    const title = document.querySelector<HTMLElement>('[data-testid="task-detail-title"]');
+    if (status === null || title === null) {
+      throw new Error('状态句或标题没画出来 ⇒ 这一条在空转');
     }
-    expect(status.style.fontSize, '状态句与区块头同字号 ⇒ 层级塌了').not.toBe(blockHeader.style.fontSize);
-    expect(status.style.fontWeight, '状态句与区块头同字重 ⇒ 层级塌了').not.toBe(blockHeader.style.fontWeight);
+    expect(status.style.fontSize, '状态句没设字号 ⇒ 它没有自己的档位').not.toBe('');
+    expect(status.style.fontSize, '状态句与标题同字号 ⇒ 层级塌了').not.toBe(title.style.fontSize);
   });
 });

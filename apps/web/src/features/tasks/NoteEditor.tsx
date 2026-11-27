@@ -45,8 +45,17 @@ import { useI18n } from '@heyta/i18n';
 import type { Task } from '@heyta/domain';
 import { NotebookPen } from 'lucide-react';
 
-/** chip 里预览的字数上限。够看出"写的是什么"，又不至于把行撑开。 */
-const PREVIEW_CHARS = 24;
+/** 摘要单行预览字数上限（配合单行省略号与固定行高）。 */
+const PREVIEW_CHARS = 48;
+
+const noteTextareaStyle: React.CSSProperties = {
+  padding: cssVar('space.2'),
+  resize: 'vertical',
+};
+
+const noteSummaryStyle: React.CSSProperties = {
+  listStyle: 'none',
+};
 
 /**
  * 备注的**第一行**，超长截断。
@@ -99,10 +108,7 @@ export function NoteField({
             onSetNote(trimmed);
           }}
           className="ht-input"
-          style={{
-            padding: cssVar('space.2'),
-            resize: 'vertical',
-          }}
+          style={noteTextareaStyle}
         />
       </div>
     </>
@@ -125,9 +131,8 @@ export function NoteBadge({ task }: { task: Task }): React.JSX.Element | null {
   const hasNote = task.note !== undefined && task.note.trim() !== '';
   if (!hasNote) return null;
   return (
-    <span className="ht-chip ht-chip--on" data-testid={`task-note-badge-${task.id}`}>
-      <NotebookPen size={ICON_SIZE.xs} aria-hidden="true" />
-      <span>{preview(task.note!)}</span>
+    <span className="ht-row__note-preview" data-testid={`task-note-badge-${task.id}`}>
+      {preview(task.note!)}
     </span>
   );
 }
@@ -159,7 +164,7 @@ export function NoteEditor({
         // 而不是在这里现写一套：chip 的边距、圆角、字号、光标都已在 app.css 里。
         // 只留 `listStyle: 'none'` —— `.ht-chip` 不负责隐藏 `<summary>` 的展开三角。
         className={hasNote ? 'ht-chip ht-chip--action ht-chip--on' : 'ht-chip ht-chip--action'}
-        style={{ listStyle: 'none' }}
+        style={noteSummaryStyle}
       >
         <NotebookPen size={ICON_SIZE.xs} aria-hidden="true" />
         {/*
