@@ -30,7 +30,7 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core';
 
-import type { Task } from '@heyta/domain';
+import { Priority, type Task } from '@heyta/domain';
 
 import './calendar-dnd.css';
 
@@ -94,7 +94,11 @@ export function CalendarDragProvider({
     [onReschedule, onSetTime],
   );
 
-  const activeTitle = activeId === null ? undefined : tasksById.get(activeId)?.title;
+  const activeTask = activeId === null ? undefined : tasksById.get(activeId);
+  const activeChecklist = activeTask?.checklist ?? [];
+  const activeChecklistDone = activeChecklist.filter((item) => item.done).length;
+  const activePriority = activeTask?.priority;
+  const showPriority = activePriority !== undefined && activePriority !== Priority.None;
 
   return (
     <DndContext
@@ -106,9 +110,34 @@ export function CalendarDragProvider({
       onDragCancel={() => setActiveId(null)}
     >
       {children}
+      {/*
+        浮影 = 一张**缩小版任务卡**，不是一行字：主色左竖条 + 卡片底 + 柔和投影 +
+        微微放大 + `grabbing`。它是纯视觉克隆（`aria-hidden`），
+        读屏听到的仍然是拖拽源自己的可及名，不会把同一张卡念两遍。
+      */}
       <DragOverlay dropAnimation={null}>
-        {activeTitle === undefined ? null : (
-          <div className="ht-content__cal-drag-overlay">{activeTitle}</div>
+        {activeTask === undefined ? null : (
+          <div className="ht-content__cal-drag-overlay" aria-hidden="true">
+            <span className="ht-content__cal-drag-overlay-stripe" />
+            <span className="ht-content__cal-drag-overlay-body">
+              <span className="ht-content__cal-drag-overlay-title">{activeTask.title}</span>
+              {activeChecklist.length === 0 && !showPriority ? null : (
+                <span className="ht-content__cal-drag-overlay-meta">
+                  {activeChecklist.length === 0 ? null : (
+                    <span className="ht-content__cal-drag-overlay-count">
+                      {activeChecklistDone}/{activeChecklist.length}
+                    </span>
+                  )}
+                  {showPriority ? (
+                    <span
+                      className="ht-content__cal-drag-overlay-priority"
+                      data-priority={String(activePriority)}
+                    />
+                  ) : null}
+                </span>
+              )}
+            </span>
+          </div>
         )}
       </DragOverlay>
     </DndContext>
