@@ -68,7 +68,7 @@ const require = createRequire(join(ROOT, 'apps/web/package.json'));
 const {
   BRAND_MARK_CANVAS,
   BRAND_MARK_RADIUS,
-  brandMarkRects,
+  brandMarkElements,
   BRAND_MARK_SAFE,
   extractVars,
   extractReducedMotion,
@@ -148,12 +148,14 @@ const unchanged = [];
  * 三块字形。`data-boot-bar` 只是给人读的标记，动画挂在选择器上 ——
  * 几何来自 brandMarkRects，与图标**同一份**（这里不重画一遍坐标）。
  */
-const bars = brandMarkRects(BRAND_MARK_SAFE);
-const barMarkup = bars
-  .map(
-    (b, i) =>
-      `      <rect class="heyta-boot__bar heyta-boot__bar--${i}" x="${b.x}" y="${b.y}" width="${b.width}" height="${b.height}" rx="${b.rx}"/>`,
-  )
+const bootEls = brandMarkElements(BRAND_MARK_SAFE);
+const barMarkup = bootEls
+  .map((el, i) => {
+    const attrs = Object.entries(el.attrs)
+      .map(([k, v]) => `${k}="${v}"`)
+      .join(' ');
+    return `      <${el.tag} class="heyta-boot__bar heyta-boot__bar--${i}" ${attrs}/>`;
+  })
   .join('\n');
 
 const styleBlock = `${MARKUP_BEGIN}

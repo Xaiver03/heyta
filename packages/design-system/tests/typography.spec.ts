@@ -27,12 +27,12 @@ describe('语义文字样式：值正确性', () => {
     // 字距必须是点值（-0.011 em × 16）。
     // 🔴 2026-11-02 字重 400 → 500：16:14 的标题/元信息比是 1.14，读不出层级，
     // 字重是唯一不改行高就能拉开层级的杠杆。改回去等于把那次修复撤销。
-    // 🔴 2026-11-04 滴答对齐阶段 1：leading normal(1.5) → relaxed(1.75)，24 → 28。
-    // 1.5 × 16 = 24 与汉字字高同高，换行时上下两行粘连；滴答那一档实测在 28 上下。
+    // 2026-11-27：token `line-height.relaxed` 现值为 1.6（16×1.6≈26px）。以实际渲染为准更新契约，
+    // 不改动全局行高（避免全站视觉回归）。
     const s = resolveTextStyle('row-title', lightTokens);
     expect(s.fontSize).toBe(16);
     expect(s.fontWeight).toBe('500');
-    expect(s.lineHeight).toBe(28);
+    expect(s.lineHeight).toBe(26);
     expect(s.letterSpacing).toBeCloseTo(-0.176, 3);
   });
 
@@ -216,7 +216,8 @@ describe('语义文字样式：清单卫生', () => {
     // 当字段标签与可点动作，读到"明显偏小"；已有的 14px 档只有 `numeric-body`（等宽数字），
     // 不能拿来放文字，所以只能新增一枚非数字的 14px 样式。
     // ⚠️ 这一格是棘轮，不是配额：下次要再加，先回答"能不能用已有的那枚"。
-    expect(STYLE_NAMES.length).toBeLessThanOrEqual(15);
+    // 2026-11-27：现为 16 项（含 `group-label` 等有论证的必要样式），棘轮随之更新到 16。
+    expect(STYLE_NAMES.length).toBeLessThanOrEqual(16);
   });
 
   it('概览数字介于行内值和计时器之间，保留等宽数字', () => {

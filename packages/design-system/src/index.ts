@@ -115,6 +115,8 @@ export {
   brandMarkSvg,
   brandMarkCircleSvg,
   brandMarkGlyphSvg,
+  brandMarkElements,
+  brandMarkGlyphMarkup,
 } from './brand-mark.js';
 export type { BrandMarkOptions, BrandMarkTransform } from './brand-mark.js';
 export type { TextStyleName, TextStyleSpec, RnTextStyle } from './typography.js';

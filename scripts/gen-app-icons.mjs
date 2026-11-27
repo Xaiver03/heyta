@@ -70,6 +70,7 @@ const {
   BRAND_MARK_SAFE,
   brandMarkCircleSvg,
   brandMarkGlyphSvg,
+  brandMarkGlyphMarkup,
   brandMarkRects,
   brandMarkSvg,
   tokensForTheme,
@@ -542,16 +543,11 @@ const WIN_MSIX = join(WIN_ASSETS, 'msix');
 function wideSvg() {
   const s = 150 / BRAND_MARK_CANVAS;
   const dx = (310 - 150) / 2;
-  const rects = brandMarkRects(BRAND_MARK_PWA_SAFE)
-    .map(
-      (b) =>
-        `<rect x="${dx + b.x * s}" y="${b.y * s}" width="${b.width * s}" height="${b.height * s}" rx="${b.rx * s}" fill="${ON_PRIMARY}"/>`,
-    )
-    .join('\n    ');
+  const glyph = brandMarkGlyphMarkup(BRAND_MARK_PWA_SAFE, ON_PRIMARY);
   return `<svg xmlns="http://www.w3.org/2000/svg" width="310" height="150" viewBox="0 0 310 150">
   <rect width="310" height="150" fill="${PRIMARY}"/>
-  <g>
-    ${rects}
+  <g transform="translate(${dx} 0) scale(${s})">
+    ${glyph}
   </g>
 </svg>
 `;
@@ -689,12 +685,7 @@ function readPngFromBuffer(buf) {
  * 与栅格器同一套约定（几何只有一份坐标，缩放交给消费方），
  * 否则每加一个尺寸就要重算一次矩形、多一处会漂的地方。
  */
-const faviconRects = brandMarkRects(BRAND_MARK_SAFE)
-  .map(
-    (b) =>
-      `<rect x="${b.x}" y="${b.y}" width="${b.width}" height="${b.height}" rx="${b.rx}" fill="${ON_PRIMARY}"/>`,
-  )
-  .join('\n  ');
+const faviconGlyph = brandMarkGlyphMarkup(BRAND_MARK_SAFE, ON_PRIMARY);
 emitText(
   join(ROOT, 'apps/landing/public/favicon.svg'),
   `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 ${BRAND_MARK_CANVAS} ${BRAND_MARK_CANVAS}" role="img" aria-label="heyta">
@@ -708,7 +699,7 @@ emitText(
        而 HTTP 层仍然是 200 + image/svg+xml，光看响应码发现不了。
   -->
   <rect width="${BRAND_MARK_CANVAS}" height="${BRAND_MARK_CANVAS}" rx="${BRAND_MARK_RADIUS}" fill="${PRIMARY}"/>
-  ${faviconRects}
+  ${faviconGlyph}
 </svg>
 `,
   'landing public/favicon.svg',
