@@ -496,6 +496,26 @@ if printf '%s' "$WANT" | grep -q "mac"; then
       skipped-*) echo "  ⏭ 公证：跳过（${MAC_NOTARY_STATE#skipped-}）" ;;
       *) echo "  ⚠️ 公证：状态读不到（${MAC_NOTARY_STATE}）—— 不按"通过"记" ;;
     esac
+    # 🔴 覆盖前必须先退掉**正在运行的已安装实例**（2026-11-25）：`rm -rf` 换掉
+    #    /Applications/Heyta.app 时旧进程还在内存里，窗口/菜单仍是旧界面，
+    #    用户会以为"新包没装上"。所以先精确找它、退它，装完再后台拉起。
+    #    判据只认**已安装路径的绝对可执行文件**，严禁 `pkill HeytaMac` ——
+    #    那会连 `HeytaMacErase*`（测试隔离实例）一起误杀。
+    MAC_OLD_PIDS="$(pgrep -f "^${INSTALLED_APP}/Contents/MacOS/HeytaMac$" 2>/dev/null || true)"
+    if [ -n "$MAC_OLD_PIDS" ]; then
+      MAC_WAS_RUNNING=1
+      echo "  关闭正在运行的旧实例（PID: $(printf '%s' "$MAC_OLD_PIDS" | tr '\n' ' ')）"
+      kill $MAC_OLD_PIDS 2>/dev/null || true
+      sleep 1
+      MAC_STILL_PIDS="$(pgrep -f "^${INSTALLED_APP}/Contents/MacOS/HeytaMac$" 2>/dev/null || true)"
+      if [ -n "$MAC_STILL_PIDS" ]; then
+        echo "  旧实例未响应 SIGTERM，强制结束（PID: $(printf '%s' "$MAC_STILL_PIDS" | tr '\n' ' ')）"
+        kill -9 $MAC_STILL_PIDS 2>/dev/null || true
+        sleep 1
+      fi
+    else
+      MAC_WAS_RUNNING=0
+    fi
     rm -rf "$INSTALLED_APP"                           # 卸旧：不留"上一次的包"
     if cp -R "$MAC_OUT/Heyta.app" "$INSTALLED_APP"; then
       echo "  ✅ 已安装到 $INSTALLED_APP"
@@ -538,6 +558,11 @@ if printf '%s' "$WANT" | grep -q "mac"; then
       if [ "$MAC_DIST_OK" = 1 ] && [ -f "$MAC_SELFIE" ] && shot_ok_logged "$MAC_SELFIE" "$MAC_SELFIE_WV"; then
         echo "  截图证据：${MAC_SELFIE}（窗口）+ ${MAC_SELFIE_WV}（共享 UI）"
         RESULT_mac=OK
+        # 原本就在跑的实例，装完再拉起来 —— 必须 `-g`（后台，不抢前台焦点，AGENTS §6.2）。
+        if [ "$MAC_WAS_RUNNING" = 1 ]; then
+          open -g -a "$INSTALLED_APP" >/dev/null 2>&1 || true
+          echo "  ✅ 新包已在后台重启（open -g，未抢前台焦点）"
+        fi
       else
         echo "  🔴 安装副本不可信 —— 产物对账没过，或窗口没起来，或共享 UI 没渲染"
         echo "     证据：${MAC_SELFIE}:$([ -f "$MAC_SELFIE" ] && stat -f%z "$MAC_SELFIE" || echo 缺)" \
