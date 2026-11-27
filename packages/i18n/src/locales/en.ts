@@ -3225,6 +3225,14 @@ export const en = {
   'web.calendar.title': 'Calendar',
   'web.calendar.prevMonth': 'Previous month',
   'web.calendar.nextMonth': 'Next month',
+  // Advanced-view dropdown. Month/week/day/year live in `common.calendar.view.*`
+  // because both ends read them; only the web-only modes and their count
+  // templates belong here.
+  'web.calendar.view.agenda': 'Agenda',
+  'web.calendar.view.multiDay': 'Multi-day',
+  'web.calendar.view.multiWeek': 'Multi-week',
+  'web.calendar.view.multiDayValue': '{n}d',
+  'web.calendar.view.multiWeekValue': '{n}w',
   'web.calendar.weekShort': 'W{n}',
   'web.calendar.backToToday': 'Back to today',
   'web.calendar.monthTitle': '{month}/{year}',
@@ -3255,6 +3263,7 @@ export const en = {
   'web.calendar.more.displaySection': 'Display',
   'web.calendar.more.showCompleted': 'Show completed',
   'web.calendar.more.showCountdown': 'Show countdowns',
+  'web.calendar.more.openDisplaySettings': 'Display settings…',
   'web.calendar.more.scopeSection': 'Display range',
   'web.calendar.more.editScope': 'Edit display range…',
   'web.calendar.more.arrangeSection': 'Schedule tasks',
@@ -3265,6 +3274,25 @@ export const en = {
   'web.calendar.more.subscribeSection': 'Calendar subscriptions',
   'web.calendar.more.subscribeHint': 'Requires server-side iCal / third-party calendar fetching — not connected yet',
   'web.calendar.more.noTasksToday': 'No tasks on this day',
+  // Layered display-settings card: color, style, toggles, secondary time zone,
+  // plus the card's own back/close chrome.
+  'web.calendar.display.title': 'Display Settings',
+  'web.calendar.display.color': 'Color',
+  'web.calendar.display.colorByProject': 'By list',
+  'web.calendar.display.colorByQuadrant': 'By priority',
+  'web.calendar.display.style': 'Style',
+  'web.calendar.display.styleClassic': 'Classic',
+  'web.calendar.display.styleModern': 'Modern',
+  'web.calendar.display.showChecklist': 'Show checklist',
+  'web.calendar.display.showAllRepeats': 'Show all repeats',
+  'web.calendar.display.showHabits': 'Show habits',
+  'web.calendar.display.showFocus': 'Show focus records',
+  'web.calendar.display.showFocusTip': 'Show Pomodoro focus logs in calendar',
+  'web.calendar.display.showCourses': 'Show courses',
+  'web.calendar.display.secondaryTimezone': 'Secondary time zone',
+  'web.calendar.display.secondaryTimezoneTip': 'Add a second time zone scale on day/week timeline',
+  'web.calendar.display.back': 'Back',
+  'web.calendar.display.close': 'Close',
 
   'mobile.weekday.mon': 'Mon',
   'mobile.weekday.tue': 'Tue',
@@ -3549,6 +3577,10 @@ export const en = {
   'mobile.calendar.a11y.moreTasks': '{count} more',
   'mobile.calendar.a11y.markDone': 'Mark done: {title}',
   'mobile.calendar.a11y.unmarkDone': 'Mark as not done: {title}',
+  // Drag-to-reschedule: the entry hint / a11y label, then the announcement after
+  // the drop (`{date}` is already localized).
+  'mobile.calendar.dragReschedule': 'Drag task onto a day cell to reschedule',
+  'mobile.calendar.rescheduledTo': 'Rescheduled to {date}',
 
   // ── Mobile · date picker ──────────────────────────────────
   'mobile.datePicker.clear': 'Clear',
