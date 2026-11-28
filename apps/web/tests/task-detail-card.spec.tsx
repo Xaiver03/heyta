@@ -1154,3 +1154,44 @@ describe('完成态在栏里那句话（§8.150）', () => {
     expect(status.style.fontSize, '状态句与标题同字号 ⇒ 层级塌了').not.toBe(title.style.fontSize);
   });
 });
+
+/**
+ * 面单的键盘出口：没有别的面板打开时，Esc 收起面单（2026-11-27）。
+ *
+ * 反例同样钉住：焦点在可编辑控件里时 Esc **不**收起 —— 否则在改标题/备注的
+ * 中途放弃编辑，会把整条任务从选中里弄丢，用户以为任务没了。
+ */
+describe('面单的键盘出口（Esc 收起）', () => {
+  it('🔴 选中任务后按 Esc（焦点不在输入控件里）⇒ 取消选中、面单消失', async () => {
+    const id = await addTask('面单键盘出口');
+    selection.select('task', id);
+    mount();
+    expect(container!.querySelector('[data-testid="task-pane"]'), '前置：面单没画出来').not.toBeNull();
+
+    act(() => {
+      document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    });
+
+    expect(selection.get('task'), 'Esc 没有取消选中').toBeNull();
+    expect(container!.querySelector('[data-testid="task-pane"]'), '取消选中后面单还留着').toBeNull();
+  });
+
+  it('焦点在可编辑控件里时 Esc 不收起面单（避免放弃编辑时把任务弄丢）', async () => {
+    const id = await addTask('输入框里 Esc');
+    selection.select('task', id);
+    mount();
+
+    const temp = document.createElement('input');
+    document.body.appendChild(temp);
+    temp.focus();
+    try {
+      act(() => {
+        document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      });
+      expect(selection.get('task'), '在输入框里按 Esc 竟把整条任务取消选中了').toBe(id);
+      expect(container!.querySelector('[data-testid="task-pane"]')).not.toBeNull();
+    } finally {
+      temp.remove();
+    }
+  });
+});

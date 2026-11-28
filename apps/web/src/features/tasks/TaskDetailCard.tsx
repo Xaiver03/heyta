@@ -50,7 +50,7 @@ import {
   Tag,
 } from 'lucide-react';
 
-import { useSelected } from '../../lib/selection.js';
+import { selection, useSelected } from '../../lib/selection.js';
 import { currentState, dispatchChecked, dispatchIntent } from '../../lib/oplog.js';
 import { DangerConfirmDialog } from '../../lib/dialog/DangerConfirmDialog.js';
 import { useProjectStore } from '../projects/store.js';
@@ -412,7 +412,19 @@ export function TaskDetailCard({
   }
 
   useEffect(() => {
-    if (activePanel === null) return undefined;
+    if (activePanel === null) {
+      if (task === undefined) return undefined;
+      const onDismissTask = (event: KeyboardEvent): void => {
+        if (event.key !== 'Escape' || event.defaultPrevented) return;
+        const activeTag = document.activeElement?.tagName;
+        if (activeTag === 'INPUT' || activeTag === 'TEXTAREA' || activeTag === 'SELECT') return;
+        selection.select('task', null);
+      };
+      document.addEventListener('keydown', onDismissTask);
+      return () => {
+        document.removeEventListener('keydown', onDismissTask);
+      };
+    }
     const onKeyDown = (event: KeyboardEvent): void => {
       if (event.key !== 'Escape') return;
       event.preventDefault();
@@ -432,7 +444,7 @@ export function TaskDetailCard({
       document.removeEventListener('keydown', onKeyDown, true);
       document.removeEventListener('pointerdown', onPointerDown);
     };
-  }, [activePanel]);
+  }, [activePanel, task]);
 
   if (task === undefined) return null;
 

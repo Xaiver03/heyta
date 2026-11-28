@@ -245,6 +245,21 @@ export function AuthPanel({
     onClose();
   });
 
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return;
+      if (openLegalDocument !== null) {
+        setOpenLegalDocument(null);
+        return;
+      }
+      onClose();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [onClose, openLegalDocument]);
+
   const [previousBaseUrl, setPreviousBaseUrl] = useState(baseUrl);
   const baseUrlRef = useRef(baseUrl);
   if (previousBaseUrl !== baseUrl) {
@@ -621,6 +636,9 @@ export function AuthPanel({
       aria-modal="true"
       tabIndex={-1}
       aria-label={brandLabel ?? t('web.auth.title')}
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
     >
       <div className="ht-sheet__auth-dialog">
         <AuthPlanScene />
