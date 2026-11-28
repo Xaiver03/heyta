@@ -35,6 +35,8 @@ import {
   PasskeyError,
 } from './passkey';
 import { authenticate, getAuthUser } from './middleware';
+import { createPrismaSqlRunner } from './billing/pricing-store';
+import { agentSessionsRoutes } from './ai/agent-sessions.routes';
 import { withAccountProfile } from './account/account-profile.store';
 import { deleteAccountWithTombstone } from './account/account-tombstones';
 import { sessionMetaFromRequest } from './account/access-sessions';
@@ -658,6 +660,13 @@ export const apiRoutes = async (
   fastify: FastifyInstance,
   opts: ApiRoutesOptions,
 ): Promise<void> => {
+  // ADR-0093：Agent run/session 服务端接口（仅托管档；本地/自备端点仍走设备本地 loop）。
+  // 归属取自会话票据；托管档闸门复用 entitlement 的 `ai` 能力（默认关 = 自托管放行）。
+  void fastify.register(agentSessionsRoutes, {
+    authenticate: authenticate as never,
+    sql: createPrismaSqlRunner(prisma as never),
+    extraHooks: [createEntitlementGuard({ capability: 'ai' }) as never],
+  });
   const PasskeyRegisterOptionsSchema = buildRegisterBodySchema(opts.requireTermsConsent);
   const MagicLinkRegisterSchema = PasskeyRegisterOptionsSchema;
   const RegistrationChallengeRequestSchema = z.object({

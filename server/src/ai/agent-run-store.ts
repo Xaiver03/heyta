@@ -84,3 +84,55 @@ export const finishAgentRun = async (
     [input.runId, input.status, input.error ?? null],
   );
 };
+
+export interface AgentSessionRow {
+  id: string;
+  user_id: number;
+  title: string | null;
+  created_at: Date | string;
+  updated_at: Date | string;
+}
+
+export interface AgentMessageRow {
+  id: string;
+  role: string;
+  content: string;
+  seq: number;
+  created_at: Date | string;
+}
+
+export interface AgentRunOwnerRow {
+  id: string;
+  status: string;
+  last_event_id: number;
+  user_id: number;
+}
+
+export const getAgentSession = async (sql: SqlRunner, id: string): Promise<AgentSessionRow | undefined> => {
+  const rows = await sql.query<AgentSessionRow>(
+    'SELECT "id","user_id","title","created_at","updated_at" FROM "agent_sessions" WHERE "id"=$1',
+    [id],
+  );
+  return rows[0];
+};
+
+export const listAgentSessions = (sql: SqlRunner, userId: number): Promise<AgentSessionRow[]> =>
+  sql.query<AgentSessionRow>(
+    'SELECT "id","user_id","title","created_at","updated_at" FROM "agent_sessions" WHERE "user_id"=$1 ORDER BY "updated_at" DESC',
+    [userId],
+  );
+
+export const listAgentMessages = (sql: SqlRunner, sessionId: string): Promise<AgentMessageRow[]> =>
+  sql.query<AgentMessageRow>(
+    'SELECT "id","role","content","seq","created_at" FROM "agent_messages" WHERE "session_id"=$1 ORDER BY "seq" ASC',
+    [sessionId],
+  );
+
+/** 归属校验用：run 的 owner 来自其 session 的 user_id。 */
+export const getAgentRunOwner = async (sql: SqlRunner, runId: string): Promise<AgentRunOwnerRow | undefined> => {
+  const rows = await sql.query<AgentRunOwnerRow>(
+    'SELECT r."id", r."status", r."last_event_id", s."user_id" FROM "agent_runs" r JOIN "agent_sessions" s ON s."id"=r."session_id" WHERE r."id"=$1',
+    [runId],
+  );
+  return rows[0];
+};
