@@ -1,3 +1,4 @@
+import * as SwitchPrimitive from '@radix-ui/react-switch';
 import { useId, type ReactNode } from 'react';
 
 import './hta.css';
@@ -18,34 +19,34 @@ export type SwitchProps = SwitchBaseProps &
   );
 
 /**
- * 即时生效的开关（`role="switch"`）。
+ * 即时生效的开关（Radix `Switch`，渲染真实 `<button role="switch">`）。
  *
  * 只在「拨一下就生效」处用它；需要审批/提交的开关不要用 Switch 伪装。
+ * 状态外观走 `data-state="checked|unchecked"`（见 hta.css），不再靠 `:checked`。
  */
 export function Switch(props: SwitchProps): React.JSX.Element {
   const { checked, onChange, disabled = false, id, testID } = props;
   const autoId = useId();
-  const inputId = id ?? autoId;
+  const controlId = id ?? autoId;
   const ariaLabel = props.label === undefined ? props.ariaLabel : undefined;
 
   return (
-    <label
-      className={`hta-switch${disabled ? ' hta-switch--disabled' : ''}`}
-      htmlFor={inputId}
-      data-testid={testID}
-    >
-      <input
-        id={inputId}
+    <div className={`hta-switch${disabled ? ' hta-switch--disabled' : ''}`} data-testid={testID}>
+      <SwitchPrimitive.Root
+        id={controlId}
         className="hta-switch__control"
-        type="checkbox"
-        role="switch"
-        aria-checked={checked}
-        aria-label={ariaLabel}
         checked={checked}
+        onCheckedChange={onChange}
         disabled={disabled}
-        onChange={(event) => onChange(event.target.checked)}
-      />
-      {props.label === undefined ? null : <span className="hta-switch__label">{props.label}</span>}
-    </label>
+        aria-label={ariaLabel}
+      >
+        <SwitchPrimitive.Thumb className="hta-switch__thumb" />
+      </SwitchPrimitive.Root>
+      {props.label === undefined ? null : (
+        <label className="hta-switch__label" htmlFor={controlId}>
+          {props.label}
+        </label>
+      )}
+    </div>
   );
 }

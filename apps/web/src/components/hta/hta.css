@@ -131,8 +131,6 @@
   color: var(--ht-color-foreground-muted);
   cursor: pointer;
   font-family: var(--ht-font-sans);
-  font-size: var(--ht-font-size-sm);
-  font-weight: var(--ht-font-weight-medium);
   white-space: nowrap;
   min-block-size: var(--ht-touch-target-min);
   padding-inline: var(--ht-space-3);
@@ -143,7 +141,7 @@
   color: var(--ht-color-foreground);
 }
 
-.hta-tab[aria-selected='true'] {
+.hta-tab[data-state='active'] {
   background: var(--ht-color-primary-subtle);
   color: var(--ht-color-primary);
 }
@@ -194,12 +192,47 @@
   background: var(--ht-color-hover);
 }
 
+/* 控件本体是 Radix 渲染的 `<button role="checkbox|radio">`（不再是原生 input），
+   勾选/选中态改由 `data-state` 选 —— 原生 `accent-color` 对它已不生效。 */
 .hta-choice__control {
   flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   inline-size: var(--ht-size-checkbox);
   block-size: var(--ht-size-checkbox);
   margin: 0;
-  accent-color: var(--ht-color-primary);
+  padding: 0;
+  appearance: none;
+  border: var(--ht-border-width-thin) solid var(--ht-color-border-strong);
+  border-radius: var(--ht-radius-sm);
+  background: var(--ht-color-surface);
+  color: var(--ht-color-on-primary);
+  cursor: pointer;
+}
+
+.hta-choice__control[data-state='checked'] {
+  border-color: var(--ht-color-primary);
+  background: var(--ht-color-primary);
+}
+
+.hta-choice__control--radio {
+  border-radius: var(--ht-radius-full);
+}
+
+.hta-choice__indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--ht-font-size-xs);
+  line-height: 1;
+}
+
+.hta-choice__indicator--radio {
+  inline-size: calc(var(--ht-size-checkbox) / 2.5);
+  block-size: calc(var(--ht-size-checkbox) / 2.5);
+  border-radius: var(--ht-radius-full);
+  background: currentColor;
 }
 
 .hta-choice__label {
@@ -215,7 +248,7 @@
   background: transparent;
 }
 
-/* 开关：原生 checkbox 做成轨道 + 滑块，焦点环仍由全局给在控件本身上。 */
+/* 开关：Radix `Switch` 的轨道 + 滑块，焦点环仍由全局给在控件本身上。 */
 .hta-switch {
   display: inline-flex;
   align-items: center;
@@ -226,6 +259,10 @@
   font-size: var(--ht-font-size-sm);
 }
 
+.hta-switch__label {
+  min-inline-size: 0;
+}
+
 .hta-switch__control {
   position: relative;
   flex: none;
@@ -233,14 +270,20 @@
   inline-size: var(--ht-space-8);
   block-size: var(--ht-space-5);
   margin: 0;
+  padding: 0;
+  border: 0;
   border-radius: var(--ht-radius-full);
   background: var(--ht-color-border);
   cursor: pointer;
   transition: background-color var(--ht-duration-fast) var(--ht-ease-standard);
 }
 
-.hta-switch__control::after {
-  content: '';
+.hta-switch__control[data-state='checked'] {
+  background: var(--ht-color-primary);
+}
+
+.hta-switch__thumb {
+  display: block;
   position: absolute;
   inset-block-start: var(--ht-space-1);
   inset-inline-start: var(--ht-space-1);
@@ -251,11 +294,7 @@
   transition: transform var(--ht-duration-fast) var(--ht-ease-standard);
 }
 
-.hta-switch__control:checked {
-  background: var(--ht-color-primary);
-}
-
-.hta-switch__control:checked::after {
+.hta-switch__control[data-state='checked'] .hta-switch__thumb {
   transform: translateX(calc(var(--ht-space-8) - var(--ht-space-5)));
 }
 
@@ -514,4 +553,32 @@
   .hta-pager {
     justify-content: flex-start;
   }
+}
+
+/* ── Tooltip（Radix 浮层，渲染在 Portal 里） ─────────── */
+.hta-tooltip {
+  z-index: var(--ht-z-tooltip);
+  max-inline-size: 18rem;
+  padding: var(--ht-space-1) var(--ht-space-2);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-foreground);
+  color: var(--ht-color-surface);
+  font-size: var(--ht-font-size-xs);
+  line-height: var(--ht-line-height-tight);
+  box-shadow: var(--ht-shadow-lg);
+}
+
+.hta-tooltip__arrow {
+  fill: var(--ht-color-foreground);
+}
+
+/* ── Popover（Radix 浮层，渲染在 Portal 里） ─────────── */
+.hta-popover {
+  z-index: var(--ht-z-popover);
+  padding: var(--ht-space-3);
+  border-radius: var(--ht-radius-lg);
+  background: var(--ht-color-surface-raised);
+  color: var(--ht-color-foreground);
+  font-size: var(--ht-font-size-sm);
+  box-shadow: var(--ht-shadow-xl);
 }
