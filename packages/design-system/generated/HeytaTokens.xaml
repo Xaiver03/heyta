@@ -108,7 +108,7 @@
     <x:Double x:Key="HeytaLineHeightTight">1.25</x:Double>
     <x:Double x:Key="HeytaLineHeightNormal">1.5</x:Double>
     <x:Double x:Key="HeytaLineHeightRelaxed">1.6</x:Double>
-    <x:String x:Key="HeytaFontSans">'PingFang SC', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'Segoe UI', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans SC', sans-serif</x:String>
+    <x:String x:Key="HeytaFontSans">'HarmonyOS_Sans_SC', 'HarmonyOS Sans SC', 'PingFang SC', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'Segoe UI', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans SC', sans-serif</x:String>
     <x:String x:Key="HeytaFontMono">'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace</x:String>
     <x:Double x:Key="HeytaRadiusNone">0</x:Double>
     <x:Double x:Key="HeytaRadiusSm">4</x:Double>

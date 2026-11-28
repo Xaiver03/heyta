@@ -145,7 +145,7 @@ enum HeytaTokens {
     static let lineHeightTight: Double = 1.25
     static let lineHeightNormal: Double = 1.5
     static let lineHeightRelaxed: Double = 1.6
-    static let fontSans: String = "'PingFang SC', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'Segoe UI', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans SC', sans-serif"
+    static let fontSans: String = "'HarmonyOS_Sans_SC', 'HarmonyOS Sans SC', 'PingFang SC', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'Segoe UI', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans SC', sans-serif"
     static let fontMono: String = "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
     static let radiusNone: Double = 0  // px
     static let radiusSm: Double = 4  // px
