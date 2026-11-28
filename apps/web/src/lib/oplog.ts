@@ -636,6 +636,20 @@ let routedDispatch: ((intent: OpIntent) => Promise<void>) | undefined;
 let routedChecked: (<T>(build: CheckedDispatchBuilder<T>) => Promise<T>) | undefined;
 
 export function attachShareWiring(wiring: ShareWiring | undefined): void {
+  /*
+    🔴 只有**装配真的变了**才 notify —— 这条 return 就是"登录框打字一顿一顿"的修复点。
+
+    同一份 wiring 被重复 attach（尤其"未登录 / 没配服务端"时反复 attach(undefined)）
+    不该通知：`notify()` 会叫醒所有 `onEngineChange` 听众，其中 `refreshPendingUpload`
+    会写一次 store；而 store 的订阅者 `armWebShareSession` 又会走一遍
+    `detach() → attachShareWiring(undefined) → notify()`。三者接起来是**一个自成一圈的环**，
+    把 SyncBar（以及挂在它下面的登录 / 注册弹窗）卷进每秒数百次重渲染 ——
+    应用里普通输入框不在这棵子树下所以没感觉，登录框每敲一个字符都在跟这个环抢主线程，
+    于是"键盘每输入一个字符要过一会儿才跳出来"。
+
+    装配没变 ⇒ 由它派生的 `routedDispatch` / `routedChecked` 也没变，跳过重建与通知都正确。
+  */
+  if (shareWiring === wiring) return;
   shareWiring = wiring;
   if (wiring === undefined) {
     routedDispatch = undefined;

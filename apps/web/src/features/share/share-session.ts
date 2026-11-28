@@ -159,7 +159,14 @@ export function armWebShareSession(): void {
   useSyncStore.subscribe(() => {
     const depKey = currentDepKey();
     if (depKey === undefined) {
-      detach();
+      /*
+        🔴 只有**真的有一份实例在**时才 detach。没有实例时反复 detach() 会一路跑到
+        `attachShareWiring(undefined)`，而那一步会（历史上无条件地）`notify()`；
+        notify 又会写一次 store、再触发本订阅 —— 与 `refreshPendingUpload`、
+        `attachShareWiring` 一起绕成一个自转环，把 SyncBar（含登录弹窗）拖成每秒
+        数百次重渲染。这里少 detach 一次，环就少一节。
+      */
+      if (built !== undefined) detach();
       return;
     }
     if (built !== undefined && built.depKey === depKey) return;
