@@ -195,3 +195,29 @@ describe('改名：一条 op，引用它的任务一个都不碰', () => {
     expect(payloadOf(rename), '改名只写 name 一个字段').toEqual({ name: '例会' });
   });
 });
+
+describe('③ 捕获建任务带标签：create({tagIds}) 同源校验并落到 Task.tagIds', () => {
+  it('有效 tagId ⇒ 落到 task.tagIds', async () => {
+    const tid = await projects.createTag('工作');
+    const taskId = await tasks.create('带标签任务', { tagIds: [tid] });
+    const task = tasks.findTask(taskId)! as unknown as Record<string, unknown>;
+    expect(task['tagIds']).toEqual([tid]);
+  });
+
+  it('🔴 悬空 tagId ⇒ 抛错（与 setTags 同源，防"查不到的标签"）', async () => {
+    await expect(tasks.create('坏标签', { tagIds: ['nonexistent'] })).rejects.toThrow(/标签/);
+  });
+
+  it('重复 tagId ⇒ 去重', async () => {
+    const tid = await projects.createTag('会议');
+    const taskId = await tasks.create('去重', { tagIds: [tid, tid] });
+    const task = tasks.findTask(taskId)! as unknown as Record<string, unknown>;
+    expect(task['tagIds']).toEqual([tid]);
+  });
+
+  it('空数组 ⇒ 不带 tagIds（null 语义，与 setTags 一致）', async () => {
+    const taskId = await tasks.create('无标签', { tagIds: [] });
+    const task = tasks.findTask(taskId)! as unknown as Record<string, unknown>;
+    expect(task['tagIds'] ?? undefined).toBeUndefined();
+  });
+});

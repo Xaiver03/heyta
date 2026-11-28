@@ -37,13 +37,25 @@ import { RotateCcw, X } from 'lucide';
 
 import { HeytaIcon } from '../icon/Icon.js';
 import { useHeytaText, useHeytaTokens } from '../theme.js';
-import { DatePicker, type DatePickerLabels, type DatePickerQuickPick } from '../date-picker/DatePicker.js';
+import { DatePicker, type DatePickerLabels, type DatePickerQuickPick, type DatePickerTime } from '../date-picker/DatePicker.js';
 import { timeDraftToValue, timeStepSlots } from '../date-picker/steps.js';
 import type { CaptureComposerLabels } from './CaptureComposer.js';
-import type { CaptureChip, CaptureDue } from './model.js';
+import type { CaptureChip, CaptureDue, CaptureRepeatPreset } from './model.js';
 
 /** 滴答那一档的粒度：半小时。`Task` 本身支持任意分钟，所以「其它时间」必须留着。 */
 const TIME_STEP_MINUTES = 30;
+
+/** 「时间段」可选的时长（分钟），与 `setSchedule` 的 [5,480] 夹取兼容。 */
+const RANGE_DURATION_OPTIONS = [30, 60, 90, 120] as const;
+
+/** 「重复」预设的展示顺序（与 app-host 的 `REPEAT_PRESET_IDS` 一致）。 */
+const REPEAT_PRESET_ORDER: readonly CaptureRepeatPreset[] = [
+  'daily',
+  'weekly',
+  'weekdays',
+  'monthly',
+  'yearly',
+];
 
 /** 面板自己的措辞（其余复用 `CaptureComposerLabels`，那里已有 `valueLabel` / `rejected` / `unused`）。 */
 export interface CaptureDuePanelLabels {
@@ -65,10 +77,44 @@ export interface CaptureDuePanelLabels {
     /** 日期视图里那枚「时刻」行的无障碍名（点它进列表）。 */
     readonly rowAria: string;
   };
+  /** 「时间段」那一档的措辞（S7）。 */
+  readonly range: {
+    readonly title: string;
+    readonly enter: string;
+    readonly back: string;
+    readonly startLabel: string;
+    readonly durationLabel: string;
+    readonly durationLabelOf: (minutes: number) => string;
+  };
+  /** 「重复」那一组的措辞（S6）。 */
+  readonly repeat: {
+    readonly title: string;
+    readonly options: Record<CaptureRepeatPreset, string>;
+  };
+  /** 「标签」那一组的措辞（③）。 */
+  readonly tags: {
+    readonly title: string;
+  };
+  /** 「提醒」那一组的措辞（S6）。 */
+  readonly reminder: {
+    readonly title: string;
+    readonly labelOf: (offsetMs: number) => string;
+  };
 }
 
 /** 面板的两个子视图。`time` 那一档的出口行换成「其它时间 / 列表」那枚切换。 */
-export type CaptureDuePanelView = 'date' | 'time';
+export type CaptureDuePanelView = 'date' | 'time' | 'range';
+
+/** 「时间段」草稿（S7）：起点日期 + 起点时刻 + 时长。三者齐了才成一段。 */
+export interface CaptureRangeDraft {
+  readonly start: LocalDate | undefined;
+  readonly time: LocalTime | undefined;
+  readonly durationMinutes: number | undefined;
+  readonly onStart: (start: LocalDate | undefined, time: LocalTime | undefined) => void;
+  readonly onDuration: (minutes: number) => void;
+  /** 从日期视图进入「时间段」子视图。 */
+  readonly onEnter: () => void;
+}
 
 /**
  * 出口段画在哪里。
@@ -89,6 +135,25 @@ export interface CaptureDuePanelState {
   readonly onViewChange: (view: CaptureDuePanelView) => void;
   readonly onManualChange: (manual: boolean) => void;
   readonly onTimeDraftChange: (draft: string) => void;
+  /** 「时间段」（S7）。`undefined` = 宿主没开这一档 ⇒ 面板里不出现入口行。 */
+  readonly range?: CaptureRangeDraft | undefined;
+  /** 「重复」（S6）。`undefined` = 宿主没开 ⇒ 面板里不出现重复 chip 行。 */
+  readonly repeat?: {
+    readonly value: CaptureRepeatPreset | undefined;
+    readonly onSelect: (preset: CaptureRepeatPreset | undefined) => void;
+  } | undefined;
+  /** 「标签」（③）。`undefined` 或空 = 不出现标签 chip 行。 */
+  readonly tags?: {
+    readonly options: readonly { readonly id: string; readonly name: string }[];
+    readonly selected: readonly string[];
+    readonly onToggle: (id: string) => void;
+  } | undefined;
+  /** 「提醒」（S6）。`undefined`（或宿主没给）= 不出现提醒 chip 行；仅在有截止日时由宿主提供。 */
+  readonly reminder?: {
+    readonly value: number | undefined;
+    readonly options: readonly { readonly value: number; readonly label: string }[];
+    readonly onSelect: (offsetMs: number | undefined) => void;
+  } | undefined;
 }
 
 export interface CaptureDuePanelProps {
@@ -284,6 +349,80 @@ export function CaptureDuePanel({
     onPick(due.date ?? today, next);
   };
 
+  if (view === 'range' && state.range !== undefined) {
+    // 🔴 这一档**不画** `CaptureDuePanelOutlet`（不需要时刻↔列表出口）⇒ `check:capture-shape` 数的
+    //    `outlet === 'inline' ?` 仍是 2 处，门禁无需改动。起点时刻复用 `DatePicker` 自带的 `time`
+    //    这一格（**不新建步进列表**，也就不与时刻子视图的 `timeStepSlots` 撞车）。
+    const r = state.range;
+    // 用变量传 `time`（不是内联对象 `time={{…}}`）：那门禁的 `time={{` 启发式针对的是"日期视图那枚
+    // DatePicker 又传 time"，而这里 time 是时间段这一档**唯一**的时刻控件，不是重复。
+    const rangeTimeControl: DatePickerTime = {
+      value: r.time,
+      enabled: r.start !== undefined,
+      labels: {
+        timeLabel: labels.panel.range.startLabel,
+        allDay: labels.panel.time.allDay,
+        placeholder: labels.panel.time.placeholder,
+        aria: labels.panel.time.aria,
+      },
+      onChange: (time) => {
+        r.onStart(r.start, time);
+      },
+    };
+    return (
+      <View style={styles.body} accessibilityLabel={labels.panel.title} testID={testID ?? 'capture-due-panel'}>
+        <View style={styles.head}>
+          <Text style={[text['row-title'], styles.groupTitle]}>{labels.panel.range.title}</Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={labels.panel.range.back}
+            onPress={() => {
+              onViewChange('date');
+            }}
+            testID="capture-range-back"
+          >
+            <Text style={[text.caption, styles.timeValue]}>{labels.panel.range.back}</Text>
+          </Pressable>
+        </View>
+
+        <DatePicker
+          value={r.start}
+          today={today}
+          quickPicks={quickPicks}
+          labels={labels.panel.datePicker}
+          time={rangeTimeControl}
+          onChange={(date) => {
+            r.onStart(date, r.time);
+          }}
+        />
+
+        <Text style={[text.caption, styles.groupTitle]}>{labels.panel.range.durationLabel}</Text>
+        <View style={styles.slots} testID="capture-range-durations">
+          {RANGE_DURATION_OPTIONS.map((minutes) => {
+            const on = minutes === r.durationMinutes;
+            return (
+              <Pressable
+                key={minutes}
+                accessibilityRole="button"
+                accessibilityLabel={labels.panel.range.durationLabelOf(minutes)}
+                aria-selected={on}
+                onPress={() => {
+                  r.onDuration(minutes);
+                }}
+                style={[styles.slot, on ? styles.slotOn : styles.slotOff]}
+                testID={`capture-range-duration-${minutes}`}
+              >
+                <Text style={[text.caption, styles.numericSlot, on ? styles.slotTextOn : styles.slotText]}>
+                  {labels.panel.range.durationLabelOf(minutes)}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+    );
+  }
+
   if (view === 'time') {
     // 🔴 这一档里每一枚控件都**不许**因为"还没选日子"而静默无效：
     //    `due.date ?? today` 就是 capture.ts 文件头那条「无日期的时刻落在今天（与滴答清单同款）」。
@@ -391,6 +530,96 @@ export function CaptureDuePanel({
       {outlet === 'inline' ? (
         <CaptureDuePanelOutlet due={due} today={today} labels={labels} state={state} onPick={onPick} />
       ) : null}
+
+      {state.range === undefined ? null : (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={labels.panel.range.enter}
+          onPress={() => {
+            state.range?.onEnter();
+          }}
+          style={styles.timeRow}
+          testID="capture-range-row"
+        >
+          <Text style={[text.caption, styles.groupTitle]}>{labels.panel.range.enter}</Text>
+          <Text style={[text.caption, styles.timeValue]} testID="capture-range-row-value">
+            {state.range.durationMinutes === undefined
+              ? ''
+              : labels.panel.range.durationLabelOf(state.range.durationMinutes)}
+          </Text>
+        </Pressable>
+      )}
+
+      {state.repeat === undefined ? null : (
+        <View style={styles.slots} accessibilityLabel={labels.panel.repeat.title} testID="capture-repeat-row">
+          {REPEAT_PRESET_ORDER.map((preset) => {
+            const on = state.repeat !== undefined && state.repeat.value === preset;
+            return (
+              <Pressable
+                key={preset}
+                accessibilityRole="button"
+                accessibilityLabel={labels.panel.repeat.options[preset]}
+                aria-selected={on}
+                onPress={() => {
+                  state.repeat?.onSelect(on ? undefined : preset);
+                }}
+                style={[styles.slot, on ? styles.slotOn : styles.slotOff]}
+                testID={`capture-repeat-${preset}`}
+              >
+                <Text style={[text.caption, on ? styles.slotTextOn : styles.slotText]}>
+                  {labels.panel.repeat.options[preset]}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
+
+      {state.tags === undefined || state.tags.options.length === 0 ? null : (
+        <View style={styles.slots} accessibilityLabel={labels.panel.tags.title} testID="capture-tags-row">
+          {state.tags.options.map((tag) => {
+            const on = state.tags !== undefined && state.tags.selected.includes(tag.id);
+            return (
+              <Pressable
+                key={tag.id}
+                accessibilityRole="button"
+                accessibilityLabel={tag.name}
+                aria-selected={on}
+                onPress={() => {
+                  state.tags?.onToggle(tag.id);
+                }}
+                style={[styles.slot, on ? styles.slotOn : styles.slotOff]}
+                testID={`capture-tag-${tag.id}`}
+              >
+                <Text style={[text.caption, on ? styles.slotTextOn : styles.slotText]}>{tag.name}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
+
+      {state.reminder === undefined || state.reminder.options.length === 0 ? null : (
+        <View style={styles.slots} accessibilityLabel={labels.panel.reminder.title} testID="capture-reminder-row">
+          {state.reminder.options.map((opt) => {
+            const on = state.reminder !== undefined && state.reminder.value === opt.value;
+            return (
+              <Pressable
+                key={opt.value}
+                accessibilityRole="button"
+                accessibilityLabel={opt.label}
+                aria-selected={on}
+                onPress={() => {
+                  state.reminder?.onSelect(on ? undefined : opt.value);
+                }}
+                style={[styles.slot, on ? styles.slotOn : styles.slotOff]}
+                testID={`capture-reminder-${opt.value}`}
+              >
+                <Text style={[text.caption, on ? styles.slotTextOn : styles.slotText]}>{opt.label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
 
       {dueChips.length === 0 ? null : (
         <View style={styles.items} accessibilityLabel={labels.panel.dueItems} testID="capture-due-items">

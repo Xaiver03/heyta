@@ -26,6 +26,12 @@ import {
   clearCaptureDue,
   makeCaptureOverride,
   withCaptureProject,
+  withCaptureRange,
+  withCaptureRepeatPreset,
+  withCaptureTags,
+  withCaptureReminder,
+  CAPTURE_RANGE_MIN_MINUTES,
+  CAPTURE_RANGE_MAX_MINUTES,
   captureChipAction,
   captureChipKey,
   captureChipRemainingDays,
@@ -381,6 +387,82 @@ describe('G. 落点：把选中的清单并进计划（`withCaptureProject`）',
     const next = withCaptureProject(frozen, 'p-2');
     expect(next).not.toBe(frozen);
     expect(frozen.projectId).toBeUndefined();
+  });
+});
+
+describe('G2. 时间段：把起止并进计划（`withCaptureRange`）', () => {
+  const base: CaptureSubmitPlan = { title: '开会' };
+
+  it('给了合法 range ⇒ 同时写入 startDate 与 durationMinutes，且不动已有的键', () => {
+    expect(withCaptureRange({ ...base, priority: Priority.High }, { startDate: 1_700_000_000_000, durationMinutes: 90 })).toEqual({
+      title: '开会',
+      priority: Priority.High,
+      startDate: 1_700_000_000_000,
+      durationMinutes: 90,
+    });
+  });
+
+  it('🔴 `undefined` ⇒ 计划**逐字节不变**（没选时间段时与改动前完全一致）', () => {
+    const plan = withCaptureRange({ ...base }, undefined);
+    expect(plan).toEqual({ title: '开会' });
+    expect(Object.prototype.hasOwnProperty.call(plan, 'startDate')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(plan, 'durationMinutes')).toBe(false);
+  });
+
+  it('🔴 时长低于下限 / 高于上限 ⇒ 整段忽略（不写半截字段，也不让下游静默夹取）', () => {
+    for (const durationMinutes of [CAPTURE_RANGE_MIN_MINUTES - 1, 0, -30, CAPTURE_RANGE_MAX_MINUTES + 1, Number.NaN]) {
+      const plan = withCaptureRange({ ...base }, { startDate: 1_700_000_000_000, durationMinutes });
+      expect(Object.prototype.hasOwnProperty.call(plan, 'startDate')).toBe(false);
+      expect(Object.prototype.hasOwnProperty.call(plan, 'durationMinutes')).toBe(false);
+    }
+  });
+
+  it('起点非法（NaN / Infinity）⇒ 整段忽略：**绝不出现"有时长没起点"**的半截状态', () => {
+    for (const startDate of [Number.NaN, Number.POSITIVE_INFINITY]) {
+      const plan = withCaptureRange({ ...base }, { startDate, durationMinutes: 60 });
+      expect(Object.prototype.hasOwnProperty.call(plan, 'durationMinutes')).toBe(false);
+    }
+  });
+
+  it('边界值本身合法（恰好 5 / 480 分钟）', () => {
+    expect(withCaptureRange({ ...base }, { startDate: 1, durationMinutes: CAPTURE_RANGE_MIN_MINUTES }).durationMinutes).toBe(
+      CAPTURE_RANGE_MIN_MINUTES,
+    );
+    expect(withCaptureRange({ ...base }, { startDate: 1, durationMinutes: CAPTURE_RANGE_MAX_MINUTES }).durationMinutes).toBe(
+      CAPTURE_RANGE_MAX_MINUTES,
+    );
+  });
+
+  it('不复制入参以外的一切：返回新对象，原计划不被改写', () => {
+    const frozen = { ...base };
+    const next = withCaptureRange(frozen, { startDate: 5, durationMinutes: 30 });
+    expect(next).not.toBe(frozen);
+    expect(frozen.startDate).toBeUndefined();
+  });
+});
+
+describe('G3. 重复预设：并进计划（`withCaptureRepeatPreset`）', () => {
+  const base: CaptureSubmitPlan = { title: '每周复盘' };
+
+  it('给了预设 ⇒ 写入 repeatPreset，且不动已有的键', () => {
+    expect(withCaptureRepeatPreset({ ...base, priority: Priority.Low }, 'weekly')).toEqual({
+      title: '每周复盘',
+      priority: Priority.Low,
+      repeatPreset: 'weekly',
+    });
+  });
+
+  it('🔴 `undefined` ⇒ 计划逐字节不变（不重复时与改动前一致）', () => {
+    const plan = withCaptureRepeatPreset({ ...base }, undefined);
+    expect(plan).toEqual({ title: '每周复盘' });
+    expect(Object.prototype.hasOwnProperty.call(plan, 'repeatPreset')).toBe(false);
+  });
+
+  it('返回新对象，原计划不被改写', () => {
+    const frozen = { ...base };
+    const next = withCaptureRepeatPreset(frozen, 'daily');
+    expect(next).not.toBe(frozen);
+    expect(frozen.repeatPreset).toBeUndefined();
   });
 });
 
@@ -740,5 +822,38 @@ describe('外壳标题该说什么（`captureDuePanelTitle`）—— 判断在�
       expect(title).not.toContain('未设置');
       expect(title).not.toContain('「」');
     }
+  });
+});
+
+describe('G4. 标签：并进计划（`withCaptureTags`）', () => {
+  const base: CaptureSubmitPlan = { title: '带标签' };
+
+  it('给了 tagIds ⇒ 去重后写入 tagIds', () => {
+    expect(withCaptureTags({ ...base }, ['t1', 't1', 't2'])).toEqual({ title: '带标签', tagIds: ['t1', 't2'] });
+  });
+
+  it('🔴 `undefined` / 空数组 ⇒ 计划逐字节不变（不带 tagIds）', () => {
+    for (const v of [undefined, []] as const) {
+      const plan = withCaptureTags({ ...base }, v);
+      expect(Object.prototype.hasOwnProperty.call(plan, 'tagIds')).toBe(false);
+    }
+  });
+
+  it('返回新对象，原计划不被改写', () => {
+    const frozen = { ...base };
+    const next = withCaptureTags(frozen, ['t1']);
+    expect(next).not.toBe(frozen);
+    expect(frozen.tagIds).toBeUndefined();
+  });
+});
+
+describe('G5. 提醒提前量：并进计划（`withCaptureReminder`）', () => {
+  const base: CaptureSubmitPlan = { title: '开会' };
+  it('给了 offsetMs ⇒ 写入 reminderOffsetMs', () => {
+    expect(withCaptureReminder({ ...base }, 1800000)).toEqual({ title: '开会', reminderOffsetMs: 1800000 });
+  });
+  it('🔴 undefined ⇒ 逐字节不变', () => {
+    const plan = withCaptureReminder({ ...base }, undefined);
+    expect(Object.prototype.hasOwnProperty.call(plan, 'reminderOffsetMs')).toBe(false);
   });
 });

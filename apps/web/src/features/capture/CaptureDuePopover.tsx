@@ -26,7 +26,7 @@
 import { useLayoutEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 
-import { closePolicyOf, placeAnchoredPanel } from '@heyta/ui';
+import { closePolicyOf } from '@heyta/ui';
 
 /** 胶囊的锚点 id —— 共享组件里那一枚 `testID="capture-due-capsule"`。 */
 const CAPSULE_TEST_ID = 'capture-due-capsule';
@@ -51,9 +51,13 @@ export function CaptureDuePopover({
     const previousFocus = document.activeElement;
     const policy = closePolicyOf('popover');
 
+    const cardEl = document.querySelector<HTMLElement>('[data-testid="capture-compose"]');
     const place = (): void => {
       if (trigger === null) return;
-      const rect = trigger.getBoundingClientRect();
+      // 「连续卡」：锚到输入卡本身（不是胶囊），与输入卡等宽、贴着它的底边（-1px 盖住边框消接缝）——
+      // 配上 CSS 去掉接缝，读作同一张卡的下半截，而不是浮在下面的第二张卡。
+      const anchor = cardEl ?? trigger;
+      const rect = anchor.getBoundingClientRect();
       const padding = Number.parseFloat(getComputedStyle(panel).paddingLeft) || 0;
       /*
        * 🔴 可用底边**不是视口底边**。塌缩档（≤768）那条底部导航（`.ht-compact-rail`）
@@ -67,11 +71,14 @@ export function CaptureDuePopover({
       const rail = document.querySelector<HTMLElement>('.ht-compact-rail');
       const railTop = rail?.getBoundingClientRect().top ?? window.innerHeight;
       const usableBottom = Math.min(window.innerHeight, railTop - padding);
-      const roomAbove = Math.max(0, rect.top - padding - padding);
-      const roomBelow = Math.max(0, usableBottom - rect.bottom - padding - padding);
       // 面板是 fixed 的：最大高度必须跟着"往哪边弹"这一判走，否则贴着视口底开
       // 会画出视口外，而最后两周根本点不到（`DueEditor` 那格翻过的同一个错）。
-      const available = Math.max(roomAbove, roomBelow);
+      // 等宽 + 贴底边（永远向下挂，保持连续性）。
+      panel.style.boxSizing = 'border-box';
+      panel.style.inlineSize = `${Math.round(rect.width)}px`;
+      const top = Math.round(rect.bottom - 1);
+      // 下方可用高度；不够就让内层滚动（浮层永远向下挂）。
+      const available = Math.max(0, usableBottom - top - padding);
       panel.style.maxBlockSize = `${available}px`;
       // 🔴 光设 maxBlockSize **不裁内容，只是让它溢出**。限高必须落在内层滚动容器上：
       // 外壳负责位置，内层负责"溢出的部分还能滚到"。
@@ -79,20 +86,24 @@ export function CaptureDuePopover({
       if (scroller instanceof HTMLElement) {
         scroller.style.maxBlockSize = `${Math.max(0, available - padding * 2)}px`;
       }
-      const size = panel.getBoundingClientRect();
-      const pos = placeAnchoredPanel(
-        rect,
-        size,
-        { width: window.innerWidth, height: usableBottom },
-        { gap: padding, edge: padding },
-      );
-      panel.style.top = `${pos.top}px`;
-      panel.style.left = `${pos.left}px`;
+      panel.style.top = `${top}px`;
+      panel.style.left = `${Math.round(rect.left)}px`;
     };
     place();
+    // 面板打开时给 body 打标记：CSS 据此把输入卡底角改方，接缝处合成一张卡。
+    document.body.dataset['capturePanelOpen'] = 'true';
 
-    const observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(place);
+    // 🔴 RO 回调里 place() 会改面板尺寸（inlineSize/maxBlockSize）⇒ 直接在回调里改会触发
+    //    "ResizeObserver loop completed with undelivered notifications"（浏览器良性报错，但会污染
+    //    控制台、也会让验收的"零 console 错误"红）。用 rAF 把改动推到下一帧，回环消失。
+    const observer =
+      typeof ResizeObserver === 'undefined'
+        ? undefined
+        : new ResizeObserver(() => {
+            requestAnimationFrame(place);
+          });
     observer?.observe(panel);
+    if (cardEl !== null) observer?.observe(cardEl);
 
     const dismiss = (event: PointerEvent): void => {
       if (policy.scrim !== 'dismiss') return;
@@ -113,6 +124,7 @@ export function CaptureDuePopover({
     window.addEventListener('resize', place);
     return () => {
       observer?.disconnect();
+      delete document.body.dataset['capturePanelOpen'];
       document.removeEventListener('pointerdown', dismiss);
       document.removeEventListener('keydown', escape, true);
       document.removeEventListener('scroll', place, true);

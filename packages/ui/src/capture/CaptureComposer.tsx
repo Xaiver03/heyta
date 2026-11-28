@@ -77,7 +77,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, TextInput, View, type ViewProps } from 'react-native';
 import type { HeytaNativeTokens } from '@heyta/design-system';
-import { today } from '@heyta/domain';
+import { dueDateToEpoch, today } from '@heyta/domain';
 import type { CaptureExclusion, LocalDate, LocalTime } from '@heyta/domain';
 import { Calendar, ChevronDown, Plus, RotateCcw, X } from 'lucide';
 import { HeytaIcon } from '../icon/Icon.js';
@@ -105,12 +105,17 @@ import {
   toCaptureSubmitPlan,
   toggleCaptureIgnore,
   withCaptureProject,
+  withCaptureRange,
+  withCaptureRepeatPreset,
+  withCaptureTags,
+  withCaptureReminder,
   type CaptureCapsuleKind,
   type CaptureChip,
   type CaptureDue,
   type CaptureOverride,
   type CaptureProjectPicker,
   type CaptureSubmitPlan,
+  type CaptureRepeatPreset,
 } from './model.js';
 
 /**
@@ -199,6 +204,15 @@ export interface CapturePanelSlot {
   readonly subject: string;
   readonly onClose: () => void;
 }
+
+/** 可选标签（③）：宿主从 store 映射出 id+name 传给捕获框。 */
+export interface CaptureTagOption {
+  readonly id: string;
+  readonly name: string;
+}
+
+/** 「提醒」可选档位（ms）：准时(0) / 提前 5 / 30 / 60 分钟 / 1 天（对齐滴答提醒档）。 */
+const REMINDER_OFFSET_OPTIONS = [0, 5 * 60_000, 30 * 60_000, 60 * 60_000, 24 * 60 * 60_000] as const;
 
 export interface CaptureComposerProps {
   readonly labels: CaptureComposerLabels;
@@ -301,6 +315,17 @@ export interface CaptureComposerProps {
    * 形状不同是**载体的差别**，不是两个产品。
    */
   readonly descriptionInput?: boolean | undefined;
+  /**
+   * 开不开「时间段」（S7）。它住在**日期面板里面**（面板打开后才出现一行「时间段 ›」），
+   * 不是常驻行 —— 开它不会把 web 顶部列表往下推。默认 `false`（逐字节等价于改动前）。
+   */
+  readonly rangeEnabled?: boolean | undefined;
+  /** 开不开「重复」（S6）。同样住在面板里（打开面板才出现 chip 行），默认 `false`。 */
+  readonly repeatEnabled?: boolean | undefined;
+  /** 可选的标签列表（③）。不传 = 不出现标签 chip 行（逐字节等价于改动前）。 */
+  readonly tags?: readonly CaptureTagOption[] | undefined;
+  /** 开不开「提醒」（S6）。只在有截止日时出现提醒 chip 行；默认 `false`。 */
+  readonly reminderEnabled?: boolean | undefined;
 }
 
 /** 取一份 token 表，建出这套样式。**一个裸尺度值都没有**（`check:design` 会拦）。 */
@@ -502,6 +527,10 @@ export function CaptureComposer({
   quickPicks,
   fillRequest,
   descriptionInput = false,
+  rangeEnabled = false,
+  repeatEnabled = false,
+  tags,
+  reminderEnabled = false,
 }: CaptureComposerProps): React.JSX.Element {
   const tokens = useHeytaTokens();
   const text = useHeytaText();
@@ -523,9 +552,19 @@ export function CaptureComposer({
    * 而"点出口 ⇒ 面板体切子视图"这件事只有两边读同一份状态才成立。
    * 留在面板里时，把那段 JSX 复制给宿主就会造出第二份状态：footer 点了，面板不动。
    */
-  const [panelView, setPanelView] = useState<'date' | 'time'>('date');
+  const [panelView, setPanelView] = useState<'date' | 'time' | 'range'>('date');
   const [panelManual, setPanelManual] = useState(false);
   const [panelTimeDraft, setPanelTimeDraft] = useState('');
+  /** 「时间段」草稿（S7）。仅在 `rangeEnabled` 时被渲染与提交。 */
+  const [rangeStart, setRangeStart] = useState<LocalDate | undefined>(undefined);
+  const [rangeTime, setRangeTime] = useState<LocalTime | undefined>(undefined);
+  const [rangeDuration, setRangeDuration] = useState<number | undefined>(undefined);
+  /** 「重复」预设草稿（S6）。仅在 `repeatEnabled` 时被渲染与提交。 */
+  const [repeatPreset, setRepeatPreset] = useState<CaptureRepeatPreset | undefined>(undefined);
+  /** 已选标签 id（③）。仅在宿主给了 `tags` 时被渲染与提交。 */
+  const [tagIds, setTagIds] = useState<readonly string[]>([]);
+  /** 提醒提前量（S6）。仅在 `reminderEnabled` 且有截止日时被渲染与提交。 */
+  const [reminderOffsetMs, setReminderOffsetMs] = useState<number | undefined>(undefined);
 
   /** 原生端自己控制焦点（见 `autoFocus` 的说明）；web 不需要。 */
   const inputRef = useRef<TextInput>(null);
@@ -596,11 +635,33 @@ export function CaptureComposer({
     const trimmedDescription = descriptionDraft.trim();
     const withDescription =
       trimmedDescription === '' ? plan : { ...plan, description: trimmedDescription };
-    void onSubmit(withCaptureProject(withDescription, captureSelectedProject(projectPicker)?.id));
+    const range =
+      rangeEnabled && rangeStart !== undefined && rangeDuration !== undefined
+        ? { startDate: dueDateToEpoch(rangeStart, rangeTime), durationMinutes: rangeDuration }
+        : undefined;
+    void onSubmit(
+      withCaptureReminder(
+        withCaptureTags(
+          withCaptureRepeatPreset(
+            withCaptureRange(withCaptureProject(withDescription, captureSelectedProject(projectPicker)?.id), range),
+            repeatEnabled ? repeatPreset : undefined,
+          ),
+          tags === undefined ? undefined : tagIds,
+        ),
+        // 提醒必须有截止日才生效（无截止的提醒无意义，动作层也会拒绝）。
+        due.date === undefined ? undefined : reminderOffsetMs,
+      ),
+    );
     setDraft('');
     setDescriptionDraft('');
     setIgnored([]);
     setOverride(undefined);
+    setRangeStart(undefined);
+    setRangeTime(undefined);
+    setRangeDuration(undefined);
+    setRepeatPreset(undefined);
+    setTagIds([]);
+    setReminderOffsetMs(undefined);
     closePanel();
   }
 
@@ -642,6 +703,52 @@ export function CaptureComposer({
     onViewChange: setPanelView,
     onManualChange: setPanelManual,
     onTimeDraftChange: setPanelTimeDraft,
+    range: rangeEnabled
+      ? {
+          start: rangeStart,
+          time: rangeTime,
+          durationMinutes: rangeDuration,
+          onStart: (start, time) => {
+            setRangeStart(start);
+            setRangeTime(time);
+          },
+          onDuration: (minutes) => {
+            setRangeDuration((prev) => (prev === minutes ? undefined : minutes));
+          },
+          onEnter: () => {
+            setPanelView('range');
+          },
+        }
+      : undefined,
+    repeat: repeatEnabled
+      ? {
+          value: repeatPreset,
+          onSelect: (preset) => {
+            setRepeatPreset(preset);
+          },
+        }
+      : undefined,
+    tags:
+      tags === undefined || tags.length === 0
+        ? undefined
+        : {
+            options: tags,
+            selected: tagIds,
+            onToggle: (id) => {
+              setTagIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+            },
+          },
+    // 提醒只在有截止日时出现（无截止日谈不上"提前"）。
+    reminder:
+      !reminderEnabled || due.date === undefined
+        ? undefined
+        : {
+            value: reminderOffsetMs,
+            options: REMINDER_OFFSET_OPTIONS.map((ms) => ({ value: ms, label: labels.panel.reminder.labelOf(ms) })),
+            onSelect: (ms) => {
+              setReminderOffsetMs((prev) => (prev === ms ? undefined : ms));
+            },
+          },
   };
 
   /**

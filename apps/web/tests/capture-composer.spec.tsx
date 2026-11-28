@@ -37,10 +37,16 @@ import { Priority } from '@heyta/domain';
 /** 记录 addTask 收到的参数。写入路径本身由 app-host 的测试覆盖，这里只关心参数对不对。 */
 const addTask = vi.fn(() => Promise.resolve());
 
+/** 标签表（③）：宿主的 CaptureComposer 会读 `entities.tags` 映射成可选标签。 */
+const MOCK_TAG_RECORD = {
+  t1: { id: 't1', name: '工作' },
+  t2: { id: 't2', name: '会议' },
+};
+
 // 只替换写入动作，UI 其余部分跑真实实现（包括真实的 parseCapture 与共享组件）。
 vi.mock('../src/features/tasks/store.js', () => ({
-  useTaskStore: (selector: (s: { addTask: typeof addTask }) => unknown) =>
-    selector({ addTask }),
+  useTaskStore: (selector: (s: { addTask: typeof addTask; entities: { tags: typeof MOCK_TAG_RECORD } }) => unknown) =>
+    selector({ addTask, entities: { tags: MOCK_TAG_RECORD } }),
 }));
 
 const { CaptureComposer } = await import('../src/features/capture/CaptureComposer.js');
@@ -392,6 +398,91 @@ describe('CaptureComposer —— 每一条截止识别都能单独取消（出�
     expect(addTask).toHaveBeenCalledWith('今天下午八点交周报', {});
   });
 });
+
+describe('S7 时间段（rangeEnabled）：面板里有入口、进得去、选得了时长', () => {
+  it('面板出现「时间段」入口行；点进 range 视图有时长 chip，点一枚即选中（aria-selected）', () => {
+    const el = render();
+    type(el, '下午开会');
+    const panel = openPanel(el);
+    const rangeRow = panel.querySelector<HTMLElement>('[data-testid="capture-range-row"]');
+    expect(rangeRow, 'rangeEnabled 时面板里应有「时间段」入口行').not.toBeNull();
+
+    act(() => {
+      rangeRow!.click();
+    });
+    const dur = document.querySelector<HTMLElement>('[data-testid="capture-range-duration-60"]');
+    expect(dur, 'range 视图里应有时长 chip').not.toBeNull();
+
+    act(() => {
+      dur!.click();
+    });
+    const after = document.querySelector<HTMLElement>('[data-testid="capture-range-duration-60"]');
+    expect(after!.getAttribute('aria-selected'), '点过之后该时长被选中').toBe('true');
+  });
+});
+
+describe('S6 重复（repeatEnabled）：面板里有预设 chip、点一枚即选中', () => {
+  it('面板出现重复 chip 行；点「每周」后该 chip aria-selected=true', () => {
+    const el = render();
+    type(el, '每周复盘');
+    const panel = openPanel(el);
+    const row = panel.querySelector<HTMLElement>('[data-testid="capture-repeat-row"]');
+    expect(row, 'repeatEnabled 时面板里应有重复 chip 行').not.toBeNull();
+
+    const weekly = row!.querySelector<HTMLElement>('[data-testid="capture-repeat-weekly"]');
+    expect(weekly, '重复行里应有「每周」chip').not.toBeNull();
+    act(() => {
+      weekly!.click();
+    });
+    const after = document.querySelector<HTMLElement>('[data-testid="capture-repeat-weekly"]');
+    expect(after!.getAttribute('aria-selected'), '点过之后「每周」被选中').toBe('true');
+  });
+});
+
+describe('③ 标签（tags）：面板里有标签 chip、选中后提交带 tagIds', () => {
+  it('点「工作(t1)」再提交 ⇒ addTask 收到 { tagIds: ["t1"] }', () => {
+    const el = render();
+    type(el, '带标签的任务');
+    const panel = openPanel(el);
+    const row = panel.querySelector<HTMLElement>('[data-testid="capture-tags-row"]');
+    expect(row, '宿主给了 tags 时面板里应有标签 chip 行').not.toBeNull();
+
+    const t1 = row!.querySelector<HTMLElement>('[data-testid="capture-tag-t1"]');
+    expect(t1, '标签行里应有「工作」chip').not.toBeNull();
+    act(() => {
+      t1!.click();
+    });
+    act(() => {
+      submit(el).click();
+    });
+    expect(addTask).toHaveBeenCalledTimes(1);
+    const [, over] = addTask.mock.calls[0] as unknown as [string, Record<string, unknown>];
+    expect(over.tagIds).toEqual(['t1']);
+  });
+});
+describe('S6 提醒（reminderEnabled）：有截止日时出现提醒 chip，选中后提交带 reminderOffsetMs', () => {
+  it('打「明天买牛奶」→ 面板有提醒行 → 点「提前30分钟」→ 提交带 reminderOffsetMs=1800000', () => {
+    const el = render();
+    type(el, '明天买牛奶');
+    const panel = openPanel(el);
+    const row = panel.querySelector<HTMLElement>('[data-testid="capture-reminder-row"]');
+    expect(row, '有截止日时面板里应有提醒 chip 行').not.toBeNull();
+
+    const m30 = row!.querySelector<HTMLElement>('[data-testid="capture-reminder-1800000"]');
+    expect(m30, '提醒行里应有「提前30分钟」chip').not.toBeNull();
+    act(() => {
+      m30!.click();
+    });
+    act(() => {
+      submit(el).click();
+    });
+    expect(addTask).toHaveBeenCalledTimes(1);
+    const [, over] = addTask.mock.calls[0] as unknown as [string, Record<string, unknown>];
+    expect(over.reminderOffsetMs).toBe(1800000);
+    expect(typeof over.dueDate).toBe('number');
+  });
+});
+
 
 describe('CaptureComposer —— 不给外壳那一档：就地展开（移动端的唯一面板路径）', () => {
   /*

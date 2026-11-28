@@ -128,6 +128,37 @@ export function captureLabels(t: Translate): CaptureComposerLabels {
         backToDay: t('mobile.capture.panel.time.backToDay'),
         rowAria: t('mobile.capture.panel.time.rowAria'),
       },
+      range: {
+        title: t('web.capture.panel.range.title'),
+        enter: t('web.capture.panel.range.enter'),
+        back: t('web.capture.panel.range.back'),
+        startLabel: t('web.capture.panel.range.startLabel'),
+        durationLabel: t('web.capture.panel.range.durationLabel'),
+        durationLabelOf: (minutes) => t('web.capture.panel.range.durationOf', { n: String(minutes) }),
+      },
+      repeat: {
+        title: t('web.capture.panel.repeat.title'),
+        options: {
+          daily: t('web.capture.panel.repeat.daily'),
+          weekly: t('web.capture.panel.repeat.weekly'),
+          weekdays: t('web.capture.panel.repeat.weekdays'),
+          monthly: t('web.capture.panel.repeat.monthly'),
+          yearly: t('web.capture.panel.repeat.yearly'),
+        },
+      },
+      tags: {
+        title: t('web.capture.panel.tags.title'),
+      },
+      reminder: {
+        title: t('web.capture.panel.reminder.title'),
+        labelOf: (ms) => {
+          if (ms === 0) return t('web.capture.panel.reminder.atTime');
+          if (ms === 5 * 60000) return t('web.capture.panel.reminder.m5');
+          if (ms === 30 * 60000) return t('web.capture.panel.reminder.m30');
+          if (ms === 60 * 60000) return t('web.capture.panel.reminder.h1');
+          return t('web.capture.panel.reminder.d1');
+      },
+        },
     },
   };
 }

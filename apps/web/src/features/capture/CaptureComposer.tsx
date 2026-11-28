@@ -153,6 +153,15 @@ export interface CaptureDestination {
 
 export function CaptureComposer(props: CaptureComposerProps): React.JSX.Element {
   const addTask = useTaskStore((s) => s.addTask);
+  /** 可选标签（③）：从 store 映射出 id+name 交给捕获框；被删的标签不出现。 */
+  const tagRecord = useTaskStore((s) => s.entities.tags);
+  const captureTags = useMemo(
+    () =>
+      Object.values(tagRecord)
+        .filter((tag) => tag.deletedAt === undefined)
+        .map((tag) => ({ id: tag.id, name: tag.name })),
+    [tagRecord],
+  );
   const { t, locale } = useI18n();
   const destination = props.destination;
   const anchorDate = props.anchorDate;
@@ -258,6 +267,37 @@ export function CaptureComposer(props: CaptureComposerProps): React.JSX.Element 
           backToDay: t('web.capture.panel.time.backToDay'),
           rowAria: t('web.capture.panel.time.rowAria'),
         },
+        range: {
+          title: t('web.capture.panel.range.title'),
+          enter: t('web.capture.panel.range.enter'),
+          back: t('web.capture.panel.range.back'),
+          startLabel: t('web.capture.panel.range.startLabel'),
+          durationLabel: t('web.capture.panel.range.durationLabel'),
+          durationLabelOf: (minutes) => t('web.capture.panel.range.durationOf', { n: String(minutes) }),
+        },
+        repeat: {
+          title: t('web.capture.panel.repeat.title'),
+          options: {
+            daily: t('web.capture.panel.repeat.daily'),
+            weekly: t('web.capture.panel.repeat.weekly'),
+            weekdays: t('web.capture.panel.repeat.weekdays'),
+            monthly: t('web.capture.panel.repeat.monthly'),
+            yearly: t('web.capture.panel.repeat.yearly'),
+          },
+        },
+        tags: {
+          title: t('web.capture.panel.tags.title'),
+        },
+        reminder: {
+          title: t('web.capture.panel.reminder.title'),
+          labelOf: (ms) => {
+            if (ms === 0) return t('web.capture.panel.reminder.atTime');
+            if (ms === 5 * 60000) return t('web.capture.panel.reminder.m5');
+            if (ms === 30 * 60000) return t('web.capture.panel.reminder.m30');
+            if (ms === 60 * 60000) return t('web.capture.panel.reminder.h1');
+            return t('web.capture.panel.reminder.d1');
+          },
+        },
       },
     }),
     [t, locale, destination, props.anchorDate],
@@ -294,6 +334,15 @@ export function CaptureComposer(props: CaptureComposerProps): React.JSX.Element 
     (plan: CaptureSubmitPlan) =>
       addTask(plan.title, {
         ...(plan.dueDate !== undefined ? { dueDate: plan.dueDate } : {}),
+        // 「时间段」（S7）：起点 + 时长，与 `dueDate` 并列，走同一条 Create op。
+        ...(plan.startDate !== undefined ? { startDate: plan.startDate } : {}),
+        ...(plan.durationMinutes !== undefined ? { durationMinutes: plan.durationMinutes } : {}),
+        // 重复预设（S6）：由 app-host 的 create() 派生 repeatRule+repeatDtstart。
+        ...(plan.repeatPreset !== undefined ? { repeatPreset: plan.repeatPreset } : {}),
+        // 标签（③）：创建时 payload 带上，走同一条 Create op。
+        ...(plan.tagIds !== undefined ? { tagIds: [...plan.tagIds] } : {}),
+        // 提醒（S6）：由 app-host 的 create() 在任务后补一条 Reminder op。
+        ...(plan.reminderOffsetMs !== undefined ? { reminderOffsetMs: plan.reminderOffsetMs } : {}),
         ...(plan.priority !== undefined ? { priority: plan.priority } : {}),
         ...(destination !== undefined ? { projectId: destination.projectId } : {}),
       }),
@@ -318,6 +367,10 @@ export function CaptureComposer(props: CaptureComposerProps): React.JSX.Element 
         quickPicks={quickPicks}
         fillRequest={props.fillRequest}
         renderDuePanel={props.inlineDuePanel === true ? undefined : renderDuePanel}
+        rangeEnabled
+        repeatEnabled
+        tags={captureTags}
+        reminderEnabled
       />
     </HeytaUiProvider>
   );

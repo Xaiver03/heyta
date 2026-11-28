@@ -126,6 +126,51 @@ describe('🔴 建任务的可覆盖字段：名字必须与模型一致', () =>
     // 反向断言：不许出现一个没人读的 `notes` 残留字段。
     expect(task['notes'], '不许写一个没人读的 `notes` 字段').toBeUndefined();
   });
+
+  it('🔴 S7：时间段 `startDate + durationMinutes` 一次 Create op 落到 Task 上（两个字段都对，且成对）', async () => {
+    // 与 note/notes 同一条纪律：`create` 把 `over` 原样铺进载荷，键名=Task 字段名。
+    // 捕获「时间段」只发**一条** Create op（一个用户意图=一个 op），而不是
+    // create + setSchedule 两条 —— 后者会留下"先有起点没时长"的中间态。
+    const startDate = 1_700_000_000_000;
+    const id = await actions.create('下午开会', { startDate, durationMinutes: 90 });
+
+    const task = actions.findTask(id)! as unknown as Record<string, unknown>;
+    expect(task['startDate'], 'Task.startDate 必须拿到起点').toBe(startDate);
+    expect(task['durationMinutes'], 'Task.durationMinutes 必须拿到时长').toBe(90);
+  });
+
+  it('没选时间段 ⇒ 载荷里两个键都不出现（与改动前逐字节等价）', async () => {
+    const id = await actions.create('只写标题');
+    const task = actions.findTask(id)! as unknown as Record<string, unknown>;
+    expect(Object.prototype.hasOwnProperty.call(task, 'startDate')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(task, 'durationMinutes')).toBe(false);
+  });
+});
+
+describe('S6：repeatPreset 随一条 Create op 派生 repeatRule + repeatDtstart', () => {
+  it('weekly 预设 ⇒ repeatRule 含 FREQ=WEEKLY、repeatDtstart = 截止日；只有一条 Create op', async () => {
+    const due = parseLocalDate(MONDAY).getTime();
+    const id = await actions.create('每周复盘', { repeatPreset: 'weekly', dueDate: due });
+
+    const task = actions.findTask(id)! as unknown as Record<string, unknown>;
+    expect(typeof task['repeatRule'], '必须派生 repeatRule').toBe('string');
+    expect(String(task['repeatRule'])).toContain('FREQ=WEEKLY');
+    expect(task['repeatDtstart'], '锚点必须派生（与 setRepeat 同源）').toBeDefined();
+    expect(task['repeatPreset'], '重复预设不许原样落进任务（不是 Task 字段）').toBeUndefined();
+    expect(task['dueDate'], '给定截止日不被覆盖').toBe(due);
+  });
+
+  it('daily 预设 ⇒ FREQ=DAILY', async () => {
+    const id = await actions.create('每天读书', { repeatPreset: 'daily', dueDate: parseLocalDate(MONDAY).getTime() });
+    expect(String((actions.findTask(id)! as unknown as Record<string, unknown>)['repeatRule'])).toContain('FREQ=DAILY');
+  });
+
+  it('无 repeatPreset ⇒ 不出现 repeatRule / repeatDtstart（与改动前逐字节等价）', async () => {
+    const id = await actions.create('只写标题');
+    const task = actions.findTask(id)! as unknown as Record<string, unknown>;
+    expect(Object.prototype.hasOwnProperty.call(task, 'repeatRule')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(task, 'repeatDtstart')).toBe(false);
+  });
 });
 
 describe('setRepeat：一个用户意图 = 一个 op', () => {
@@ -544,5 +589,36 @@ describe('完成后顺延 vs 固定排期（Task.repeatAfterCompletion）', () =
     expect(after.length - before.length).toBe(1);
     expect(actions.findTask(id)!.repeatRule).toBe(ruleBefore);
     expect(actions.findTask(id)!.repeatDtstart).toBe(anchorBefore);
+  });
+});
+
+describe('S6 提醒：create({dueDate,reminderOffsetMs}) ⇒ 任务 + 独立 Reminder（两条 op/两个实体）', () => {
+  const remindersFor = (taskId: string): { id: string }[] =>
+    Object.values(engine.getState().reminders).filter((r) => r.taskId === taskId) as { id: string }[];
+
+  it('建一条任务 + 一条提前提醒；任务 Create op 一条、提醒是独立 REMINDER Create op', async () => {
+    const due = clock + 7 * 86_400_000; // 相对测试"现在"的未来截止，保证提醒时刻未过
+    const id = await actions.create('开会前提醒', { dueDate: due, reminderOffsetMs: 30 * 60 * 1000 });
+
+    const taskCreates = (await engine.getOpsForEntity('TASK', id)).filter((o) => o.opType === OpType.Create);
+    expect(taskCreates, '任务只有一条 Create op（提醒不混进任务载荷）').toHaveLength(1);
+    // 提醒不落进任务载荷
+    expect(taskCreates[0]!.payload).not.toHaveProperty('reminderOffsetMs');
+
+    const rems = remindersFor(id);
+    expect(rems, '必须建出一条提醒（独立实体）').toHaveLength(1);
+    const remCreates = (await engine.getOpsForEntity('REMINDER', rems[0]!.id)).filter((o) => o.opType === OpType.Create);
+    expect(remCreates, '提醒走独立 REMINDER 实体的 Create op').toHaveLength(1);
+  });
+
+  it('没有 reminderOffsetMs ⇒ 无提醒', async () => {
+    const id = await actions.create('无提醒', { dueDate: parseLocalDate(MONDAY).getTime() });
+    expect(remindersFor(id)).toHaveLength(0);
+  });
+
+  it('🔴 设提醒但无截止 ⇒ 抛错，且不建任务（无半截）', async () => {
+    const before = Object.keys(engine.getState().tasks).length;
+    await expect(actions.create('只有提醒', { reminderOffsetMs: 600000 })).rejects.toThrow(/截止/);
+    expect(Object.keys(engine.getState().tasks).length, '抛错前不建任务').toBe(before);
   });
 });
