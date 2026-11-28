@@ -1,4 +1,3 @@
-import { Slot } from '@radix-ui/react-slot';
 import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
 
 import type { ControlTone } from '@heyta/ui';
@@ -8,7 +7,7 @@ import './hta.css';
 
 /**
  * 按钮色调 = 共享表的 `ControlTone`（`@heyta/ui` 的 `CONTROL_TONES`）。
- * 这里只把色调名翻成 `controls.css` 里已有的类，**不复制任何配方**。
+ * 这里只是把色调名翻成 `controls.css` 里已有的类，**不复制任何配方**。
  */
 export type ButtonTone = ControlTone;
 export type ButtonSize = 'sm' | 'default';
@@ -19,31 +18,12 @@ export type ButtonSize = 'sm' | 'default';
  *   · `check:control-semantics` 的 A4 反查「界面写了、中央 CSS 没有」的幻影类时，
  *     按源码里的字面量名取候选 —— 显式映射让每一档都出现在扫描面上，拼出来的看不到。
  */
-export const TONE_CLASS: Readonly<Record<ButtonTone, string>> = {
+const TONE_CLASS: Readonly<Record<ButtonTone, string>> = {
   primary: 'ht-btn ht-btn--primary',
   secondary: 'ht-btn ht-btn--secondary',
   ghost: 'ht-btn ht-btn--ghost',
   danger: 'ht-btn ht-btn--danger',
 };
-
-/**
- * 拼出按钮的完整 className；`extra` 追加在最后。
- * 🔴 也导出给**命令式造 DOM** 的调用方（`features/auth/desktop-handoff.ts` 造引导链接），
- * 那样全仓的按钮类名只有这一处有字面量。
- */
-export function buttonClassName(
-  tone: ButtonTone,
-  options?: { readonly commit?: boolean; readonly size?: ButtonSize; readonly extra?: string | undefined },
-): string {
-  return [
-    TONE_CLASS[tone],
-    options?.commit === true && tone === 'danger' ? 'ht-btn--commit' : '',
-    options?.size === 'sm' ? 'hta-btn--sm' : '',
-    options?.extra ?? '',
-  ]
-    .filter((part) => part !== '')
-    .join(' ');
-}
 
 export interface ButtonProps
   extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'disabled' | 'type'> {
@@ -59,17 +39,6 @@ export interface ButtonProps
   readonly leadingIcon?: ReactNode;
   readonly children?: ReactNode;
   readonly type?: 'button' | 'submit' | 'reset';
-  /**
-   * 与 Radix `Slot` 的 `asChild` 同一语义：**不自己渲染 `<button>`**，
-   * 而是把类名与行为合并到唯一那个子元素上。
-   *
-   * 用途只有一处：按钮长得像按钮、但语义必须是链接（`<a href>` / 路由 `<Link>`）。
-   * 反过来**不许**用它绕开"一屏一枚 primary"这类判断 —— 那与包装无关。
-   *
-   * 🔴 `asChild` 时 `leadingIcon` / `loading` 的 spinner 不渲染：内容归子元素所有，
-   * 组件不再替你拼结构（拼了就会在 `<a>` 里塞进两个并列节点，破坏排版）。
-   */
-  readonly asChild?: boolean;
 }
 
 /**
@@ -86,34 +55,30 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
     children,
     className,
     type = 'button',
-    asChild = false,
     ...rest
   },
   ref,
 ): React.JSX.Element {
-  const classes = buttonClassName(tone, { commit, size, extra: className });
-
-  /*
-    `Slot` 与原生 `'button'` 的 props 形状不同（Slot 不接受 `type`），
-    所以走 `ElementType` 而不是联合类型 —— 联合会让 `type` / `disabled`
-    在两个分支上互相打架，从而逼出 `as any`。
-  */
-  const Comp = (asChild ? Slot : 'button') as React.ElementType;
+  const classes = [
+    TONE_CLASS[tone],
+    commit && tone === 'danger' ? 'ht-btn--commit' : '',
+    size === 'sm' ? 'hta-btn--sm' : '',
+    className,
+  ]
+    .filter((part) => part !== '')
+    .join(' ');
 
   return (
-    <Comp
+    <button
       ref={ref}
-      {...(asChild ? {} : { type, disabled: disabled || loading })}
+      type={type}
       className={classes}
+      disabled={disabled || loading}
       aria-busy={loading ? true : undefined}
       {...rest}
     >
-      {asChild ? children : (
-        <>
-          {loading ? <Spinner size="xs" /> : leadingIcon}
-          {children}
-        </>
-      )}
-    </Comp>
+      {loading ? <Spinner size="xs" /> : leadingIcon}
+      {children}
+    </button>
   );
 });

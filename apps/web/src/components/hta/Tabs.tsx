@@ -1,6 +1,6 @@
-import * as TabsPrimitive from '@radix-ui/react-tabs';
-import type { ReactNode } from 'react';
+import { useId, type ReactNode } from 'react';
 
+import { onTabRovingKeyDown, rovingTabKey } from '../../lib/tab-roving.js';
 import './hta.css';
 
 export interface TabItem {
@@ -23,8 +23,7 @@ export interface TabsProps {
 /**
  * 同页二级面切换。**单行可横滚、不换行**（`flex-wrap: nowrap` 在地基 CSS 里）。
  *
- * 键盘漫游交给 Radix `Tabs`（方向键 / Home / End、`tabIndex` 游标都由它管，
- * 不再手写 `lib/tab-roving.ts`）。选中态外观走 `data-state="active|inactive"`（见 hta.css）。
+ * 键盘漫游接 `lib/tab-roving.ts`：组内只有选中那枚进 Tab 序列，方向键/Home/End 移焦点。
  */
 export function Tabs({
   tabs,
@@ -34,22 +33,38 @@ export function Tabs({
   panelId,
   testID,
 }: TabsProps): React.JSX.Element {
+  const baseId = useId();
+  const orderedKeys = tabs.map((tab) => tab.key);
+  const rovingKey = rovingTabKey(orderedKeys, value);
+
   return (
-    <TabsPrimitive.Root value={value} onValueChange={onChange}>
-      <TabsPrimitive.List className="hta-tabs" aria-label={label} data-testid={testID}>
-        {tabs.map((tab) => (
-          <TabsPrimitive.Trigger
+    <div
+      className="hta-tabs"
+      role="tablist"
+      aria-label={label}
+      data-testid={testID}
+      onKeyDown={(event) => onTabRovingKeyDown(event, 'horizontal')}
+    >
+      {tabs.map((tab) => {
+        const selected = tab.key === value;
+        return (
+          <button
             key={tab.key}
-            value={tab.key}
+            type="button"
+            role="tab"
+            id={`${baseId}-tab-${tab.key}`}
+            aria-selected={selected}
+            aria-controls={panelId}
+            tabIndex={rovingKey === tab.key ? 0 : -1}
             disabled={tab.disabled}
-            className="hta-tab ht-type-body-sm"
+            className={`hta-tab${selected ? ' hta-tab--active' : ''}`}
             data-testid={testID === undefined ? undefined : `${testID}-${tab.key}`}
-            {...(panelId === undefined ? {} : { 'aria-controls': panelId })}
+            onClick={() => onChange(tab.key)}
           >
             {tab.label}
-          </TabsPrimitive.Trigger>
-        ))}
-      </TabsPrimitive.List>
-    </TabsPrimitive.Root>
+          </button>
+        );
+      })}
+    </div>
   );
 }
