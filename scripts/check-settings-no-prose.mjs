@@ -284,8 +284,75 @@ const LEDGER = join(ROOT, 'scripts/settings-prose-ledger.json');
  * （`⚠️ 需要一台空设备` 下面跟一整句），但 2026-10-24 起**组件自己**把正文放进了 `?`
  * （`SettingsNotice.tsx` 的 `detailInTip`）—— 判据落在组件里，调用点就合法了。
  * 只有 `live` / `danger` / `success` 三种才直接显示正文，那是反馈。
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * 🔴 2026-11-27：这条尺子**失明过很久**，产品负责人第三次发火后修
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * 原正则是 `ht-settings__` + 小写字母数字连字符 + `(hint|note|lead)` + 同样的尾巴，
+ * 它有两个洞，两个都实测过（跑一次 `node -e` 打表，别靠读代码猜）：
+ *
+ *   1. **驼峰全漏**：那一段字符类只认小写 ⇒ `ht-settings__cardNote`
+ *      （「功能模块」那 8 条副标题）一处都不算，而它当时就在设置页第一屏。
+ *   2. **只认 `ht-settings__` 前缀**：`ht-ai__note`（21 处）、`ht-type-caption`
+ *      （28 处）、`sync-settings__section-hint`、`ht-settings__subtitle` 全在视野外。
+ *
+ * 于是"设置界面里一句内联说明文字都没有"这句打印与事实不符 —— 本仓的元规则：
+ * **一条永远通过的判据比没有判据更糟**。
+ *
+ * 现在的判据按**语义**列容器（不再靠前缀猜），并且**排除**这三类（它们不是说明）：
+ *   · `ht-note*` / `*-note-preview` / `*-note-editor`：便签**内容本身**，是数据不是文案；
+ *   · `ht-type-*`：排版档位（`ht-type-caption` 常用来画**标签/读数**，如「今天 3 次」）；
+ *   · `*-tip*` / `*-tooltip*`：问号气泡**就是**唯一合法载体，它自己不算违规。
  */
-const BANNED_CLASS = /ht-settings__[a-z0-9-]*(hint|note|lead)[a-z0-9-]*/u;
+const BANNED_CLASS = new RegExp(
+  [
+    // 设置面：任何 `ht-settings__` / `sync-settings__` / `privacy-settings__` 下带说明语义的容器。
+    String.raw`(?:ht-settings|sync-settings|privacy-settings)__[A-Za-z0-9-]*(?:hint|note|lead|subtitle|caption|desc)[A-Za-z0-9-]*`,
+    // AI 面：`ht-ai__note` / `ht-ai__step-note` / `ht-ai__proposal-lead`。
+    String.raw`ht-ai__[A-Za-z0-9-]*(?:note|lead|hint|subtitle|desc)[A-Za-z0-9-]*`,
+    // 散在其它界面的说明容器（逐个点名，加新的要写进来 —— 否则它悄悄不在读数里）。
+    String.raw`ht-sidebar__agenda-note`,
+    String.raw`ht-sheet__(?:reconfirm-note|auth-notes)`,
+    String.raw`ht-habit__freq-hint`,
+    String.raw`ht-content__cal-viewhint`,
+    String.raw`ht-app__detail-note`,
+    String.raw`ht-input-field__hint`,
+  ].join('|'),
+  'u',
+);
+
+/**
+ * 这些**不是**说明文字（便签内容 / 排版档位 / 问号气泡 / 表格标题）。
+ * 用整串类名判，避免误伤 `ht-note`（便签）这类与 `note` 同词的实体。
+ */
+const NOT_PROSE_CLASS =
+  /(?:^|["\s])(?:ht-note[A-Za-z0-9_-]*|ht-note-preview|ht-row__note-preview|ht-type-[A-Za-z0-9_-]+|ht-settings__tip[A-Za-z0-9_-]*|hta-tooltip[A-Za-z0-9_-]*|hta-table__caption)(?:["\s]|$)/u;
+
+/**
+ * 🔴 **标题不是说明文字**。
+ *
+ * 第一版放宽到 `subtitle` 之后，`MemoryPanel` 那 6 个 `<h3 className="ht-settings__subtitle">`
+ * 全被判红 —— 而它们是**分组标题**（「记着的」「待确认的」「已撤回的」），
+ * 删掉它们用户就真的不知道该组是什么了。判据错在按**类名**判，
+ * 而同一个类名在这里装的是标题。
+ *
+ * 所以按**元素**判：`<h1>`–`<h6>`、`<legend>`、`<dt>`、`<summary>`、`<th>` 是标题位，
+ * 不参与"说明文字"判定。这也正是 §11 说的"标题已经说了，就不再补一句同义副标题"——
+ * 判的是**标题之外**的那一句。
+ */
+const HEADING_ELEMENT = /<(?:h[1-6]|legend|dt|summary|th)\b/u;
+
+/**
+ * 🔴 **读数是数据，不是解释**（与文件头"计费/额度的读数"同一条）。
+ *
+ * `sync-pending-count`（待上传 3 条）、`sync-last-synced`（上次 10:24）、
+ * `profile-center-version`（v1.2.3）都是**会随时间变的值**，不是一句说明。
+ * 它们的 testid 是稳定的、可点名的，所以这里按 testid 白名单放行 ——
+ * 新增一个读数时把它写进这张表，比让它悄悄变成"合法说明文字"要好。
+ */
+const READING_TESTID =
+  /data-testid="[^"]*(?:count|lastSynced|last-synced|version|usage|quota|at|email|balance|size|status)[^"]*"/iu;
 
 /**
  * ⚠️ 移动端行模型的 `hint:` **现在合法**（2026-10-24 晚）：`@heyta/ui` 的
@@ -365,6 +432,12 @@ function findViolations(text) {
     const banned = BANNED_CLASS.exec(line)?.[0];
     const mobileHint = false;
     if (banned === undefined && !mobileHint) return;
+    // 便签内容 / 排版档位 / 问号气泡：同词不同物，不是说明文字（见 `NOT_PROSE_CLASS`）。
+    if (NOT_PROSE_CLASS.test(line)) return;
+    // 标题位：分组标题不是"给标题再补一句"。
+    if (HEADING_ELEMENT.test(line)) return;
+    // 读数：会随时间变的值是数据，不是解释。
+    if (READING_TESTID.test(line)) return;
 
     // 反馈/披露标记：看**这一行的元素**，不看邻居（见 `enclosingTag` 的注释）。
     const windowText = carrierContext(lines, index);

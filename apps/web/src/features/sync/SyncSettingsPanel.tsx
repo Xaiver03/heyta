@@ -127,16 +127,26 @@ export function SyncSettingsPanel({
 
       <div className="sync-settings__stack">
         {signedIn ? <fieldset className="sync-settings__fieldset" aria-labelledby="sync-status-title">
-          <legend id="sync-status-title" className="sync-settings__legend">{t('web.settings.syncUx.statusTitle')}</legend>
-          <p className="sync-settings__section-hint">{t('web.settings.syncUx.statusHint')}</p>
-          {/* 共享那枚状态条骨架（`@heyta/ui`）。Provider 由 Web 壳提供。 */}
-          {signedIn ? <HeytaUiProvider>
+          <legend id="sync-status-title" className="sync-settings__legend">
+            {t('web.settings.syncUx.statusTitle')}
+            <SettingsInfoTip
+              testId="tip-sync-local-first"
+              label={t('web.settings.syncUx.statusTitle')}
+              text={t('web.settings.syncUx.localFirst')}
+            />
+          </legend>
+          {/* 这里原来还有一句「先确认连接状态，再修改服务端或账号凭据」——
+              纯操作指示语（`ux-principles.md` §11 禁），2026-11-27 删。
+              顺序由版面本身表达：状态条在上，凭据在下面的 fieldset 里。 */}
+          {/* 共享那枚状态条骨架（`@heyta/ui`）。Provider 由 Web 壳提供。
+              `signedIn` 外层已经判过一次，这里不再写 else 分支（那段 else 永远不可达）。 */}
+          <HeytaUiProvider>
             <SyncStatusBar
               status={sync.status}
               labels={{ status: (status) => describeSyncStatus(status, t) }}
               testID="sync-status-bar"
             />
-          </HeytaUiProvider> : <p className="sync-settings__section-hint">{t('common.sync.signIn')}</p>}
+          </HeytaUiProvider>
           {/*
             R7「我的数据到哪了」：待上传条数 + 上次成功同步，两个都是**本地读数**
             （零网络）。不加卡片、不加图表 —— 这一节回答的是"我现在安全吗"，
@@ -154,9 +164,11 @@ export function SyncSettingsPanel({
               ? t('web.settings.syncUx.lastSyncedNever')
               : t('web.settings.syncUx.lastSynced', { at: new Date(sync.lastSyncedAt).toLocaleString() })}
           </p>
-          <p className="sync-settings__section-hint" data-testid="sync-local-first">
-            {t('web.settings.syncUx.localFirst')}
-          </p>
+          {/*
+            「数据先写在这台设备上」是**数据去向披露**（§11 允许保留），
+            但常驻一句是说明书 —— 2026-11-27 移到问号里，挂在状态标题旁。
+            它**不是**读数：它不随时间变，所以不做成一行文字。
+          */}
           {signedIn && sync.status.kind === 'error' ? (
             <SettingsNotice
               title={t('web.settings.syncUx.errorTitle')}
@@ -180,7 +192,8 @@ export function SyncSettingsPanel({
         <fieldset className="sync-settings__fieldset" aria-labelledby="sync-hosted-title">
           <legend id="sync-hosted-title" className="sync-settings__legend">{t('common.sync.hosted.title')}</legend>
           {signedIn ? (
-            <p className="sync-settings__section-hint">{sync.email ?? t('common.sync.account.connected')}</p>
+            /* 这是**读数**（当前登录的是哪个账号），不是说明 —— 给它一个可点名的 testid。 */
+            <p className="sync-settings__section-hint" data-testid="sync-account-email">{sync.email ?? t('common.sync.account.connected')}</p>
           ) : (
             <SettingsAccountGate messageKey="common.sync.hosted.hint" testId="sync-signin-required" />
           )}

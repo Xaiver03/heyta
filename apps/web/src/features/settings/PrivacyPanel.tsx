@@ -29,6 +29,7 @@ import { formatPrivacyDecisionTime, type PrivacyConsentRecord } from '@heyta/app
 import { privacyConsent, privacyConsentActions, readPrivacyConsentPersistence, subscribePrivacyConsent } from '../privacy/consent-gate.js';
 import { usePrivacyStore } from '../privacy/store.js';
 import { SettingsNotice } from './SettingsNotice.js';
+import { SettingsInfoTip } from './SettingsInfoTip.js';
 import { Button } from '../../components/hta/index.js';
 import './privacy-settings.css';
 
@@ -69,8 +70,16 @@ export function PrivacyPanel({ active = true }: { active?: boolean }): React.JSX
       <h2 id="privacy-settings-title" className="ht-settings__title ht-type-section-title">{t('common.privacy.settings.title')}</h2>
 
       <fieldset className="privacy-settings__fieldset" aria-labelledby="privacy-status-title">
-        <legend id="privacy-status-title" className="privacy-settings__legend">{t('common.privacy.settings.statusTitle')}</legend>
-        <p className="privacy-settings__hint">{t('common.privacy.settings.statusHint')}</p>
+        <legend id="privacy-status-title" className="privacy-settings__legend">
+          {t('common.privacy.settings.statusTitle')}
+          {/* 「这一项只控制本机是否联网、不会删本地数据」是**隐私披露**，§11 允许保留；
+              但常驻一句就是说明书 —— 载体是问号（2026-11-27）。 */}
+          <SettingsInfoTip
+            testId="tip-privacy-status"
+            label={t('common.privacy.settings.statusTitle')}
+            text={t('common.privacy.settings.statusHint')}
+          />
+        </legend>
         <SettingsNotice
           title={t(stateKey)}
           tone={record === null ? 'warning' : record.decision === 'accepted' ? 'success' : 'info'}
@@ -83,8 +92,19 @@ export function PrivacyPanel({ active = true }: { active?: boolean }): React.JSX
       </fieldset>
 
       <fieldset className="privacy-settings__fieldset" aria-labelledby="privacy-action-title">
-        <legend id="privacy-action-title" className="privacy-settings__legend">{t('common.privacy.settings.actionTitle')}</legend>
-        <p className="privacy-settings__hint">{t(record?.decision === 'accepted' ? 'common.privacy.settings.revokeHint' : 'common.privacy.settings.chooseHint')}</p>
+        <legend id="privacy-action-title" className="privacy-settings__legend">
+          {t('common.privacy.settings.actionTitle')}
+          {/* 撤回的后果是**披露**（"停止对外请求、本地数据不受影响"），§11 允许保留 ——
+              但它的载体只能是问号：常驻那一句是说明书，不是界面。
+              未同意时这里**不挂任何东西**：按钮自己写着「重新选择」，没有需要预告的后果。 */}
+          {record?.decision === 'accepted' ? (
+            <SettingsInfoTip
+              testId="tip-privacy-revoke"
+              label={t('common.privacy.settings.revoke')}
+              text={t('common.privacy.settings.revokeHint')}
+            />
+          ) : null}
+        </legend>
         <div className="privacy-settings__actions">
           {record?.decision !== 'accepted' ? (
             // 尚未同意联网（包括明确只用本机）：把同意面板再打开一次。
