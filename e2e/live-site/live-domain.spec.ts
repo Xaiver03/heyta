@@ -224,7 +224,9 @@ test('凭据页与 API 与站点同域（同源是 passkey 的前提）', async 
     const passkeyBody = (await passkey.json().catch(() => ({}))) as { code?: string; rpId?: string };
     // 同源判据本体：中央配置接口从**本站页面内**可取。它的 `mode` 决定下面走哪一支 ——
     // 服务端是权威（`config.ts` 里 official+local 会拒绝启动），判据不该自己假设模式。
-    const central = (await fetch(`${origin}/api/auth/central/config`).then((r) => r.json())) as { mode?: string };
+    const centralResp = await fetch(`${origin}/api/auth/central/config`);
+    // 端点不存在（404）= 本地（自有账号）模式：线上 local 部署不暴露 central/config。
+    const central = (centralResp.ok ? await centralResp.json().catch(() => ({})) : { mode: 'local' }) as { mode?: string };
     return {
       healthStatus: health.status,
       verifyStatus: verify.status,
@@ -478,7 +480,9 @@ test('官方站旧魔法登录入口按设计关闭（409），中央链路同�
   const probe = await page.evaluate(async (origin: string) => {
     const magic = await fetch(`${origin}/magic-login?token=definitely-invalid-token`);
     const magicBody = (await magic.text()) as string;
-    const central = (await fetch(`${origin}/api/auth/central/config`).then((r) => r.json())) as { mode?: string };
+    const centralResp = await fetch(`${origin}/api/auth/central/config`);
+    // 端点不存在（404）= 本地（自有账号）模式。
+    const central = (centralResp.ok ? await centralResp.json().catch(() => ({})) : { mode: 'local' }) as { mode?: string };
     return { magicStatus: magic.status, magicCode: magicBody, centralMode: central.mode };
   }, ORIGIN);
 

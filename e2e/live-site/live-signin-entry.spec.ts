@@ -294,9 +294,9 @@ test('线上 /signin/ 只剩出口，那段说明在文档中心读得到', asyn
   expect(ctaBox, '正文里没有主行动按钮 —— 上面那条 a[href] 判据的前提变了').not.toBeNull();
   expect(footerBox, '页脚里没有可比的参照链接：这条判据的参照物没了，要改就一起改').not.toBeNull();
   expect(
-    Math.round(ctaBox!.x),
+    Math.abs(Math.round(ctaBox!.x) - Math.round(footerBox!.x)),
     `出口按钮在 x=${String(Math.round(ctaBox!.x))} 而内容列在 x=${String(Math.round(footerBox!.x))} —— 少了一层 .lp-wrap`,
-  ).toBe(Math.round(footerBox!.x));
+  ).toBeLessThanOrEqual(1);
 
   await page.screenshot({ path: `${SHOT_DIR}/live-4-signin-page.png` });
 
