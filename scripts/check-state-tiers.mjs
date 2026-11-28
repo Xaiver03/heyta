@@ -65,6 +65,10 @@ const TIERS = new Map([
   ['apps/web/src/features/admin/sections/shared.tsx', ['page']],
   // 共享列表态组件：空态未写 size，按默认 page 记账（与源码一致）。
   ['apps/web/src/components/hta/ListState.tsx', ['page']],
+  // 课程表视图整块空掉 = 整页没有内容（同 page 档）。
+  ['apps/web/src/features/calendar/CalendarTimetable.tsx', ['page']],
+  // 习惯记录列表空态：源码 size="section"。
+  ['apps/web/src/features/habits/HabitRecordList.tsx', ['section']],
   // ── 卡片档（居中但紧凑、无插画）：面板 / 格子 / 卡片内的子列表
   ['packages/ui/src/calendar/CalendarBoard.tsx', ['line']],
   ['packages/ui/src/calendar/CalendarDayBoard.tsx', ['page']],
