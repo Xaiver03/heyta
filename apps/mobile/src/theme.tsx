@@ -19,10 +19,10 @@
  * `@heyta/ui` 的 `native.fontSans` 只认登记在 `packagedFonts` 里的真实字体名
  * （见那边 `resolveFontFamily` 与 `DEFAULT_PACKAGED_FONTS` 的说明）。
  *
- * 🔴 2026-11-27：产品要求「全部用苹方」。iOS / macOS 系统自带 `PingFang SC`，所以
- * `App.tsx` 在 **iOS** 上把 `PingFang SC` 登记进清单（`PLATFORM_PACKAGED_FONTS`），
- * 让全部文字（含数字 / 拉丁）显式走苹方。Android / HarmonyOS 没有苹方、也不能随包
- * 分发 Apple 的版权字体，那份清单在那两平台保持为空 → 用各自系统字体。
+ * 🔴 2026-11-27 定案：**Android 随包自带鸿蒙黑体**（`PLATFORM_PACKAGED_FONTS` 登记
+ * `HarmonyOS_Sans_SC`，文件在 `android/.../assets/fonts/`）；**iOS 不打包，走系统字**
+ * （产品口径：iOS 就用系统苹方）。清单在 iOS 上为空 → `fontSans` undefined → 系统字体
+ * （中文即 PingFang SC、拉丁 SF）。
  *
  * 将来真要打包自带字体（如思源黑体）时，同样在 `app.tsx` 把字体名加进清单
  * （`<HeytaUiProvider packagedFonts={…}>`）—— 但**不要**在这里重新解析 token。

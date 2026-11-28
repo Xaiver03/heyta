@@ -31,7 +31,7 @@
  */
 
 import React, { useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { Animated, AppState, StatusBar, useWindowDimensions, View } from 'react-native';
+import { Animated, AppState, Platform, StatusBar, useWindowDimensions, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ErrorBoundary } from './ui/error-boundary';
 import { I18nProvider, useI18n, type Locale } from '@heyta/i18n';
@@ -378,18 +378,19 @@ export default function App(): React.JSX.Element {
 }
 
 /**
- * 字体：鸿蒙黑体（HarmonyOS Sans SC）—— 产品 2026-11-27 选定，并授权随 App 自带。
+ * 字体策略 —— 按平台分：
+ * · **Android**：随包自带鸿蒙黑体（HarmonyOS Sans SC）。字体在
+ *   `android/app/src/main/assets/fonts/`（Regular + _bold），文件名即 family；
+ *   `<700` 走 Regular、`≥700` 走 `_bold`（RN 的 ReactFontManager 规则）。
+ * · **iOS**：产品口径「iOS 就走苹方，用系统字就行」—— 不打包任何字体，
+ *   `packagedFonts` 传空数组 → `fontSans` 为 undefined → 用系统字体，
+ *   中文即苹方（PingFang SC）、拉丁即 SF，正是想要的。
  *
  * 🔴 `@heyta/ui` 的 `native.fontSans` 只认**登记在 `packagedFonts` 里的真实字体名**
- * （见 `design-system/native-values.ts`）。设计令牌 `font.sans` 首项已是
- * `'HarmonyOS Sans SC'`，这里把它登记进来，RN 就会对全部文字（含数字/拉丁）用它。
- *
- * · Android：字体文件打包在 `android/app/src/main/assets/fonts/`（Regular + _bold），
- *   文件名即 family；`<700` 走 Regular，`≥700` 走 `_bold`（RN 的 ReactFontManager 规则）。
- * · iOS：系统无此字体，未随包注册时 RN 会安全回退到系统字体（中文仍为苹方）；
- *   后续把 ttf 注册进 Info.plist 即可命中鸿蒙黑体。
+ * （见 `design-system/native-values.ts`）。所以这里只在 Android 登记。
  */
-const PLATFORM_PACKAGED_FONTS: readonly string[] = ['HarmonyOS_Sans_SC'];
+const PLATFORM_PACKAGED_FONTS: readonly string[] =
+  Platform.OS === 'android' ? ['HarmonyOS_Sans_SC'] : [];
 
 /**
  * 语言宿主：React 驱动当前 locale；冷启动优先恢复独立设备偏好。

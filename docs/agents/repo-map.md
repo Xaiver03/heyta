@@ -1,17 +1,17 @@
 # 仓库地图（脚本生成）
 
 > ⚠️ **本文件由脚本自动生成，禁止手工改正文**；责任描述只改「人工批注」区，重跑不覆盖它。
-> 生成时间：`2026-11-28 01:05:31` · 生成命令：`python3 "$CTX_KIT/bin/ctx" map --root . --out docs/agents`
-> 代码指纹 tree_hash：`da750506defa0727`（代码一变它就变，供漂移检查用）
+> 生成时间：`2026-11-28 08:16:01` · 生成命令：`python3 "$CTX_KIT/bin/ctx" map --root . --out docs/agents`
+> 代码指纹 tree_hash：`510ab7c88cbc45f5`（代码一变它就变，供漂移检查用）
 
-- 源码文件：**12108** 个 · 约 **88.6 MB**
-- 语言分布：C 6375、TS 2171、C++ 1907、TSX 575、JS 532、Shell 231、Python 196、Swift 68、C# 49、Kotlin 3、Ruby 1
+- 源码文件：**12087** 个 · 约 **88.3 MB**
+- 语言分布：C 6375、TS 2166、C++ 1907、TSX 575、JS 516、Shell 231、Python 196、Swift 68、C# 49、Kotlin 3、Ruby 1
 
 ## 1. 目录 → 职责 → 能不能改
 
 | 目录 | 源码文件 | 体积 | 能不能改 |
 |---|---|---|---|
-| `apps/` | 9579 | 53899 KB | ✅ 可改 |
+| `apps/` | 9558 | 53561 KB | ✅ 可改 |
 | `packages/` | 1007 | 14574 KB | ✅ 可改 |
 | `server/` | 442 | 6526 KB | ✅ 可改 |
 | `scripts/` | 385 | 7223 KB | ✅ 可改 |
@@ -59,14 +59,14 @@
 
 | 文件 | 被导入次数 | 谁在依赖它 |
 |---|---|---|
-| `packages/domain/src/index.ts` | 513 | apps/desktop/renderer/main.tsx, apps/desktop/tests/reuse.spec.ts, apps/desktop/tests/tag-alias-filter.spec.ts, apps/mobile/src/ai/AssistantScreen.tsx … |
-| `packages/i18n/src/index.ts` | 490 | apps/landing/pitch/main.tsx, apps/landing/src/components/Capabilities.tsx, apps/landing/src/components/FinalCta.tsx, apps/landing/src/components/Footer.tsx … |
-| `packages/app-host/src/index.ts` | 301 | apps/mobile/src/App.tsx, apps/mobile/src/ai/AiSettingsSection.tsx, apps/mobile/src/ai/AssistantScreen.tsx, apps/mobile/src/ai/chat-controller.ts … |
-| `packages/ui/src/index.ts` | 278 | apps/desktop/renderer/main.tsx, apps/landing/tests/mockup-project-shape.spec.tsx, apps/mobile/src/ai/AssistantScreen.tsx, apps/mobile/src/ai/chat-transcript.tsx … |
-| `packages/design-system/src/index.ts` | 234 | apps/landing/src/components/AssistantIcon.tsx, apps/landing/src/components/Capabilities.tsx, apps/landing/src/components/FinalCta.tsx, apps/landing/src/components/Footer.tsx … |
+| `packages/domain/src/index.ts` | 500 | apps/desktop/renderer/main.tsx, apps/desktop/tests/reuse.spec.ts, apps/desktop/tests/tag-alias-filter.spec.ts, apps/mobile/src/ai/AssistantScreen.tsx … |
+| `packages/i18n/src/index.ts` | 475 | apps/landing/pitch/main.tsx, apps/landing/src/components/Capabilities.tsx, apps/landing/src/components/FinalCta.tsx, apps/landing/src/components/Footer.tsx … |
+| `packages/app-host/src/index.ts` | 299 | apps/mobile/src/App.tsx, apps/mobile/src/ai/AiSettingsSection.tsx, apps/mobile/src/ai/AssistantScreen.tsx, apps/mobile/src/ai/chat-controller.ts … |
+| `packages/ui/src/index.ts` | 262 | apps/desktop/renderer/main.tsx, apps/landing/tests/mockup-project-shape.spec.tsx, apps/mobile/src/ai/AssistantScreen.tsx, apps/mobile/src/ai/chat-transcript.tsx … |
+| `packages/design-system/src/index.ts` | 225 | apps/landing/src/components/AssistantIcon.tsx, apps/landing/src/components/Capabilities.tsx, apps/landing/src/components/FinalCta.tsx, apps/landing/src/components/Footer.tsx … |
 | `packages/sync-core/src/index.ts` | 217 | apps/mobile/hermes-aed-probe-entry.js, apps/mobile/src/screens/JoinShareScreen.tsx, apps/mobile/src/screens/ProfileScreen.tsx, apps/mobile/src/screens/ShareSpaceScreen.tsx … |
 | `packages/storage/src/index.ts` | 191 | apps/mobile/hermes-aed-probe-entry.js, apps/mobile/src/db/op-sqlite-driver.ts, apps/mobile/tests/calendar-event-source.spec.ts, apps/mobile/tests/focus-task-source.spec.ts … |
-| `packages/shared-schema/src/index.ts` | 171 | apps/mobile/src/auth/account-security-copy.ts, apps/mobile/src/lib/attachment-pick.ts, apps/mobile/src/lib/avatar-prepare.ts, apps/mobile/src/lib/card-export-units.ts … |
+| `packages/shared-schema/src/index.ts` | 170 | apps/mobile/src/auth/account-security-copy.ts, apps/mobile/src/lib/attachment-pick.ts, apps/mobile/src/lib/avatar-prepare.ts, apps/mobile/src/lib/card-export-units.ts … |
 | `packages/op-log/src/index.ts` | 148 | apps/mobile/hermes-aed-probe-entry.js, apps/mobile/src/db/open-host.ts, apps/mobile/src/lib/share-activity-copy.ts, apps/mobile/src/share/share-session.ts … |
 | `e2e/tests/helpers.ts` | 134 | e2e/_probe/goal-live-b4.spec.ts, e2e/_probe/goal-live.spec.ts, e2e/auth-journey/auth-journey.spec.ts, e2e/auth-journey/helpers.ts … |
 | `server/src/db.ts` | 108 | server/scripts/admin.ts, server/scripts/clear-data.ts, server/scripts/delete-user.ts, server/scripts/pricing.ts … |
