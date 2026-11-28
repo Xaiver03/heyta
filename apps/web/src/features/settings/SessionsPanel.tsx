@@ -194,7 +194,7 @@ export function SessionsPanel({ active = true }: { active?: boolean }): React.JS
               与 `check:ui-provider` 同源）；这里自带一层，面板被单独挂载时也不塌。
             */
             <HeytaUiProvider>
-              <EmptyState title={t('common.sessions.empty')} />
+              <EmptyState illustration="complete" title={t('common.sessions.empty')} />
             </HeytaUiProvider>
           )}
 

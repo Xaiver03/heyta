@@ -66,6 +66,8 @@ const TIERS = new Map([
   ['apps/web/src/features/admin/sections/shared.tsx', ['page']],
   ['packages/ui/src/calendar/CalendarBoard.tsx', ['line']],
   ['packages/ui/src/calendar/CalendarDayBoard.tsx', ['page']],
+  // 日程视图（Web 壳的新板）：整块日历区空掉 = 整页没有日程，与日档同属页面档。
+  ['apps/web/src/features/calendar/CalendarAgendaBoard.tsx', ['page']],
   ['packages/ui/src/timeline/GanttChart.tsx', ['page']],
   ['packages/ui/src/search/SearchPanel.tsx', ['page']],
   ['packages/ui/src/trash/TrashBoard.tsx', ['page']],
@@ -78,7 +80,7 @@ const TIERS = new Map([
   ['packages/ui/src/task-list/TaskList.tsx', ['line']],
   // ── 区块档（左对齐、不占页面高度）
   ['packages/ui/src/categories/CategoryReport.tsx', ['page']],
-  ['apps/web/src/features/tags/TagsManager.tsx', ['section']],
+  ['apps/web/src/features/tags/TagsManager.tsx', ['page']],
   ['apps/web/src/features/habits/HabitsView.tsx', ['page']],
   ['apps/web/src/features/focus/FocusDetailPane.tsx', ['section']],
   ['apps/mobile/src/screens/SessionsSection.tsx', ['section']],
@@ -87,7 +89,6 @@ const TIERS = new Map([
   // ── 一行档（辅助信息，住在分组标签 / 设置行下面）
   ['apps/web/src/features/settings/InboundAutomationSettings.tsx', ['line', 'line']],
   ['apps/web/src/features/settings/SessionsPanel.tsx', ['page']],
-  ['apps/web/src/features/tasks/TaskDetailCard.tsx', ['line']],
   ['apps/web/src/features/ai/AssistantPanel.tsx', ['line']],
   // ── 移动端（这一轮先如实登记现状，档位是否合适在账本文档里逐条标）
   ['apps/mobile/src/screens/TasksScreen.tsx', ['page', 'page', 'page']],

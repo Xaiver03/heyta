@@ -224,7 +224,11 @@ function NotificationsTab({
       // 必填，而"居中一句"正是滴答空态的实测形态（`model.ts` 的文件头）。
       // 传图标要 `lucide` 的图标**数据**（`packages/ui` 用的那个包），
       // 而本项目只依赖 `lucide-react`（组件）—— 为一句空态多引一个依赖不值。
-      <EmptyState title={t('web.inbox.notifications.empty')} testID={`${testID}-empty`} />
+      <EmptyState
+        illustration="complete"
+        title={t('web.inbox.notifications.empty')}
+        testID={`${testID}-empty`}
+      />
     );
   }
 
@@ -270,6 +274,7 @@ function ActivityTab({
   if (invite?.invite === undefined) {
     return (
       <EmptyState
+        illustration="complete"
         title={t('web.inbox.activity.empty')}
         testID={`${testID}-activity-empty`}
       />
