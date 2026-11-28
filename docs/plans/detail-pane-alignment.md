@@ -11419,3 +11419,53 @@ e2e 族 **69 passed**（68 → 69 就是 N7 那一条）、各层单测条数同
 
 
 
+
+## 8.155 专注概览从「2×2 四宫格」改成三层：今日主舞台 / 七日脉搏 / 累计账本 + 时间轴记录（W7 后续，2026-11-28，状态：**本单已完成**）
+
+上一版把「今日实时」与「历史累计」放进四个同款灰框，两者拿到一样的视觉权重。
+可是它们的阅读频率差一个量级：今天做了多少是每次打开都要看的，累计是偶尔瞟一眼的账。
+这一单按**层级**重排，不是换皮。
+
+### 1. 三层结构
+
+| 层 | 内容 | 视觉契约 |
+|---|---|---|
+| 今日 Hero | 今日番茄数 + 今日专注时长 | 主色浅底 + 2xl 数字（`ht-type-numeric-summary`），整栏唯一的「有颜色」区域 |
+| 七日脉搏 | 近 7 日每日强度 7 格（今天在最右） | `data-level` 0..4 → `--ht-color-heat-0..4`；空格子也有底色（沿用 `.ht-habit__dot` 契约） |
+| 累计账本 | 总番茄 + 总专注时长 | 无底色、无边框、一行左右对齐、次要前景色 —— 明确降级 |
+| 记录 | 时间轴：状态节点 + 任务名/时间 + 时长 + 能量条 | 完成=实心节点、放弃=空心环（形状不同，不靠颜色）；能量条宽度按 `data-level` |
+
+### 2. 口径全部落在共享层，视图一个数都不算
+
+`packages/app-host/src/focus-overview.ts` 新增两块派生，**都在共享层**，界面只画：
+
+- `days: FocusDayPulse[]`（`FOCUS_PULSE_DAYS = 7`，旧→新，末位今天）：逐日调 `focusStatsForDay`，**不自己按 `dayRange` 重切**。
+- `records[].energyLevel`：相对「这一屏最长的一段」分档。
+
+两处强度都走 `@heyta/domain#intensityLevel`（相对峰值的四等分），不新造分桶。
+🔴 **取整与文字同源**：`roundedMinuteMs`（`Math.round(ms/60000)*60000`，与 `durationParts` 同一条取整）先取整再分档 —— 否则一段 3 秒的记录会显示「0 分钟」却画满格深蓝条，同一行两个读数互相打脸（本轮真截图抓到的）。
+
+### 3. 顺手修掉一条假报错（`apps/web/src/boot-splash.ts`）
+
+12 秒硬超时定时器在**成功退场后从不 `clearTimeout`** ⇒ 任何页面开满 12 秒都会往控制台写「首屏在超时内未被应用接管 —— 这通常意味着启动链卡死」。这直接让「界面里零控制台错误」那条 e2e 判据对**任何慢用例**恒红，报的还是最误导人的措辞。修法：把定时器 id 存下，`leave()` 里清掉；超时自身触发时先作废 id 再 `leave()`。
+
+### 4. 判据（四层，读数现量）
+
+| 层 | 文件 | 条数 |
+|---|---|---|
+| 领域/共享 | `packages/app-host/tests/focus-overview.spec.ts` | 22 |
+| 视图（jsdom） | `apps/web/tests/focus-detail-pane.spec.tsx` | 15 |
+| 真浏览器 | `e2e/tests/focus-detail-pane.spec.ts` | 7 |
+
+关键判据：七日窗口**恰 7 格**且旧→新末位今天（少画=视图截窗、多画=视图补天，两种都红）；`days` 为空时整条不画（七根空柱子会谎称「这周没专注」）；今日两读数必在 hero、累计两读数必在账本、两者容器不可互换；每格/每条强度落在 `data-level` 属性（不是内联样式）。
+
+### 5. 截图（逐张打开看过）
+
+`apps/web/evidence/focus-detail-pane/` 三枚：`f1-four-cards.png`（空态层级：hero+pulse+账本+空态）、`f3-empty-records.png`（同一空态句子）、`f5-aborted-record.png`（真记录：空心节点 + 未关联任务 + 中途放弃 + 能量条轨道）。
+⚠️ 前两枚是**同一屏**（都无记录）⇒ 像素相同；它们证的是不同判据，不是两份证据。`f1-four-cards` 这个名字是历史沿用的（§8 多处引用着它，`--e2e` 每趟原地重写），内容是当前布局。
+
+### 6. 闸门读数
+
+`check:design` / `check:l4` / `check:row-single-source`（34 = 34）/ `check:ui-language` / `check:empty-state` / `check:design-token-refs`（162 引用全解析）/ `check:layering` / `check:materialized-reads` / `check:rn-aria` / `check:docs` / 四道 `check-detail-pane-*` —— 全部 RC=0。
+六包 typecheck（domain / design-system / i18n / ui / app-host / web）RC=0；web 全量测试 2693 passed / 12 skipped。
+🔴 **`check:selection-single-source` 红**，站点是 `apps/web/src/features/tasks/TaskDetailCard.tsx` 里一处 `panelTaskId` useState —— **不在本单射程**（任务详情面在途改动，不代改、不吸收凑绿）。

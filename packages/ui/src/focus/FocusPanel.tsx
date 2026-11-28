@@ -217,6 +217,7 @@ export function FocusPanel({
           justifyContent: 'center',
           gap: tokens['space.2'],
           minHeight: tokens['touch-target.min'],
+          minWidth: tokens['space.12'] * 2 + tokens['space.6'],
           paddingHorizontal: tokens['space.8'],
           borderRadius: tokens['radius.full'],
         },
@@ -251,45 +252,8 @@ export function FocusPanel({
 
   return (
     <View style={[styles.root, fill === true ? styles.rootFill : null]} testID={testID}>
-      {header}
-
-      <FocusRing
-        progress={view.progress}
-        elapsedMs={focusElapsedMs(state, now)}
-        variant={view.mode === 'countup' ? 'dial' : 'progress'}
-        tone={view.tone}
-        label={labels.ring(view.percent)}
-        testID="focus-ring"
-      >
-        <View style={styles.face}>
-          {/* 大号计时数字。空闲倒计时态点击本身就是改时长的入口，不另堆说明按钮。 */}
-          {canPressTime ? (
-            <Pressable
-              onPress={onTimePress}
-              accessibilityRole="button"
-              accessibilityLabel={timePressA11y ?? focusDisplayText(state, now)}
-              testID={timePressTestID ?? 'focus-time-trigger'}
-              style={({ pressed }) => [
-                styles.timeHit,
-                { opacity: pressed && !reducedMotion ? tokens['state.pressed-opacity'] : 1 },
-              ]}
-            >
-              {displayNode}
-            </Pressable>
-          ) : (
-            displayNode
-          )}
-          {phaseText === undefined || phaseText === '' ? null : (
-            <Text style={[text['row-meta'], { color: tokens['color.foreground-muted'] }]}>
-              {phaseText}
-            </Text>
-          )}
-        </View>
-      </FocusRing>
-
       {/*
-        模式切换（正计时 / 倒计时）—— **页面中部、环正下方**，不占顶部 tab、不占底部。
-        它改变的是「这一轮怎么计时」，视线本就落在环上，放在环下伸手可及。
+        模式切换（番茄专注 / 正计时）—— 面板顶部居中，位于关联任务轻入口与进度环上方。
         只在 idle 可切（领域层 `selectMode` 也判一次，不靠这里当唯一防线）。
       */}
       {modeLabels === undefined || onModeChange === undefined ? null : (
@@ -340,6 +304,42 @@ export function FocusPanel({
           })}
         </View>
       )}
+
+      {header}
+
+      <FocusRing
+        progress={view.progress}
+        elapsedMs={focusElapsedMs(state, now)}
+        variant={view.mode === 'countup' ? 'dial' : 'progress'}
+        tone={view.tone}
+        label={labels.ring(view.percent)}
+        testID="focus-ring"
+      >
+        <View style={styles.face}>
+          {/* 大号计时数字。空闲倒计时态点击本身就是改时长的入口，不另堆说明按钮。 */}
+          {canPressTime ? (
+            <Pressable
+              onPress={onTimePress}
+              accessibilityRole="button"
+              accessibilityLabel={timePressA11y ?? focusDisplayText(state, now)}
+              testID={timePressTestID ?? 'focus-time-trigger'}
+              style={({ pressed }) => [
+                styles.timeHit,
+                { opacity: pressed && !reducedMotion ? tokens['state.pressed-opacity'] : 1 },
+              ]}
+            >
+              {displayNode}
+            </Pressable>
+          ) : (
+            displayNode
+          )}
+          {phaseText === undefined || phaseText === '' ? null : (
+            <Text style={[text['row-meta'], { color: tokens['color.foreground-muted'] }]}>
+              {phaseText}
+            </Text>
+          )}
+        </View>
+      </FocusRing>
 
       {labels.roundLength === undefined ? null : (
         <Text style={[text.caption, { color: tokens['color.foreground-subtle'] }]}>

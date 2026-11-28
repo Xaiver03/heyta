@@ -1704,6 +1704,9 @@ export const zhCN = {
   'web.focus.detail.recordsEmpty': '还没有专注记录。完成一轮就会出现在这里。',
   'web.focus.detail.unlinked': '未关联任务',
   'web.focus.detail.aborted': '中途放弃',
+  // 七日脉搏每一格的无障碍名（格子本身是颜色，这句是它被读出来的那份事实）。
+  // `{weekday}` 复用 `common.weekday.*`，不另开一套"周几"。
+  'web.focus.detail.pulseDay': '{weekday}，专注 {duration}',
 
   // ── Web · 习惯 ────────────────────────────────────────────
   /*

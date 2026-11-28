@@ -68,7 +68,20 @@ export function armBootSplashDismiss(appRoot: HTMLElement | null): void {
   // 它必须是**安静**的（这里没东西可退场，报错只会把应用本身也拖下水）。
   if (boot === null) return;
 
+  /*
+   * 🔴 硬超时的定时器 id。**成功退场时必须把它清掉** —— 否则它会照常在第 12 秒
+   * 触发，往控制台写一条"启动链卡死"的假报错，而那时应用早已正常接管。
+   * 这个假报错会被"界面里零控制台错误"那条验收判据抓到：页面只要开满 12 秒
+   * （慢用例、或用户就是开着不动）就必红，报的还是"卡死"这种最误导人的措辞。
+   * 定时器本身不能依赖"别处会清"：这里就是它唯一的清点。
+   */
+  let hardTimeoutId: number | undefined;
+
   const leave = () => {
+    if (hardTimeoutId !== undefined) {
+      window.clearTimeout(hardTimeoutId);
+      hardTimeoutId = undefined;
+    }
     if (boot.classList.contains(LEAVING_CLASS)) return;
     boot.classList.add(LEAVING_CLASS);
     // 动画结束后摘掉节点：留着它，`pointer-events: none` 虽然不挡点击，
@@ -158,7 +171,10 @@ export function armBootSplashDismiss(appRoot: HTMLElement | null): void {
    * 取值 12s：比任何正常冷启动都宽裕（实测首次建库在秒级），
    * 又不至于让用户以为死机。
    */
-  window.setTimeout(() => {
+  hardTimeoutId = window.setTimeout(() => {
+    // 走到这里说明 12 秒内根本没退场 —— 定时器已自然触发，先作废 id，
+    // 免得下面 `leave()` 里那句 `clearTimeout` 清到一个已执行完的句柄（无害但会误导）。
+    hardTimeoutId = undefined;
     observer.disconnect();
     try {
       console.error('[heyta] 首屏在超时内未被应用接管 —— 这通常意味着启动链卡死或渲染失败');

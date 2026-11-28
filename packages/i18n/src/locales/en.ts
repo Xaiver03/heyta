@@ -1544,6 +1544,9 @@ export const en = {
   'web.focus.detail.recordsEmpty': 'No focus records yet. Finish a session and it will show up here.',
   'web.focus.detail.unlinked': 'No linked task',
   'web.focus.detail.aborted': 'Ended early',
+  // Accessible name for one cell of the seven-day pulse (the cell itself is colour;
+  // this sentence is the fact it reads out). `{weekday}` reuses `common.weekday.*`.
+  'web.focus.detail.pulseDay': '{weekday}, {duration} focused',
 
   // ── Web · habits ──────────────────────────────────────────
   'web.habits.addPlaceholder': 'e.g. “Drink water”, “Sleep by 11”, “Read 10 pages”',

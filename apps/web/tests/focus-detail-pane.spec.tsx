@@ -41,6 +41,24 @@ function overview(over: Partial<FocusOverview> = {}): FocusOverview {
     totalCount: 0,
     totalFocusMs: 0,
     records: [],
+    days: [],
+    ...over,
+  };
+}
+
+/**
+ * 一条记录。`energyLevel` 现在是 `FocusRecord` 的必填字段（由 `focusOverview`
+ * 按"相对记录里最长的一段"分档），所以夹具必须带上 —— 省掉它会让类型检查红，
+ * 而那不是本文件的判据在说话。
+ */
+function record(over: Partial<FocusOverview['records'][number]> = {}): FocusOverview['records'][number] {
+  return {
+    id: 'r',
+    at: Date.now(),
+    actualMs: 25 * MIN,
+    completed: true,
+    taskTitle: '写周报',
+    energyLevel: 4,
     ...over,
   };
 }
@@ -128,14 +146,47 @@ describe('A 四张卡读的是那个出口，不是自己算的', () => {
     expect(textOf(el, 'focus-card-total-duration')).toBe('0 分钟');
   });
 
-  it('🔴 四张卡是**四张**，且标签各自不同 —— 少一张卡不会报错，只会让人以为没做', async () => {
+  /**
+   * 🔴 这一条是本轮重设计的**核心判据**：今日实时 与 历史累计
+   * 不许再拿到同一种容器、同一种视觉权重。
+   *
+   * 旧布局是 2×2 四个同款灰框，两个 `today*` 与两个 `total*` 长得一模一样 ——
+   * 于是"今天做了多少"这个每天都要看的数，跟"累计账本"一样抢不到注意力。
+   * 现在：`today*` 必须落在 hero 里（有底色、大号读数），
+   * `total*` 必须落在账本行里（无底色、紧凑）。**两个容器不能是同一个**。
+   */
+  it('今日的两个读数在 hero 里，累计的两个读数在账本行里 —— 不是同一批卡片', async () => {
     const el = await mount(<FocusDetailPane />);
-    const cards = el.querySelectorAll('.ht-app__detail-card');
-    expect(cards).toHaveLength(4);
-    const labels = [...cards].map(
-      (c) => c.querySelector<HTMLElement>('.ht-app__detail-card-label')?.textContent ?? '',
+    const hero = el.querySelectorAll('.ht-app__detail-hero-cell');
+    const ledger = el.querySelectorAll('.ht-app__detail-ledger-row');
+    expect(hero, '今日 Hero 应有 2 格').toHaveLength(2);
+    expect(ledger, '累计账本应有 2 行').toHaveLength(2);
+
+    // 今日两格：一个装今日番茄、一个装今日时长。
+    const heroIds = [...hero].map(
+      (c) => c.querySelector<HTMLElement>('.ht-app__detail-hero-value')?.dataset.testid ?? '',
     );
-    expect(new Set(labels).size, `卡标签有重复：${labels.join(' / ')}`).toBe(4);
+    expect(heroIds.sort()).toEqual(['focus-card-today-count', 'focus-card-today-duration']);
+
+    // 累计两行：一个装总番茄、一个装总时长。
+    const ledgerIds = [...ledger].map(
+      (r) => r.querySelector<HTMLElement>('.ht-app__detail-ledger-value')?.dataset.testid ?? '',
+    );
+    expect(ledgerIds.sort()).toEqual(['focus-card-total-count', 'focus-card-total-duration']);
+
+    // 反向：`total*` 不许出现在 hero 里、`today*` 不许出现在账本里。
+    expect(el.querySelector('.ht-app__detail-hero [data-testid="focus-card-total-count"]')).toBeNull();
+    expect(el.querySelector('.ht-app__detail-ledger [data-testid="focus-card-today-count"]')).toBeNull();
+  });
+
+  it('四个标签各自不同 —— 少一个读数不会报错，只会让人以为没做', async () => {
+    const el = await mount(<FocusDetailPane />);
+    const labels = [
+      ...el.querySelectorAll<HTMLElement>('.ht-app__detail-hero-label'),
+      ...el.querySelectorAll<HTMLElement>('.ht-app__detail-ledger-label'),
+    ].map((n) => n.textContent ?? '');
+    expect(labels).toHaveLength(4);
+    expect(new Set(labels).size, `标签有重复：${labels.join(' / ')}`).toBe(4);
   });
 });
 
@@ -145,9 +196,9 @@ describe('B 专注记录列表', () => {
       overview: overview({
         totalCount: 3,
         records: [
-          { id: 'r1', at: Date.now(), actualMs: 25 * MIN, completed: true, taskTitle: '写周报' },
-          { id: 'r2', at: Date.now(), actualMs: 8 * MIN, completed: false, taskTitle: null },
-          { id: 'r3', at: Date.now(), actualMs: 25 * MIN, completed: true, taskTitle: '读论文' },
+          record({ id: 'r1', actualMs: 25 * MIN, completed: true, taskTitle: '写周报' }),
+          record({ id: 'r2', actualMs: 8 * MIN, completed: false, taskTitle: null, energyLevel: 1 }),
+          record({ id: 'r3', actualMs: 25 * MIN, completed: true, taskTitle: '读论文' }),
         ],
       }),
     });
@@ -165,7 +216,7 @@ describe('B 专注记录列表', () => {
   it('没关联任务的行说「未关联任务」；留空读起来像数据丢了', async () => {
     useFocusStore.setState({
       overview: overview({
-        records: [{ id: 'r1', at: Date.now(), actualMs: 25 * MIN, completed: true, taskTitle: null }],
+        records: [record({ id: 'r1', taskTitle: null })],
       }),
     });
     const el = await mount(<FocusDetailPane />);
@@ -177,8 +228,8 @@ describe('B 专注记录列表', () => {
     useFocusStore.setState({
       overview: overview({
         records: [
-          { id: 'done', at: Date.now(), actualMs: 25 * MIN, completed: true, taskTitle: 'A' },
-          { id: 'early', at: Date.now(), actualMs: 6 * MIN, completed: false, taskTitle: 'B' },
+          record({ id: 'done', actualMs: 25 * MIN, completed: true, taskTitle: 'A' }),
+          record({ id: 'early', actualMs: 6 * MIN, completed: false, taskTitle: 'B', energyLevel: 1 }),
         ],
       }),
     });
@@ -188,6 +239,84 @@ describe('B 专注记录列表', () => {
     const aborted = rows.filter((r) => r.querySelector('.ht-app__detail-record-aborted') !== null);
     expect(aborted).toHaveLength(1);
     expect(aborted[0]?.querySelector('.ht-app__detail-record-task')?.textContent).toBe('B');
+  });
+
+  /**
+   * 🔴 能量条：25 分钟与 50 分钟必须一眼分得开。
+   *
+   * 以前两行只写文字时长，差一倍得靠读数字才看得出来 —— 而这一栏的作用
+   * 正是"扫一眼就知道今天怎么过的"。这里断的是"档位被画进 DOM"：
+   * 每行的能量条 `data-level` 必须等于出口给的 `energyLevel`。
+   * （颜色映射在 CSS；jsdom 不解析样式表，所以断言落在属性上。）
+   */
+  it('每行的能量条 data-level == 出口给的 energyLevel（长段与短段分得开）', async () => {
+    useFocusStore.setState({
+      overview: overview({
+        records: [
+          record({ id: 'long', actualMs: 50 * MIN, energyLevel: 4 }),
+          record({ id: 'short', actualMs: 25 * MIN, energyLevel: 2 }),
+        ],
+      }),
+    });
+    const el = await mount(<FocusDetailPane />);
+    const levels = [...el.querySelectorAll<HTMLElement>('.ht-app__detail-record-energy')].map(
+      (n) => n.dataset.level,
+    );
+    expect(levels).toEqual(['4', '2']);
+  });
+});
+
+/**
+ * 七日脉搏：给"今天"一个参照系。
+ *
+ * 🔴 这一条守的是"补天由生产者做"：`days` 有几格 (7) 就画几格，
+ * 界面不自己补、也不自己截。以及"今天在最右一格"—— 那是它作为今日
+ * Hero 时间锚点的唯一依据。
+ */
+describe('E 七日脉搏', () => {
+  function days(): FocusOverview['days'] {
+    return [
+      { date: '2026-09-18', focusMs: 0, completedCount: 0, level: 0 },
+      { date: '2026-09-19', focusMs: 10 * MIN, completedCount: 1, level: 1 },
+      { date: '2026-09-20', focusMs: 0, completedCount: 0, level: 0 },
+      { date: '2026-09-21', focusMs: 45 * MIN, completedCount: 2, level: 4 },
+      { date: '2026-09-22', focusMs: 20 * MIN, completedCount: 1, level: 2 },
+      { date: '2026-09-23', focusMs: 30 * MIN, completedCount: 1, level: 3 },
+      { date: '2026-09-24', focusMs: 12 * MIN, completedCount: 1, level: 1 },
+    ];
+  }
+
+  it('有几格画几格，每格的 data-level 等于出口给的 level', async () => {
+    useFocusStore.setState({ overview: overview({ days: days() }) });
+    const el = await mount(<FocusDetailPane />);
+    const cells = [...el.querySelectorAll<HTMLElement>('[data-testid="focus-pulse-day"]')];
+    expect(cells).toHaveLength(7);
+    expect(cells.map((c) => c.dataset.level)).toEqual(['0', '1', '0', '4', '2', '3', '1']);
+  });
+
+  it('今天是最右一格（`data-today` 只在末位）', async () => {
+    useFocusStore.setState({ overview: overview({ days: days() }) });
+    const el = await mount(<FocusDetailPane />);
+    const cells = [...el.querySelectorAll<HTMLElement>('[data-testid="focus-pulse-day"]')];
+    const today = cells.filter((c) => c.hasAttribute('data-today'));
+    expect(today).toHaveLength(1);
+    expect(cells[cells.length - 1]?.hasAttribute('data-today')).toBe(true);
+  });
+
+  it('`days` 为空（引擎还没就绪）时整条不画 —— 七根空柱子会谎称"这周没专注"', async () => {
+    const el = await mount(<FocusDetailPane />);
+    expect(countOf(el, 'focus-pulse')).toBe(0);
+  });
+
+  it('每一格都有可读出的文字事实（不靠颜色单独传达）', async () => {
+    useFocusStore.setState({ overview: overview({ days: days() }) });
+    const el = await mount(<FocusDetailPane />);
+    const legends = [...el.querySelectorAll<HTMLElement>('.ht-app__detail-pulse-legend')].map(
+      (n) => n.textContent ?? '',
+    );
+    expect(legends).toHaveLength(7);
+    // 末位是今天（12 分钟）：周几 + 时长都要在。
+    expect(legends[6]).toContain('12 分钟');
   });
 });
 
