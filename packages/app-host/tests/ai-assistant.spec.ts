@@ -197,6 +197,59 @@ const GRANTED_TOOL_CALLING_CONSENT: readonly EgressConsent[] = [
 
 // ─────────────────────────────────────────────────────────────────────────
 
+describe('用户主动停止', () => {
+  it('已 abort 的信号 ⇒ 返回 cancelled，且一个请求都没发', async () => {
+    const host = fakeHost(TASKS, PROJECTS);
+    // 脚本为空：只要发出任何请求，假端点就会抛"没有回包"——所以 calls=0 是真证据。
+    const { impl, calls } = scriptedFetch([]);
+    const controller = new AbortController();
+    controller.abort();
+    const outcome = await requestAssistantTurn(
+      { text: '你好呀' },
+      {
+        routing: routing(LOCAL),
+        consents: [],
+        localize: LOCALIZE_ZH,
+        host,
+        routed: { fetchImpl: impl },
+        signal: controller.signal,
+      },
+    );
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+    expect(outcome.kind).toBe('cancelled');
+    expect(calls.length).toBe(0);
+    expect(host.submits).toBe(0);
+  });
+
+  it('请求进行中按下停止 ⇒ 不采用这次结果，报 cancelled（请求确实发过一次）', async () => {
+    const host = fakeHost(TASKS, PROJECTS);
+    const { impl, calls } = scriptedFetch([{ kind: 'text', text: '这句不该被采用' }]);
+    const controller = new AbortController();
+    // 在"发出请求的那一刻"同步 abort：模拟用户正好在请求飞行中按下停止。
+    const abortDuringFetch = ((url: unknown, init?: { body?: unknown }) => {
+      const p = impl(url as never, init as never);
+      controller.abort();
+      return p;
+    }) as unknown as typeof fetch;
+    const outcome = await requestAssistantTurn(
+      { text: '你好呀' },
+      {
+        routing: routing(LOCAL),
+        consents: [],
+        localize: LOCALIZE_ZH,
+        host,
+        routed: { fetchImpl: abortDuringFetch },
+        signal: controller.signal,
+      },
+    );
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+    expect(outcome.kind).toBe('cancelled');
+    expect(calls.length).toBe(1);
+  });
+});
+
 describe('多步读循环', () => {
   it('读 → 读 → 答：三次请求，观察结果真的回送了模型', async () => {
     const host = fakeHost(TASKS, PROJECTS);
@@ -500,10 +553,10 @@ describe('🔴 出境披露：循环前一次算完，越界就停', () => {
   });
 });
 
-describe('🔴 三个硬上界：触顶要明说，不许静默截断', () => {
-  it('消息数超上界 ⇒ 停，且**一次请求都没发**', async () => {
+describe('🔴 上界与长会话压缩', () => {
+  it('历史超过阈值 ⇒ 先压缩历史再发（不再硬停），最近原文仍保留', async () => {
     const host = fakeHost(TASKS);
-    const { impl, calls } = scriptedFetch([{ kind: 'text', text: '不该发' }]);
+    const { impl, calls } = scriptedFetch([{ kind: 'text', text: '好。' }]);
     const history = Array.from({ length: MAX_ASSISTANT_MESSAGES }, (_unused, i) => ({
       role: i % 2 === 0 ? ('user' as const) : ('assistant' as const),
       text: `第 ${String(i)} 条`,
@@ -512,11 +565,15 @@ describe('🔴 三个硬上界：触顶要明说，不许静默截断', () => {
       { text: '继续' },
       { routing: routing(LOCAL), consents: [], localize: LOCALIZE_ZH, host, history, routed: { fetchImpl: impl } },
     );
-    expect(calls.length).toBe(0);
+    // 关键差别：不再"一次请求都不发"，而是压缩后**发出去**（calls=1）。
+    expect(calls.length).toBe(1);
+    const sent = calls[0]?.messages ?? [];
+    expect(sent.length).toBeLessThan(MAX_ASSISTANT_MESSAGES);
+    const texts = sent.map((m) => String(m['content'] ?? ''));
+    expect(texts.some((t) => t.includes('已压缩'))).toBe(true);
+    // 最近一条历史原文（下标 MAX-1）被保留，不被一起折叠掉。
+    expect(texts).toContain(`第 ${String(MAX_ASSISTANT_MESSAGES - 1)} 条`);
     expect(outcome.ok).toBe(true);
-    if (!outcome.ok || outcome.kind !== 'stopped') return;
-    expect(outcome.limit).toBe('messages');
-    expect(outcome.text).toContain(String(MAX_ASSISTANT_MESSAGES));
   });
 
   it('单步出境字节超上界 ⇒ 停，且越界那段没发出去', async () => {

@@ -72,6 +72,8 @@ import {
   type HealthMap,
   type RoutedDeps,
 } from '@heyta/ai';
+import { compactAssistantHistory } from './assistant-compaction.js';
+import { projectAssistantCards, type AssistantDataCard } from './assistant-cards.js';
 import {
   LOCAL_API_TOOLS,
   TOOL_ENVELOPE_EGRESS_FIELDS,
@@ -280,6 +282,8 @@ export type AssistantOutcome =
       kind: 'answer';
       readonly text: string;
       readonly steps: readonly AssistantStep[];
+      /** 读结果的结构化卡片（模型只引用、不改写；`projectAssistantCards` 产出）。 */
+      readonly cards?: readonly AssistantDataCard[];
       /** 本轮新增的消息（用户那句 + 助手的回答）。壳负责 append 进历史。 */
       readonly appended: readonly AssistantMessage[];
       readonly health: HealthMap;
@@ -316,6 +320,15 @@ export type AssistantOutcome =
       ok: true;
       kind: 'stopped';
       readonly limit: AssistantLimit;
+      readonly text: string;
+      readonly steps: readonly AssistantStep[];
+      readonly appended: readonly AssistantMessage[];
+      readonly health: HealthMap;
+    }
+  | {
+      ok: true;
+      kind: 'cancelled';
+      /** 用户主动停止；`steps` 保留已经发生的部分，界面自己决定怎么说。 */
       readonly text: string;
       readonly steps: readonly AssistantStep[];
       readonly appended: readonly AssistantMessage[];
@@ -403,6 +416,13 @@ export interface AssistantTurnDeps {
    * 单步面板零出境、在对话里却把数据发出去了，而且两边都"正常工作"。
    */
   readonly rules?: readonly ToolSelectionRule[];
+  /**
+   * 用户主动「停止」的信号（可选）。**只在循环边界消费**：每一步开始前、
+   * 调模型前、执行工具前各看一次；命中即返回 `kind:'cancelled'` 并保留已发生的步骤。
+   * 不把它推进 `invokeRouted`（出境层不接外部 signal）——单次请求会自然跑完再被丢弃，
+   * 所以停止最多晚一个请求，不静默丢数据、不谎报"没请求就已停"。
+   */
+  readonly signal?: AbortSignal;
 }
 
 const ASSISTANT_SYSTEM_PROMPT = [
@@ -838,9 +858,15 @@ export async function requestAssistantTurn(
 
   const steps: AssistantStep[] = [];
   const toolTranscript: ChatMessage[] = [];
+  /** 读工具的观察结果，供最终回答附带结构化卡片（只报已读到的东西，不参与出境）。 */
+  const observations: { tool: string; data: unknown }[] = [];
   let health: HealthMap = {};
   let destination: EgressDestination | undefined;
   let lastText = '';
+  /** 用户是否已按「停止」。包成函数调用，避免 TS 把属性比较在多次判断间窄化成字面量。 */
+  const stopRequested = (): boolean => deps.signal?.aborted === true;
+  // 长会话先压缩历史（确定性、零额外出境）：把"撞上 MAX_ASSISTANT_MESSAGES 就硬停"换成"先压缩再发"。
+  const effectiveHistory = compactAssistantHistory(deps.history ?? []);
 
   // 🔴 循环上界是 `MAX_ASSISTANT_TOOL_STEPS`，而**每一次**循环都是一次模型调用，
   // 所以"最多几次请求"也是被这个常量推导的（见 `planAssistantEgress`），不是另写一个数。
@@ -857,7 +883,12 @@ export async function requestAssistantTurn(
       };
     }
 
-    const messages = assistantMessages(system, deps.history ?? [], text, toolTranscript);
+    // 用户已按「停止」：在进入这一步之前就退出，不发起新的出境。
+    if (stopRequested()) {
+      return { ok: true, kind: 'cancelled', text: '', steps, appended: [], health };
+    }
+
+    const messages = assistantMessages(system, effectiveHistory.history, text, toolTranscript);
     if (messages.length > MAX_ASSISTANT_MESSAGES) {
       return {
         ok: true,
@@ -908,6 +939,11 @@ export async function requestAssistantTurn(
       };
     }
 
+    // 发请求前再判一次：上一步拖长时用户可能刚好按了停止。
+    if (stopRequested()) {
+      return { ok: true, kind: 'cancelled', text: '', steps, appended: [], health };
+    }
+
     const outcome = await invokeRouted(
       deps.routing,
       invocation,
@@ -917,6 +953,12 @@ export async function requestAssistantTurn(
     );
     health = outcome.health;
     const result = outcome.result;
+
+    // 单次请求期间用户按了停止：结果虽然回来了，但不采用它 —— 明确报「已停止」，
+    // 不回一句"其实已经答完了"。代价是这一次请求照样花掉，换来的是用户按下去就有明确回执。
+    if (stopRequested()) {
+      return { ok: true, kind: 'cancelled', text: '', steps, appended: [], health };
+    }
 
     if (!result.ok) {
       return {
@@ -948,6 +990,7 @@ export async function requestAssistantTurn(
         ],
         health,
         destination,
+        cards: projectAssistantCards(observations),
       };
     }
 
@@ -987,6 +1030,11 @@ export async function requestAssistantTurn(
     const onEvent = deps.onEvent;
     onEvent?.({ type: 'tool-started', tool: call.name, kind });
 
+    // 执行工具前再判一次：模型这一步回来后用户可能已经点了停止。
+    if (stopRequested()) {
+      return { ok: true, kind: 'cancelled', text: '', steps, appended: [], health };
+    }
+
     const run = await runSelectedTool(
       { kind: 'tool', ruleId: `assistant:${call.name}`, tool: call.name, args: parsed.args },
       runnerDeps,
@@ -1016,6 +1064,7 @@ export async function requestAssistantTurn(
       }
       steps.push({ tool: run.tool, kind: 'read', ok: true });
       onEvent?.({ type: 'tool-finished', tool: run.tool, kind: 'read', ok: true });
+      observations.push({ tool: run.tool, data: run.data });
       toolTranscript.push({
         role: 'tool',
         content: JSON.stringify(run.data),
