@@ -57,7 +57,7 @@
 import { ICON_SIZE } from '@heyta/design-system';
 import { useI18n, type MessageKey } from '@heyta/i18n/provider';
 import { ArrowLeft, LogIn, RefreshCw, ShieldCheck } from 'lucide-react';
-import { Fragment, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 
 import { AdminPanel } from './AdminPanel.js';
 import { ADMIN_NAV_GROUPS } from './nav.js';
@@ -65,6 +65,7 @@ import { appEntryHref } from './route.js';
 import { canSignInFrom, useAdminStore } from './store.js';
 // 🔴 首启的隐私同意面板必须在这一页上也挂着 —— 见下面挂载点那条注释。
 import { PrivacyConsentSheet } from '../privacy/PrivacyConsentSheet.js';
+import { requireNetworkConsent } from '../privacy/store.js';
 import { useNetworkAllowed } from '../privacy/use-network-allowed.js';
 import { AuthPanel } from '../auth/AuthPanel.js';
 import { useSyncStore } from '../sync/store.js';
@@ -77,6 +78,13 @@ export function AdminConsolePage(): React.JSX.Element {
   const baseUrl = useSyncStore((s) => s.baseUrl);
   const [loginOpen, setLoginOpen] = useState(false);
   const [loginDismissed, setLoginDismissed] = useState(false);
+
+  // 🔴 admin 是独立启动壳（ADR-0078），且它一进来就要 probe（联网）。ADR-0086「冷启动不主动弹」
+  //   在这是死锁：AdminPanel 要 networkAllowed 才挂载 → probe 才发 fetch → 闸门才打开隐私面板；
+  //   未同意时既不挂载也不 fetch，隐私面板永不弹 → 永久 Loading。所以这里主动要求隐私决定。
+  useEffect(() => {
+    requireNetworkConsent();
+  }, []);
 
   // 403 不给登录入口：那个人已经登录了，问题在权限（见 `canSignInFrom`）。
   const showSignIn = canSignInFrom(store.errorKey);
