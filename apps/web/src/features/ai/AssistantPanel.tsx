@@ -231,6 +231,9 @@ interface AssistantEphemeralShape {
 }
 
 
+/** 空态建议芯片的键（与移动端 `SUGGESTIONS` 同序）：点一下把整句**填进输入框**，不直接发送。 */
+const SUGGESTION_KEYS = ['today', 'capture', 'summary', 'plan'] as const;
+
 export function AssistantPanel(props: AssistantPanelProps): React.JSX.Element {
   const session = usePanelSession();
   return <AssistantSessionPanel key={session.generation} {...props} account={session.account} />;
@@ -990,6 +993,27 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
           </header>
       <div className={`ht-ai__chat-body ${!hasConversation ? 'ht-ai__chat-body--welcome' : ''}`}>
       {!hasConversation && <div className="ht-ai__welcome" data-testid="ai-assistant-welcome">
+        {/* 空态呼吁：一句行动号召 + 几枚建议芯片（点一下把整句填进输入框）。
+            文案/样式都走既有 i18n 与 `.ht-ai__greeting`/`.ht-ai__suggestion`，不新增裸值。 */}
+        <div className="ht-ai__greeting" data-testid="ai-assistant-greeting">
+          <p className="ht-ai__greeting-title">{t('web.ai.chat.welcome.title')}</p>
+        </div>
+        <div className="ht-ai__suggestions" data-testid="ai-assistant-suggestions">
+          {SUGGESTION_KEYS.map((key) => (
+            <button
+              key={key}
+              type="button"
+              className="ht-ai__suggestion"
+              data-testid={`ai-assistant-suggestion-${key}`}
+              onClick={() => {
+                setDraft(t(`web.ai.chat.suggestion.${key}` as MessageKey));
+                requestAnimationFrame(() => composerRef.current?.focus());
+              }}
+            >
+              {t(`web.ai.chat.suggestion.${key}.label` as MessageKey)}
+            </button>
+          ))}
+        </div>
         {composer}
       </div>}
 
