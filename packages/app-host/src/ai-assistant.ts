@@ -72,6 +72,7 @@ import {
   type HealthMap,
   type RoutedDeps,
 } from '@heyta/ai';
+import { compactAssistantHistory } from './assistant-compaction.js';
 import {
   LOCAL_API_TOOLS,
   TOOL_ENVELOPE_EGRESS_FIELDS,
@@ -859,6 +860,8 @@ export async function requestAssistantTurn(
   let lastText = '';
   /** 用户是否已按「停止」。包成函数调用，避免 TS 把属性比较在多次判断间窄化成字面量。 */
   const stopRequested = (): boolean => deps.signal?.aborted === true;
+  // 长会话先压缩历史（确定性、零额外出境）：把"撞上 MAX_ASSISTANT_MESSAGES 就硬停"换成"先压缩再发"。
+  const effectiveHistory = compactAssistantHistory(deps.history ?? []);
 
   // 🔴 循环上界是 `MAX_ASSISTANT_TOOL_STEPS`，而**每一次**循环都是一次模型调用，
   // 所以"最多几次请求"也是被这个常量推导的（见 `planAssistantEgress`），不是另写一个数。
@@ -880,7 +883,7 @@ export async function requestAssistantTurn(
       return { ok: true, kind: 'cancelled', text: '', steps, appended: [], health };
     }
 
-    const messages = assistantMessages(system, deps.history ?? [], text, toolTranscript);
+    const messages = assistantMessages(system, effectiveHistory.history, text, toolTranscript);
     if (messages.length > MAX_ASSISTANT_MESSAGES) {
       return {
         ok: true,

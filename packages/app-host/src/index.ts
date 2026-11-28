@@ -1375,3 +1375,13 @@ export {
   type FilterActionsOptions,
   type NewFilterFields,
 } from './filter-actions.js';
+
+// 长会话历史压缩（确定性，零额外出境）——把"撞上界硬停"换成"先压缩再发"
+export {
+  ASSISTANT_COMPACT_KEEP_RECENT,
+  ASSISTANT_COMPACT_SNIPPET_MAX,
+  ASSISTANT_COMPACT_TRIGGER,
+  compactAssistantHistory,
+  type CompactableMessage,
+  type CompactionResult,
+} from './assistant-compaction.js';

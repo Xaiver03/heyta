@@ -553,10 +553,10 @@ describe('🔴 出境披露：循环前一次算完，越界就停', () => {
   });
 });
 
-describe('🔴 三个硬上界：触顶要明说，不许静默截断', () => {
-  it('消息数超上界 ⇒ 停，且**一次请求都没发**', async () => {
+describe('🔴 上界与长会话压缩', () => {
+  it('历史超过阈值 ⇒ 先压缩历史再发（不再硬停），最近原文仍保留', async () => {
     const host = fakeHost(TASKS);
-    const { impl, calls } = scriptedFetch([{ kind: 'text', text: '不该发' }]);
+    const { impl, calls } = scriptedFetch([{ kind: 'text', text: '好。' }]);
     const history = Array.from({ length: MAX_ASSISTANT_MESSAGES }, (_unused, i) => ({
       role: i % 2 === 0 ? ('user' as const) : ('assistant' as const),
       text: `第 ${String(i)} 条`,
@@ -565,11 +565,15 @@ describe('🔴 三个硬上界：触顶要明说，不许静默截断', () => {
       { text: '继续' },
       { routing: routing(LOCAL), consents: [], localize: LOCALIZE_ZH, host, history, routed: { fetchImpl: impl } },
     );
-    expect(calls.length).toBe(0);
+    // 关键差别：不再"一次请求都不发"，而是压缩后**发出去**（calls=1）。
+    expect(calls.length).toBe(1);
+    const sent = calls[0]?.messages ?? [];
+    expect(sent.length).toBeLessThan(MAX_ASSISTANT_MESSAGES);
+    const texts = sent.map((m) => String(m['content'] ?? ''));
+    expect(texts.some((t) => t.includes('已压缩'))).toBe(true);
+    // 最近一条历史原文（下标 MAX-1）被保留，不被一起折叠掉。
+    expect(texts).toContain(`第 ${String(MAX_ASSISTANT_MESSAGES - 1)} 条`);
     expect(outcome.ok).toBe(true);
-    if (!outcome.ok || outcome.kind !== 'stopped') return;
-    expect(outcome.limit).toBe('messages');
-    expect(outcome.text).toContain(String(MAX_ASSISTANT_MESSAGES));
   });
 
   it('单步出境字节超上界 ⇒ 停，且越界那段没发出去', async () => {
