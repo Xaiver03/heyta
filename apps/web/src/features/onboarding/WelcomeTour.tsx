@@ -31,6 +31,7 @@ import { Button } from '../../components/hta/index.js';
 import { WebModalShell } from '../../lib/dialog/WebModalShell.js';
 import { hasSeenWelcome, markWelcomeSeen } from './first-run.js';
 import { usePrivacyStore } from '../privacy/store.js';
+import { wantsSignInOnLoad } from '../../lib/auth-deep-link.js';
 
 interface Slide {
   readonly titleKey: MessageKey;
@@ -51,8 +52,10 @@ export function WelcomeTour(): React.JSX.Element | null {
   const [index, setIndex] = useState(0);
   // 隐私同意未处理时导览让位：两者都是 z.modal 浮层，导览盖住隐私同意会让用户无法先同意（先合规、后引导）。
   const privacyOpen = usePrivacyStore((s) => s.open);
+  // 登录深链落地不弹导览：用户意图是登录，导览会盖住登录面板（同意落下后尤其会回来盖住）。
+  const signinIntent = wantsSignInOnLoad();
 
-  if (!open || privacyOpen) return null;
+  if (!open || privacyOpen || signinIntent) return null;
 
   const close = (): void => {
     markWelcomeSeen();
