@@ -3338,7 +3338,6 @@ export const en = {
   'web.calendar.more.showCompleted': 'Show completed',
   'web.calendar.more.showCountdown': 'Show countdowns',
   'web.calendar.more.openDisplay': 'Display settings…',
-  'web.calendar.display.title': 'Display settings',
   'web.calendar.display.colorBy': 'Colour',
   'web.calendar.display.colorByList': 'By list',
   'web.calendar.display.colorByPriority': 'By priority',

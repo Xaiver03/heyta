@@ -3631,7 +3631,6 @@ export const zhCN = {
   'web.calendar.more.showCompleted': '显示已完成',
   'web.calendar.more.showCountdown': '显示倒数纪念日',
   'web.calendar.more.openDisplay': '显示设置…',
-  'web.calendar.display.title': '显示设置',
   'web.calendar.display.colorBy': '配色',
   'web.calendar.display.colorByList': '按清单',
   'web.calendar.display.colorByPriority': '按优先级',

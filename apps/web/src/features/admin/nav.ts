@@ -81,4 +81,3 @@ export const ADMIN_NAV_GROUPS: readonly AdminNavGroup[] = [
   { id: 'content', headerKey: 'web.admin.nav.content', entries: ADMIN_TABS.filter((e) => e.group === 'content') },
   { id: 'system', headerKey: 'web.admin.nav.system', entries: ADMIN_TABS.filter((e) => e.group === 'system') },
 ];
-];
