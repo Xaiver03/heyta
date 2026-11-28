@@ -641,3 +641,51 @@
 .ht-ai__chat-body:not(.ht-ai__chat-body--welcome):has(> .ht-ai__org) {
   grid-template-rows: auto minmax(0, 1fr) auto;
 }
+
+/* ── 工具结果卡片（读结果；确定性投影，模型只引用不改写）────────────── */
+.ht-ai__cards {
+  display: grid;
+  gap: var(--ht-space-2);
+  margin-block-start: var(--ht-space-2);
+}
+
+.ht-ai__card {
+  border: var(--ht-border-width-hairline) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface);
+  padding: var(--ht-space-2) var(--ht-space-3);
+}
+
+.ht-ai__card-title {
+  margin: 0 0 var(--ht-space-1);
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-xs);
+}
+
+.ht-ai__card-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--ht-space-1);
+}
+
+.ht-ai__card-item {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--ht-space-2);
+  color: var(--ht-color-foreground);
+  font-size: var(--ht-font-size-sm);
+}
+
+.ht-ai__card-primary {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ht-ai__card-meta {
+  white-space: nowrap;
+  color: var(--ht-color-foreground-subtle);
+  font-size: var(--ht-font-size-xs);
+}

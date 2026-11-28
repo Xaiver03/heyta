@@ -706,6 +706,7 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
       text: outcome.text,
       steps: outcome.steps,
       stoppedAt: outcome.kind === 'stopped' ? outcome.limit : undefined,
+      ...('cards' in outcome && outcome.cards !== undefined ? { cards: outcome.cards } : {}),
     });
   }
 
@@ -1075,6 +1076,30 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
                     className="ht-ai__assistant-text"
                     testId="ai-chat-assistant-text"
                   />
+                  {item.cards !== undefined && item.cards.length > 0 && (
+                    <div className="ht-ai__cards" data-testid="ai-chat-cards">
+                      {item.cards.map((card, cardIndex) => (
+                        <div className="ht-ai__card" key={`${card.tool}-${String(cardIndex)}`}>
+                          <p className="ht-ai__card-title">
+                            {t('web.ai.card.resultCount', { n: card.count })}
+                          </p>
+                          <ul className="ht-ai__card-list">
+                            {card.items.map((row, rowIndex) => (
+                              <li
+                                className="ht-ai__card-item"
+                                key={`${card.tool}-${String(cardIndex)}-${String(rowIndex)}`}
+                              >
+                                <span className="ht-ai__card-primary">{row.primary}</span>
+                                {row.meta !== undefined && (
+                                  <span className="ht-ai__card-meta">{row.meta}</span>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   {!suppressMiddleLabel && (
                     <AiGeneratedLabel
                       label={t('common.ai.generatedLabel')}

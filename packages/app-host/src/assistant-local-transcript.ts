@@ -14,6 +14,7 @@
 
 import type { AiToolProposal } from './ai-tool-run.js';
 import type { AssistantFailureReason, AssistantStep } from './ai-assistant.js';
+import type { AssistantDataCard } from './assistant-cards.js';
 import type { AiFailureReason } from '@heyta/ai';
 import type { LocalApiWriteResult } from '@heyta/local-api';
 
@@ -25,6 +26,8 @@ export type ChatItem =
       readonly role: 'assistant';
       readonly text: string;
       readonly steps: readonly AssistantStep[];
+      /** 读结果的结构化卡片（可 JSON 序列化，随记录落盘）。 */
+      readonly cards?: readonly AssistantDataCard[];
       /** 触顶时的那一句（`stopped` 也是回答，只是带"我停在哪儿"）。 */
       readonly stoppedAt: string | undefined;
     }

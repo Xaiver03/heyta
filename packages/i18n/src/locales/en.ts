@@ -2531,6 +2531,7 @@ export const en = {
   'web.ai.chat.send': 'Send',
   'web.ai.chat.stop': 'Stop',
   'web.ai.chat.stoppedByUser': 'Stopped.',
+  'web.ai.card.resultCount': 'Results · {n}',
   'web.ai.chat.newSession': 'New chat',
   'web.ai.chat.history.title': 'Chats',
   'web.ai.chat.history.today': 'Today',

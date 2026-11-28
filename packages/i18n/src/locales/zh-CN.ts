@@ -2732,6 +2732,7 @@ export const zhCN = {
   'web.ai.chat.send': '发送',
   'web.ai.chat.stop': '停止',
   'web.ai.chat.stoppedByUser': '已停止。',
+  'web.ai.card.resultCount': '查询结果 · {n} 项',
   'web.ai.chat.newSession': '新会话',
   'web.ai.chat.history.title': '会话',
   'web.ai.chat.history.today': '今天',

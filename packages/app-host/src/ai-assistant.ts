@@ -73,6 +73,7 @@ import {
   type RoutedDeps,
 } from '@heyta/ai';
 import { compactAssistantHistory } from './assistant-compaction.js';
+import { projectAssistantCards, type AssistantDataCard } from './assistant-cards.js';
 import {
   LOCAL_API_TOOLS,
   TOOL_ENVELOPE_EGRESS_FIELDS,
@@ -281,6 +282,8 @@ export type AssistantOutcome =
       kind: 'answer';
       readonly text: string;
       readonly steps: readonly AssistantStep[];
+      /** 读结果的结构化卡片（模型只引用、不改写；`projectAssistantCards` 产出）。 */
+      readonly cards?: readonly AssistantDataCard[];
       /** 本轮新增的消息（用户那句 + 助手的回答）。壳负责 append 进历史。 */
       readonly appended: readonly AssistantMessage[];
       readonly health: HealthMap;
@@ -855,6 +858,8 @@ export async function requestAssistantTurn(
 
   const steps: AssistantStep[] = [];
   const toolTranscript: ChatMessage[] = [];
+  /** 读工具的观察结果，供最终回答附带结构化卡片（只报已读到的东西，不参与出境）。 */
+  const observations: { tool: string; data: unknown }[] = [];
   let health: HealthMap = {};
   let destination: EgressDestination | undefined;
   let lastText = '';
@@ -985,6 +990,7 @@ export async function requestAssistantTurn(
         ],
         health,
         destination,
+        cards: projectAssistantCards(observations),
       };
     }
 
@@ -1058,6 +1064,7 @@ export async function requestAssistantTurn(
       }
       steps.push({ tool: run.tool, kind: 'read', ok: true });
       onEvent?.({ type: 'tool-finished', tool: run.tool, kind: 'read', ok: true });
+      observations.push({ tool: run.tool, data: run.data });
       toolTranscript.push({
         role: 'tool',
         content: JSON.stringify(run.data),
