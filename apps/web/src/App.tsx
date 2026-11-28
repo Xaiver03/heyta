@@ -148,7 +148,7 @@ import { ConflictDialog } from './features/sync/ConflictDialog.js';
 import { PrivacyConsentSheet } from './features/privacy/PrivacyConsentSheet.js';
 import { LegalReconfirmSheet } from './features/legal-recheck/LegalReconfirmSheet.js';
 import { WelcomeTour } from './features/onboarding/WelcomeTour.js';
-import { usePrivacyStore } from './features/privacy/store.js';
+import { requireNetworkConsent, usePrivacyStore } from './features/privacy/store.js';
 import { armFirstLaunchConsent } from './features/privacy/first-launch.js';
 import { CalendarSidebar } from './features/calendar/CalendarSidebar.js';
 import { useNarrowLayout } from './features/shell/useNarrowLayout.js';
@@ -1142,18 +1142,19 @@ export function App(): React.JSX.Element {
       现在读的是 `getState()` 的当前值（不是渲染期快照，那正是原注释担心的时序问题）：
       面板真开着（例如用户刚在设置里点了隐私）才等它落下，否则立刻兑现意图。
     */
-    if (!usePrivacyStore.getState().open) {
-      useSyncStore.getState().openSignIn();
-      return;
+    // 🔴 ADR-0086 + 合规：登录深链落地 = 登录动作开始，先要求隐私决定（同意联网）再兑现登录面板。
+    //   未决时 requireNetworkConsent 会打开 privacy-consent 面板并返回 false，等它落下再 openSignIn。
+    if (!requireNetworkConsent()) {
+      const unsubscribe = usePrivacyStore.subscribe((state) => {
+        if (state.open) return;
+        unsubscribe();
+        useSyncStore.getState().openSignIn();
+      });
+      return () => {
+        unsubscribe();
+      };
     }
-    const unsubscribe = usePrivacyStore.subscribe((state) => {
-      if (state.open) return;
-      unsubscribe();
-      useSyncStore.getState().openSignIn();
-    });
-    return () => {
-      unsubscribe();
-    };
+    useSyncStore.getState().openSignIn();
   }, []);
 
   const [aiSettings, setAiSettings] = useState(loadAiSettings);
