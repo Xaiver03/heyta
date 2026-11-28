@@ -327,7 +327,7 @@ test('PWA 资产在 /app/ 子路径下拿到真身，且 SW 真的注册成功',
   });
   const page = await context.newPage();
   const logs = attachLogs(page);
-  await page.goto(`${ORIGIN}/app/`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`${ORIGIN}/app/?signin=1`, { waitUntil: 'domcontentloaded' });
 
   /**
    * 🔴 **必须等应用真的渲染出来再截图** —— 而且这一步本身就是一条判据。

@@ -85,20 +85,13 @@ test('线上 /admin 未登录：给的是"进不去"的一句话，而后台端�
     .then(() => page.locator('[data-testid="privacy-consent-accept"]').first().click())
     .catch(() => undefined);
 
-  // 落点：后台壳在，而**内容区一块都没有**（未登录不许看到任何读数），
-  // 并且那一格给的是**一句原因**而不是空白。
-  // ⚠️ 断"非空"不断字面：这句话跟着界面语言走（线上这一趟是英文装机态），
-  // 钉死中文会得到一条只在默认语言下才成立的假判据。
+  // 落点：后台壳在，而**内容区一块都没有**（未登录不许看到任何读数）。
+  // ADR-0078 D4（2026-10-29 收窄）：没会话的人第一眼是**登录面**（AuthPanel 自己就在场），
+  // 不是"一句原因"；主动关掉登录面才退回原因块。所以断言登录面可见、内容区不渲染。
   await expect(page.getByTestId('admin-console')).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId('admin-panel')).toHaveCount(0);
-  const reason = page.getByTestId('admin-console-reason');
-  await expect(reason).not.toHaveText('');
-  // 🔴 这一句是**线上量出来的**那条缺陷的形状（2026-10-25 第一次跑就是红的在这里）：
-  // 未登录时 `baseUrl` 也还是空，于是那一屏说的是"没有配置服务器地址"，
-  // 把一个人支去查一个没坏的配置。真实原因是没会话 —— 判它"不许指向服务器地址"，
-  // 而不是判它"必须含某句中文"：这一页跟着界面语言走，钉死字面会得到一条
-  // 只在默认语言下成立的假判据。
-  expect(await reason.innerText()).not.toMatch(/服务器地址|server address/iu);
+  const loginFace = page.locator('[data-testid="auth-form-email"], [data-testid="central-auth-panel"]').first();
+  await expect(loginFace, '未登录进 /admin 第一眼应是登录面（ADR-0078 D4）').toBeVisible({ timeout: 30_000 });
   await page.screenshot({ path: `${SHOT_DIR}/live-admin-logged-out.png`, fullPage: true });
 
   expect(errors, `页面报错：\n${errors.join('\n')}`).toEqual([]);
