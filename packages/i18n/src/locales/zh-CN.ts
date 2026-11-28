@@ -641,8 +641,11 @@ export const zhCN = {
   'web.shell.modules.habits.label': '习惯打卡',
   'web.shell.modules.timeline.label': '时间线',
   'web.shell.modules.focus.label': '番茄钟',
+  'web.shell.modules.focus.note': '用番茄计时保持专注。',
   'web.shell.modules.growth.label': '成长',
+  'web.shell.modules.growth.note': '看长期趋势与累计，而不是今天。',
   'web.shell.modules.notes.label': '便签',
+  'web.shell.modules.notes.note': '随时记一笔，不必先变成一条任务。',
   'web.shell.views.groupMore': '更多',
   'web.shell.rail.customize': '自定义侧栏',
   'web.shell.rail.customizeDone': '完成自定义',
@@ -1094,6 +1097,7 @@ export const zhCN = {
   'web.sync.password.strong': '不会',
   'web.sync.password.tail': '被保存到磁盘，只存在于本次会话。已设置加密数据钥匙的数据，可在下方使用口令或已保存的恢复码解锁；尚未迁移的旧格式数据仍需要原口令。重置登录密码不能解密数据。',
   'web.settings.syncUx.statusTitle': '同步状态',
+  'web.settings.syncUx.statusHint': '先确认连接状态，再修改服务端或账号凭据。',
   // R7：本地读数（零网络），措辞只说事实，不给"很快就好"的承诺。
   // R7：rail 上那句"还有几条没传"，与设置里那三行是同一件事的两个可见面。
   'web.sync.rail.pendingOne': '1 项还没上传',
@@ -6915,6 +6919,16 @@ export const zhCN = {
   'web.summary.copy': '复制总结',
   'web.summary.copied': '已复制',
   'web.summary.failed': '复制失败',
+  'common.privacy.settings.chooseHint': '需要同步或登录时，可以在这里重新选择是否联网。打开选择面板不会改变当前权限。',
+  'web.shell.modules.intro': '关掉不用的模块，它就从左侧导航里消失。只影响这台设备。',
+  'web.shell.modules.calendar.note': '按日期看哪天有什么事。',
+  'web.shell.modules.quadrant.note': '按重要与紧急把任务分到四格。',
+  'web.shell.modules.kanban.note': '按清单分列，拖动卡片换清单。',
+  'web.shell.modules.habits.note': '养成习惯，让自律成为日常。',
+  'web.shell.modules.timeline.note': '按日期把任务铺在一条时间轴上。',
+  'web.shell.modules.savedHint': '已保存 —— 左侧导航已经跟着变了。',
+  'web.calendar.footnote': '未设截止时间的任务不在日历上，它们在「任务」页的收集箱里。',
+  'mobile.calendar.footnote': '未设截止时间的任务不在日历上，它们在「任务」页的收集箱里。',
 } as const;
 
 /**

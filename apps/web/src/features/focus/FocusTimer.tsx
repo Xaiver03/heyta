@@ -24,7 +24,7 @@ import {
   focusConfigToDraft,
   type FocusConfigDraft,
 } from '../../lib/focus-config.js';
-import { useSelected } from '../../lib/selection.js';
+import { selection, useSelected } from '../../lib/selection.js';
 import { useFocusStore } from './store.js';
 import { NoiseSettings } from './NoiseSettings.js';
 
