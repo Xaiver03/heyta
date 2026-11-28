@@ -75,6 +75,9 @@ export async function closeTaskDetailIfOpen(page: Page): Promise<void> {
   await page.evaluate(() => {
     (document.activeElement as HTMLElement | null)?.blur();
   });
+  if ((await dialog.getByTestId('task-detail-popover').count()) > 0) {
+    await page.keyboard.press('Escape');
+  }
   await page.keyboard.press('Escape');
   await expect(dialog, '窄档面单对话框没关掉（后面的行上判据会被遮罩挡住）').toHaveCount(0);
 }

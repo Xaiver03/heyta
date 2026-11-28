@@ -131,6 +131,8 @@ export {
   calendarSelectedForCursor,
   calendarYearColumns,
   calendarMonthDrill,
+  multiDayGrid,
+  multiWeekGrid,
   stepCalendarCursor,
   groupTasksByDueDate,
   MAX_CALENDAR_BARS,

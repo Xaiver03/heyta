@@ -126,10 +126,14 @@ export interface TaskRowProps {
    */
   readonly swipeActions?: (row: TaskRowModel) => TaskRowSwipeSpec | null;
   readonly labels?: TaskRowLabels;
-  /** 标题下方的元信息行（截止 / 优先级 / 重复…）。`minimal` 档不渲染它。 */
+  /** 标题槽覆盖（例如桌面端选中后再次点击标题进入原位重命名）；返回 `undefined` 则走默认标题。 */
+  readonly renderTitle?: (row: TaskRowModel) => React.ReactNode | undefined;
+  /** 行首行右侧的元信息（归属 / 截止 / 优先级…）。`minimal` 档不渲染它。 */
   readonly renderMeta?: (row: TaskRowModel) => React.ReactNode;
-  /** 行尾的动作（删除按钮 / 拖动手柄…）。`minimal` 档不渲染它。 */
+  /** 行首行尾部的附加标记与拖拽手柄。`minimal` 档不渲染它。 */
   readonly renderTrailing?: (row: TaskRowModel) => React.ReactNode;
+  /** 标题正下方的离散副行（备注单行摘要 / 彩色标签胶囊行）。无内容返回 `null` 时不占高度。 */
+  readonly renderSubline?: (row: TaskRowModel) => React.ReactNode;
   /** 正在处理中的这一行 —— 用于置灰、避免连点发出两条变更。 */
   readonly busy?: boolean;
   /**
@@ -170,8 +174,10 @@ export function TaskRow({
   onLongPressTask,
   swipeActions,
   labels,
+  renderTitle,
   renderMeta,
   renderTrailing,
+  renderSubline,
   busy = false,
   active = false,
   selected = false,
@@ -259,40 +265,29 @@ export function TaskRow({
       StyleSheet.create({
         row: {
           flexDirection: 'row',
-          alignItems: 'center',
-          // `minHeight` 为 `null` 的档位（`minimal`）不设下限。
-          // 用 `undefined`（而不是 0）让 RN 完全不下发这条声明 ——
-          // 0 会是一条真实的 CSS 声明，改变的是"最小高"的语义。
-          // 🔴 `tokens[...]` 的静态类型是 `string | number`，而 RN 要 `DimensionValue` ——
-          // 断言**只在类型层**，运行时一个字节都不变（由父 agent 于第 51 轮补，
-          // 修的是 `pnpm -r typecheck` 连续三轮的唯一红）。
+          alignItems: 'flex-start',
           minHeight:
             spec.minHeight === null
               ? undefined
               : (tokens[spec.minHeight] as DimensionValue),
           gap: tokens[spec.gap],
         },
-        /**
-         * 🔴 命中区**必须是一条真实的尺寸声明**，不能靠 `marginLeft` 借位。
-         *
-         * 改之前这里只有 `marginLeft: -(44-22)/2 = -11px`，**没有任何 width/height**，
-         * 于是注释里承诺的"44 触控下限"在盒模型上根本不存在 —— 实测命中区就是那个
-         * 22px 的圈（类 A：用一个不存在的属性表达契约）。按无障碍标准量的是
-         * **输入区域**而不是那个视觉标记，所以"圈是 22"不是问题，"命中区也是 22"才是。
-         *
-         * 而那 11px 的负边距同时是**被裁的一半**（类 B）：裁剪祖先是 RNW 的
-         * `ScrollView`（⇒ `overflow-x: hidden`），它的可视左边恰好等于行的左边，
-         * 负边距推出去的部分落在裁剪区里 ⇒ 圈**正好少一半**。
-         *
-         * ⚠️ 这里**刻意没有** `flexShrink: 0`：RN/RNW 的 `View` 默认已经是 0
-         * （实测计算样式 `flex-shrink: 0`，见计划 §2.1 结论 1）。加上去是一行
-         * **不起作用的修法** —— 它不解决任何问题，还会让人以为解决了。
-         */
-        // 行首那枚「清单图标」的槽位。尺寸与勾选框同一档（`checkboxSize`），
-        // 这样"关"与"开"不会让整行高度跳一下 —— 那个跳变本身就是一种视觉噪音。
+        mainCol: {
+          flex: 1,
+          minWidth: 0,
+        },
+        topLine: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          minHeight:
+            spec.minHeight === null
+              ? undefined
+              : (tokens[spec.minHeight] as DimensionValue),
+          gap: tokens[spec.gap],
+        },
         iconSlot: {
           width: tokens[TASK_ROW_SHAPE.checkboxSize],
-          height: tokens[TASK_ROW_SHAPE.checkboxSize],
+          height: tokens[TASK_ROW_SHAPE.touchTarget],
           alignItems: 'center',
           justifyContent: 'center',
         },
@@ -407,15 +402,22 @@ export function TaskRow({
    * 标题必须单独可寻址：行体（`task-row-*`）的 `textContent` 里现在**一定**有元信息
    *（归属常驻），按行体取"这条叫什么"会把「收集箱」之类的徽章一起吞进去。
    */
-  const title = (
-    <Text
-      style={[text[spec.title], row.done ? styles.titleDone : null]}
-      testID={`task-title-${row.id}`}
-      numberOfLines={1}
-    >
-      {row.title}
-    </Text>
-  );
+  const customTitle = renderTitle?.(row);
+  const title =
+    customTitle !== undefined ? (
+      customTitle
+    ) : (
+      <Text
+        style={[text[spec.title], row.done ? styles.titleDone : null]}
+        testID={`task-title-${row.id}`}
+        numberOfLines={1}
+      >
+        {row.title}
+      </Text>
+    );
+
+  const subline =
+    renderSubline === undefined || !spec.showTrailing ? null : renderSubline(row);
 
   const rowNode = (
     /**
@@ -501,38 +503,33 @@ export function TaskRow({
         </View>
       )}
 
-      {/*
-        🔴 没有 `onOpenTask` 时，行体**不是**可点的。
-        在勾选框外面再套一层可点区域会让读屏念两遍，
-        而两个语义重叠的命中区在触屏上也很难区分。
-      */}
-      {onOpenTask === undefined ? (
-        <View style={styles.body} testID={`task-row-${row.id}`}>
-          {title}
+      <View style={styles.mainCol}>
+        <View style={styles.topLine}>
+          {customTitle !== undefined || onOpenTask === undefined ? (
+            <View style={styles.body} testID={`task-row-${row.id}`}>
+              {title}
+            </View>
+          ) : (
+            <Pressable
+              accessibilityRole="button"
+              {...(openLabel === undefined ? {} : { accessibilityLabel: openLabel })}
+              onPress={() => onOpenTask(row.id)}
+              {...(onLongPressTask === undefined ? {} : { onLongPress: () => onLongPressTask(row.id) })}
+              style={styles.body}
+              testID={`task-row-${row.id}`}
+            >
+              {title}
+            </Pressable>
+          )}
+
+          {renderMeta === undefined || !spec.showMeta ? null : (
+            <View style={styles.metaRow}>{renderMeta(row)}</View>
+          )}
+
+          {renderTrailing === undefined || !spec.showTrailing ? null : renderTrailing(row)}
         </View>
-      ) : (
-        <Pressable
-          accessibilityRole="button"
-          {...(openLabel === undefined ? {} : { accessibilityLabel: openLabel })}
-          onPress={() => onOpenTask(row.id)}
-          {...(onLongPressTask === undefined ? {} : { onLongPress: () => onLongPressTask(row.id) })}
-          style={styles.body}
-          testID={`task-row-${row.id}`}
-        >
-          {title}
-        </Pressable>
-      )}
-
-      {/*
-        🔴 元信息放**行尾**（单行等高，对齐提醒事项/滴答）：标题独占左侧、日期/旗标/优先级/
-        子任务靠右。以前塞在标题下面当第二行 —— 有元信息的行就比没有的行高一截，
-        同一列表里卡片高度不一致（Apple/提醒事项的行是等高的）。
-      */}
-      {renderMeta === undefined || !spec.showMeta ? null : (
-        <View style={styles.metaRow}>{renderMeta(row)}</View>
-      )}
-
-      {renderTrailing === undefined || !spec.showTrailing ? null : renderTrailing(row)}
+        {subline}
+      </View>
     </View>
   );
 

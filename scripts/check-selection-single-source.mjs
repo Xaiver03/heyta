@@ -514,6 +514,19 @@ const ROW_ID_EXEMPT = [
   ['apps/web/src/features/kanban/KanbanView.tsx', 'overColumnId', 'dragging'],
   ['apps/web/src/features/settings/PasskeyPanel.tsx', 'confirmingId', 'confirm-gate'],
   ['apps/web/src/features/settings/PasskeyPanel.tsx', 'editingRowId', 'inline-rename'],
+  ['apps/web/src/features/settings/MemoryPanel.tsx', 'editingRowId', 'inline-rename'],
+  // 桌面任务列表的**行内原地重命名**：它记的是"哪一行的标题此刻变成了输入框"，
+  // 是五类瞬态里的 `inline-rename`（与 PasskeyPanel/MemoryPanel 的 editingRowId 同形），
+  // 不是"当前看的是哪一条"——后者走 `useSelected('task')`（`selectedTaskId`）。
+  ['apps/web/src/App.tsx', 'editingRowTaskId', 'inline-rename'],
+  ['apps/web/src/features/admin/sections/AnnouncementsSection.tsx', 'pendingWithdrawId', 'confirm-gate'],
+  ['apps/web/src/features/admin/sections/RefundsSection.tsx', 'pendingApproveId', 'confirm-gate'],
+  ['apps/web/src/features/calendar/CalendarDnd.tsx', 'activeId', 'dragging'],
+  ['apps/web/src/features/calendar/CalendarHubPanel.tsx', 'tagBusyId', 'in-flight'],
+  ['apps/web/src/features/categories/CategoryCreateDialog.tsx', 'parentId', 'form-draft'],
+  ['apps/web/src/features/settings/CalendarSubscriptionsCard.tsx', 'busyId', 'in-flight'],
+  ['apps/mobile/src/ai/session-list.tsx', 'renamingId', 'inline-rename'],
+  ['apps/mobile/src/screens/CalendarScreen.tsx', 'busyHabitId', 'in-flight'],
   // 后台退款那两枚按钮是**两步式批准**：第一下记下"待批准的是哪一条"，第二下（确认框里那枚）才发请求。
   // 类别按那处代码自己的注释归（原 `AdminPanel.tsx`：「待确认的那一条退款 id（两步式"批准"）」）。
   // 🔴 后台拆分后随 RefundsSection.tsx 迁移（表按「文件 + 变量名」索引，搬家必须一起改文件名）。
@@ -1170,7 +1183,7 @@ const VIEW_STANCES = [
     stance: 'filters',
     entity: 'tag',
     locus: 'apps/web/src/features/projects/ProjectsPanel.tsx',
-    needle: 'toOrganizerNodes(toTagItems(projects.tags))',
+    needle: 'toTagTree(projects.tags)',
     because: '标签行与清单行走同一条 onFilterWith 通道，语义同上（C1 #14）。',
   },
 ];

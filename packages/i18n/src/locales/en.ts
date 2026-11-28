@@ -168,7 +168,6 @@ export const en = {
   'common.privacy.settings.revoke': 'Withdraw consent',
   'common.privacy.settings.revokeHint': 'Withdrawing stops every outbound request from this device immediately (including the live sync connection) and asks you again. Your local data is unaffected.',
   'common.privacy.settings.chooseAgain': 'Choose again',
-  'common.privacy.settings.chooseHint': 'Choose whether to go online when you need sync or sign-in. Opening the choice panel does not change your current permission.',
 
   // ── Landing · generic ─────────────────────────────────────
   'landing.skipLink': 'Skip to main content',
@@ -552,24 +551,14 @@ export const en = {
   'web.inbox.activity.invite.status.pending': 'Waiting for email verification',
   'web.inbox.activity.invite.unknownName': 'A friend',
   'web.inbox.activity.invite.empty': 'No invites yet',
-  'web.shell.modules.intro': 'Turn off what you do not use and it leaves the left nav. This device only.',
   'web.shell.modules.calendar.label': 'Calendar',
-  'web.shell.modules.calendar.note': 'See what is due on which day.',
   'web.shell.modules.quadrant.label': 'Quadrants',
-  'web.shell.modules.quadrant.note': 'Sort tasks into four boxes by importance and urgency.',
   'web.shell.modules.kanban.label': 'Board',
-  'web.shell.modules.kanban.note': 'One column per list — drag a card to move it.',
   'web.shell.modules.habits.label': 'Habits',
-  'web.shell.modules.habits.note': 'Build habits and make discipline routine.',
   'web.shell.modules.timeline.label': 'Timeline',
-  'web.shell.modules.timeline.note': 'Lay tasks out along a date axis.',
   'web.shell.modules.focus.label': 'Focus timer',
-  'web.shell.modules.focus.note': 'Stay focused with a pomodoro timer.',
   'web.shell.modules.growth.label': 'Growth',
-  'web.shell.modules.growth.note': 'See long-run trends and totals instead of today.',
   'web.shell.modules.notes.label': 'Notes',
-  'web.shell.modules.notes.note': 'Jot something down without turning it into a task.',
-  'web.shell.modules.savedHint': 'Saved — the left nav already changed.',
   'web.shell.views.groupMore': 'More',
   'web.shell.rail.customize': 'Customize sidebar',
   'web.shell.rail.customizeDone': 'Done customizing',
@@ -999,7 +988,6 @@ export const en = {
   'web.settings.syncUx.lastSyncedNever': 'No successful sync yet.',
   'web.settings.syncUx.lastSynced': 'Last successful sync: {at}',
   'web.settings.syncUx.localFirst': 'Data is written on this device first, then synced to your server. It keeps working offline.',
-  'web.settings.syncUx.statusHint': 'Check the connection state first, then change the server or account credentials.',
   'web.settings.syncUx.errorTitle': 'Sync needs attention',
   'web.settings.syncUx.accountTitle': 'Server and account',
   'web.settings.syncUx.accountHint': 'The server URL decides where data goes. Sign-in or a manually entered token proves access to it. Draft values do not change the current connection until you save.',
@@ -1605,6 +1593,9 @@ export const en = {
   'web.focus.detail.recordsEmpty': 'No focus records yet. Finish a session and it will show up here.',
   'web.focus.detail.unlinked': 'No linked task',
   'web.focus.detail.aborted': 'Ended early',
+  // Accessible name for one cell of the seven-day pulse (the cell itself is colour;
+  // this sentence is the fact it reads out). `{weekday}` reuses `common.weekday.*`.
+  'web.focus.detail.pulseDay': '{weekday}, {duration} focused',
 
   // ── Web · habits ──────────────────────────────────────────
   'web.habits.addPlaceholder': 'e.g. “Drink water”, “Sleep by 11”, “Read 10 pages”',
@@ -1992,7 +1983,7 @@ export const en = {
   'web.organize.moveBlockedShared': 'Tasks in a shared list cannot change lists yet',
   'web.organize.tagsLegend': 'Tags',
   'web.organize.tagToggle': 'Add or remove tag “{name}” on task “{title}”',
-  'web.organize.noTags': 'No tags yet — create one under “Tags” on the left.',
+  'web.organize.noTags': 'No tags yet',
   // ── Web · per-row "due" editor (batch 1, multi-end coverage goal §2) ──
   'web.due.trigger': 'Due',
   'web.due.summaryAria': 'Set due date for task “{title}”',
@@ -2588,6 +2579,7 @@ export const en = {
   'web.ai.assistant.mcpSplit': 'This covers the built-in assistant only. The switches under On-device API control whether external programs may call tools; the two are independent.',
   // Chat assistant UI (W12 / ADR-0045)
   'web.ai.chat.title': 'AI assistant',
+  'web.ai.chat.welcome.title': 'Let\'s get moving',
   'web.ai.chat.tierLabel': 'Assistant access',
   'web.ai.chat.suggestion.today': 'What do I need to do today?',
   'web.ai.chat.suggestion.today.label': 'Today',
@@ -3308,12 +3300,19 @@ export const en = {
   'web.calendar.title': 'Calendar',
   'web.calendar.prevMonth': 'Previous month',
   'web.calendar.nextMonth': 'Next month',
+  // Advanced-view dropdown. Month/week/day/year live in `common.calendar.view.*`
+  // because both ends read them; only the web-only modes and their count
+  // templates belong here.
+  'web.calendar.view.agenda': 'Agenda',
+  'web.calendar.view.multiDay': 'Multi-day',
+  'web.calendar.view.multiWeek': 'Multi-week',
+  'web.calendar.view.multiDayValue': '{n}d',
+  'web.calendar.view.multiWeekValue': '{n}w',
   'web.calendar.weekShort': 'W{n}',
   'web.calendar.backToToday': 'Back to today',
   'web.calendar.monthTitle': '{month}/{year}',
   'web.calendar.dayTitle': '{weekday}, {month}/{day}',
   'web.calendar.dayEmpty': 'Nothing is due on this day.',
-  'web.calendar.footnote': 'Tasks without a due date are not on the calendar; they live in the Inbox on the Tasks tab.',
   'web.calendar.a11y.dayWithTasks': '{date}, {count} tasks',
   'web.calendar.a11y.dayWithTasksOne': '{date}, {count} task',
   'web.calendar.a11y.dayNoTasks': '{date}, no tasks',
@@ -3344,6 +3343,7 @@ export const en = {
   'web.calendar.display.colorByList': 'By list',
   'web.calendar.display.colorByPriority': 'By priority',
   'web.calendar.display.colorByOff': 'No colour',
+  'web.calendar.more.openDisplaySettings': 'Display settings…',
   'web.calendar.more.scopeSection': 'Display range',
   'web.calendar.more.editScope': 'Edit display range…',
   'web.calendar.more.arrangeSection': 'Schedule tasks',
@@ -3355,6 +3355,25 @@ export const en = {
   'web.calendar.more.subscribeHint': 'Requires server-side iCal / third-party calendar fetching — not connected yet',
   'web.calendar.more.subscribe': 'Calendar subscriptions…',
   'web.calendar.more.noTasksToday': 'No tasks on this day',
+  // Layered display-settings card: color, style, toggles, secondary time zone,
+  // plus the card's own back/close chrome.
+  'web.calendar.display.title': 'Display Settings',
+  'web.calendar.display.color': 'Color',
+  'web.calendar.display.colorByProject': 'By list',
+  'web.calendar.display.colorByQuadrant': 'By priority',
+  'web.calendar.display.style': 'Style',
+  'web.calendar.display.styleClassic': 'Classic',
+  'web.calendar.display.styleModern': 'Modern',
+  'web.calendar.display.showChecklist': 'Show checklist',
+  'web.calendar.display.showAllRepeats': 'Show all repeats',
+  'web.calendar.display.showHabits': 'Show habits',
+  'web.calendar.display.showFocus': 'Show focus records',
+  'web.calendar.display.showFocusTip': 'Show Pomodoro focus logs in calendar',
+  'web.calendar.display.showCourses': 'Show courses',
+  'web.calendar.display.secondaryTimezone': 'Secondary time zone',
+  'web.calendar.display.secondaryTimezoneTip': 'Add a second time zone scale on day/week timeline',
+  'web.calendar.display.back': 'Back',
+  'web.calendar.display.close': 'Close',
 
   'mobile.weekday.mon': 'Mon',
   'mobile.weekday.tue': 'Tue',
@@ -3368,7 +3387,7 @@ export const en = {
   'mobile.tab.tasks': 'Tasks',
   'mobile.tab.calendar': 'Calendar',
   'mobile.tab.focus': 'Focus',
-  'mobile.tab.profile': 'Profile',
+  'mobile.tab.profile': 'Me',
   'mobile.tab.categories': 'Stats',
   'mobile.tab.ai': 'AI',
 
@@ -3631,7 +3650,6 @@ export const en = {
   'mobile.calendar.view.3day': '3-Day',
   'mobile.calendar.view.timetable': 'Timetable',
   'mobile.calendar.today': 'Today',
-  'mobile.calendar.footnote': 'Tasks without a due date are not on the calendar; they live in the Inbox on the Tasks tab.',
   'mobile.calendar.a11y.dayWithTasks': '{date}, {count} tasks',
   // Singular sibling; a day with exactly one due task is common.
   'mobile.calendar.a11y.dayWithTasksOne': '{date}, {count} task',
@@ -3639,6 +3657,10 @@ export const en = {
   'mobile.calendar.a11y.moreTasks': '{count} more',
   'mobile.calendar.a11y.markDone': 'Mark done: {title}',
   'mobile.calendar.a11y.unmarkDone': 'Mark as not done: {title}',
+  // Drag-to-reschedule: the entry hint / a11y label, then the announcement after
+  // the drop (`{date}` is already localized).
+  'mobile.calendar.dragReschedule': 'Drag task onto a day cell to reschedule',
+  'mobile.calendar.rescheduledTo': 'Rescheduled to {date}',
 
   // ── Mobile · date picker ──────────────────────────────────
   'mobile.datePicker.clear': 'Clear',
@@ -3952,13 +3974,15 @@ export const en = {
   'mobile.settings.section.features': 'Features & AI',
   'mobile.profile.entry.features': 'All features',
   'mobile.profile.entry.stats': 'Stats & review',
-  'mobile.tabbarCustomize.title': 'Customize bottom bar',
+  'mobile.tabbarCustomize.title': 'Bottom bar',
   'mobile.tabbarCustomize.hint': 'Pick {min}–{max}; “Me” stays last',
   'mobile.tabbarCustomize.up': 'Move up',
   'mobile.tabbarCustomize.down': 'Move down',
   'mobile.tabbarCustomize.restore': 'Restore default',
   'mobile.tabbarCustomize.error.min': 'Keep at least {min}',
   'mobile.tabbarCustomize.error.max': 'At most {max}',
+  'mobile.tabbarCustomize.reorder': 'Reorder',
+  'mobile.settings.more': 'More settings',
   'mobile.settings.section.about': 'About & help',
   'mobile.settings.section.profile': 'Profile',
   'mobile.settings.section.general': 'General',
@@ -5557,7 +5581,7 @@ export const en = {
 
   // Notes (the UI layer of hallucination #12). Distinct from a task's own
   // note field, so the copy deliberately avoids the word "note" alone.
-  'notes.title': 'Sticky notes',
+  'notes.title': 'Notes',
   'notes.empty': 'No sticky notes yet',
   'notes.composer.placeholder': 'Write something…',
   'notes.add': 'Add note',

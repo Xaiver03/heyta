@@ -208,9 +208,10 @@ function makeStyles(tokens: HeytaNativeTokens) {
     root: {
       gap: tokens['space.2'],
     },
-    /** 卡片形态：靠边框与底色分段（mobile 的 `Card` 是这一档的参照）。 */
+    /** 卡片形态：白卡落在 grouped 画布上，靠紧凑上下留白与行间发丝线组织。 */
     card: {
-      padding: tokens['space.4'],
+      paddingHorizontal: tokens['space.4'],
+      paddingVertical: tokens['space.1'],
       borderRadius: tokens['radius.lg'],
       backgroundColor: tokens['color.surface'],
     },
@@ -223,9 +224,10 @@ function makeStyles(tokens: HeytaNativeTokens) {
     /** 一行：标签在左、值/控件在右。 */
     row: {
       flexDirection: 'row',
-      alignItems: 'flex-start',
+      alignItems: 'center',
       justifyContent: 'space-between',
       gap: tokens['space.3'],
+      minHeight: tokens['touch-target.min'],
     },
     /** 行首那一列（标签 + 提示）。它吃掉弹性宽度，值/控件才靠得住边。 */
     body: {
@@ -239,11 +241,18 @@ function makeStyles(tokens: HeytaNativeTokens) {
     list: {
       gap: tokens['space.2'],
     },
-    /** 宿主显式要求的分隔线（见 `SettingsRowCommon.divider`）。 */
+    cardList: {
+      gap: 0,
+    },
+    /** 宿主显式要求或卡片行间的发丝分隔线。 */
     divider: {
       borderTopWidth: tokens['border-width.thin'],
       borderTopColor: tokens['color.border-subtle'],
       paddingTop: tokens['space.2'],
+    },
+    cardDivider: {
+      borderTopWidth: tokens['border-width.thin'],
+      borderTopColor: tokens['color.border-subtle'],
     },
     /** 开关的状态标记：一个小方框，选中时是主色 + 对钩。 */
     marker: {
@@ -262,18 +271,19 @@ function makeStyles(tokens: HeytaNativeTokens) {
       justifyContent: 'center',
     },
     /**
-     * 标签那一行：记号 + 文字，水平排列。
+     * 标签那一行：记号（图标）+ 文字，水平排列。
      *
-     * 🔴 `alignItems: 'flex-start'` 而不是 `'center'`：`?` 气泡展开时那一列会多出一行正文，
-     *    居中对齐把**图标本身**也一起挪位（2026-10-24 设备截图看得见：展开后 `?` 比标题高出一截，
-     *    点一下动一次）。顶端对齐之后图标只随标题首行定位，开合都在同一处。
-     *    ⚠️ **没有做像素级定量**：展开会让列表重排，两版截图之间比绝对 y 会被滚动锚点混淆；
-     *    证据是同一脚本拍的两张图（`apps/mobile/evidence/subscription-20261024/00/01-*.png`），
-     *    以及居中版那张同位置截图 —— 肉眼可判，机器读数在这一屏上不可靠。
+     * 🔴 2026-11-27 改成 `alignItems: 'center'`。此前是 `'flex-start'`，理由是
+     *    `?` 气泡展开时那一列会多一行、居中会把图标一起挪。实测代价是**图标整体偏高**：
+     *    1080×2400 / 420dpi 真机截图逐行量，图标视觉中心比文字中心高 **13–17px（≈5–6dp）**，
+     *    就是产品说的「图标和文字没有上下居中」。
+     *
+     *    改成居中后，图标与文字盒子共享同一条垂直中轴；`?` 只是一枚和文字同高的按钮，
+     *    居中不会再挪位（它不再是"多出一行正文"的形状）。多行说明走 `noteRow`，那里仍顶端对齐。
      */
     actionHead: {
       flexDirection: 'row',
-      alignItems: 'flex-start',
+      alignItems: 'center',
       gap: tokens['space.2'],
     },
     /** 说明句那一行：记号 + 文字。 */
@@ -406,12 +416,33 @@ export function SettingsSection({
         <Text style={[text.caption, { color: tokens['color.foreground-muted'] }]}>{note}</Text>
       )}
 
-      <View style={styles.list} testID={listTestID}>
-        {visibleRows.map((row, index) => (
-          <View key={settingsRowKey(row, index)} style={row.divider === true ? styles.divider : null}>
-            <SettingsRow row={row} styles={styles} />
-          </View>
-        ))}
+      <View style={variant === 'card' ? styles.cardList : styles.list} testID={listTestID}>
+        {visibleRows.map((row, index) => {
+          const prev = index > 0 ? visibleRows[index - 1] : undefined;
+          const autoCardDivider =
+            variant === 'card' &&
+            index > 0 &&
+            row.kind !== 'note' &&
+            prev !== undefined &&
+            prev.kind !== 'note' &&
+            prev.kind !== 'heading';
+          return (
+            <View
+              key={settingsRowKey(row, index)}
+              style={
+                variant === 'card'
+                  ? row.divider === true || autoCardDivider
+                    ? styles.cardDivider
+                    : null
+                  : row.divider === true
+                    ? styles.divider
+                    : null
+              }
+            >
+              <SettingsRow row={row} styles={styles} />
+            </View>
+          );
+        })}
       </View>
 
       {children}
@@ -505,14 +536,19 @@ function ValueLine({
 
   const body = (
     <View style={styles.row}>
-      <Text style={[text['row-meta'], styles.dynamic, { color: tokens['color.foreground-muted'] }]}>
+      <Text style={[text['row-title'], styles.dynamic, { color: tokens['color.foreground'] }]}>
         {row.label}
       </Text>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: tokens['space.1'] }}>
         <Text
           testID={row.valueTestID}
           numberOfLines={1}
-          style={[text['numeric-body'], styles.dynamic, { color: toneColor(tokens, row.tone ?? 'default') }]}
+          style={[
+            text['row-meta'],
+            { fontVariant: ['tabular-nums'] },
+            styles.dynamic,
+            { color: toneColor(tokens, row.tone ?? 'muted') },
+          ]}
         >
           {row.value}
         </Text>
@@ -797,7 +833,7 @@ function ActionLine({
         <Text
           {...linkProps(row.href)}
           style={[
-            text.headline,
+            text['row-title'],
             styles.dynamic,
             /*
              * 🔴 2026-11-14：从"一律主色"改成"**只有真链接才是主色**"。

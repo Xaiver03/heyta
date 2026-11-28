@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { addTask, metaFor, openApp, parkCursor, rowFor, switchTheme, switchView, waitForOverlaySettled } from './helpers';
+import { addTask, metaFor, openApp, parkCursor, rowFor, switchTheme, switchView } from './helpers';
 
 /**
  * 滴答对齐阶段 3-4 的**浏览器腿**（单元层量不到的那三格）。
@@ -35,7 +35,7 @@ async function createCategory(page: import('@playwright/test').Page, buttonName:
   await sidebar.getByRole('button', { name: buttonName }).click();
   await page.locator('#ht-category-create-name').fill(name);
   await page.getByRole('button', { name: submitName }).click();
-  await expect(sidebar.getByText(name, { exact: true })).toBeVisible();
+  await expect(sidebar.getByText(name, { exact: true }).first()).toBeVisible();
 }
 
 /**
@@ -109,7 +109,7 @@ test.describe('滴答对齐：逾期色 / 工具条 / 分组说明', () => {
     await page.screenshot({ path: 'test-results/dida-overdue-badge.png' });
   });
 
-  test('② 底部工具条三枚：两枚把焦点送到字段，第三枚把行菜单做成一件事', async ({ page }) => {
+  test('② 紧凑底栏：清单选择器 + 五枚动作图标，其中「更多」能把行菜单做成一件事', async ({ page }) => {
     await openApp(page);
     await createCategory(page, '新建清单', LIST, '创建清单');
     await addTask(page, '写周报');
@@ -118,41 +118,49 @@ test.describe('滴答对齐：逾期色 / 工具条 / 分组说明', () => {
 
     const toolbar = page.getByTestId('task-detail-toolbar');
     await expect(toolbar, '详情面底部没有工具条').toBeVisible();
-    await expect(toolbar.locator('button')).toHaveCount(3);
 
-    await page.getByTestId('task-detail-goto-note').click();
-    await expect
-      .poll(() => page.evaluate(() => document.activeElement?.getAttribute('data-testid') ?? ''), {
-        message: '点「备注」之后焦点不在备注正文框上',
-      })
-      .toBe('task-note-input');
+    // 左侧直接放清单选择器：当前选中项就是刚建的 `LIST`。⚠️ 不要改选成收集箱 ——
+    // 那会让任务离开当前清单过滤视图，后面的行断言就找不到它。
+    const projectSelect = toolbar.getByTestId('organize-project-select');
+    await expect(projectSelect, '工具条左侧没有清单选择器').toBeVisible();
+    await expect(
+      projectSelect.locator('option:checked'),
+      '清单选择器的当前项不是刚建的那条清单',
+    ).toHaveText(LIST);
 
-    await page.getByTestId('task-detail-goto-list').click();
-    await expect
-      .poll(() => page.evaluate(() => document.activeElement?.getAttribute('data-testid') ?? ''), {
-        message: '点「移动到」之后焦点不在清单下拉上',
-      })
-      .toBe('organize-project-select');
+    // 右侧 5 枚紧凑动作图标：清单 / 标签 / 子任务 / 附件 / 更多。
+    await expect(toolbar.locator('button')).toHaveCount(5);
 
-    // 🔴 第三枚「更多」判的是**它能不能做成一件事**，不是它存不存在：
-    // 面单里此前只有右键 / Shift+F10 两个隐形把手，界面上没有可见入口 ——
-    // 所以这一枚的意义是"动作区可达"，断言必须打到菜单里那一项真的写进数据。
+    // 「清单」那一枚把核对清单的输入框叫出来（面单里的那一格）。
+    await page.getByTestId('task-detail-checklist-trigger').click();
+    await expect(
+      page.getByTestId('task-checklist-add-input'),
+      '点「清单」之后没有出现核对清单的输入框',
+    ).toBeVisible();
+
+    // 顶栏右侧直接改优先级 ⇒ 落到行元信息槽。
+    await page.getByTestId('task-priority-select').selectOption('3');
+    await expect(
+      metaFor(page, '写周报').first(),
+      '从面单顶栏选的优先级没落到行上',
+    ).toContainText('高优先级');
+
+    // 🔴 「更多」判的是**它能不能做成一件事**，不是它存不存在：
+    // 点开行菜单执行置顶 op，再点开时同一枚显示「取消置顶」。
     await toolbar.scrollIntoViewIfNeeded();
     await page.getByTestId('task-detail-more').click();
     await expect(
       page.getByTestId('task-row-menu'),
       '点面单里的「更多」没有打开这条任务的行菜单',
     ).toBeVisible();
-    await page.getByTestId('task-row-menu-priority').click();
-    await page.getByTestId('task-row-menu-priority-3').click();
+    await page.getByTestId('task-row-menu-pin').click();
     await expect(
       page.getByTestId('task-row-menu'),
-      '选完档位菜单该收掉',
+      '选完置顶后菜单该收掉',
     ).toHaveCount(0);
-    await expect(
-      metaFor(page, '写周报').first(),
-      '从面单「更多」里选的优先级没落到行上',
-    ).toContainText('高优先级');
+    await page.getByTestId('task-detail-more').click();
+    await expect(page.getByTestId('task-row-menu-pin')).toContainText('取消置顶');
+    await page.keyboard.press('Escape');
 
     // 🔴 证据图必须拍到**工具条本身**：上面那两次点击把详情面滚到了字段处，
     // 底部这一行落在视口外面 —— 一张看不见被判据的图不算取证（§6.2 规定一）。
@@ -183,50 +191,42 @@ test.describe('滴答对齐：逾期色 / 工具条 / 分组说明', () => {
     throw new Error(`方向键走八步也没到 ${testId}`);
   }
 
-  // 🔴 这一条是本轮修掉的那个缺陷的**浏览器版**判据：子菜单在 jsdom 里能证"Enter 之后
-  // DOM 里长出选项"，但"焦点真的能一路走到选项并按下去"只有真浏览器量得到。
-  test('④ 键盘全程：Shift+F10 开菜单 → 走到「移动到」→ Enter 展开 → Enter 换归属', async ({ page }) => {
+  // 🔴 行的「优先级 / 移动到 / 标签」已按 R1 收敛从行菜单移入面单（`App.tsx` 的
+  // `TaskRowMenu` 接线注释）；行菜单仍保留「置顶」这一项 —— 这一条量的是"键盘能走到
+  // 一枚仍在的项并真的把它做成"，与鼠标腿（⑥）互为对照。
+  test('④ 键盘全程：Shift+F10 开菜单 → 方向键走到「置顶」→ Enter 置顶 / 取消置顶', async ({ page }) => {
     await openApp(page);
-    await createCategory(page, '新建清单', LIST, '创建清单');
     await addTask(page, '写周报');
-    const row = page.locator('[data-testid^="task-item-"]').filter({ hasText: '写周报' }).first();
-    await expect(row.locator('[data-testid="task-meta"]')).toContainText(LIST);
+    await addTask(page, '交房租');
+    const rows = page.locator('[data-testid^="task-row-"]');
+    await expect(rows.first(), '未置顶时第一行应当是先进的那条').toContainText('写周报');
 
     // 焦点交给**行体**（可聚焦的那一枚是 `task-row-*`，外层 `task-item-*` 没有 tabindex ——
     // `closeRowMenu` 归还焦点时瞄的就是它），再按菜单键：与没有鼠标的人走同一条路。
-    await page.locator('[data-testid^="task-row-"]').filter({ hasText: '写周报' }).first().evaluate((el) => {
+    await page.locator('[data-testid^="task-row-"]').filter({ hasText: '交房租' }).first().evaluate((el) => {
       (el as HTMLElement).focus();
     });
     await page.keyboard.press('Shift+F10');
     await expect(page.getByTestId('task-row-menu'), 'Shift+F10 没打开行菜单').toBeVisible();
 
-    await focusMenuItem(page, 'task-row-menu-move');
+    await focusMenuItem(page, 'task-row-menu-pin');
     await page.keyboard.press('Enter');
-    const option = page.getByTestId('task-row-menu-project-inbox');
-    await expect(option, 'Enter 没有展开「移动到」子菜单').toBeVisible();
+    await expect(page.getByTestId('task-row-menu'), '置顶之后菜单该收掉').toHaveCount(0);
+    await expect(rows.first(), '键盘置顶后第一条应当是「交房租」').toContainText('交房租');
 
-    // 下一枚可停靠项就是「收集箱」；按下去 = 这条任务离开那个清单。
-    await page.keyboard.press('ArrowDown');
-    await page.keyboard.press('Enter');
-    await expect(page.getByTestId('task-row-menu'), '选完归属之后菜单该收掉').toHaveCount(0);
-
-    /*
-     * 🔴 归属一换，这一行就**离开当前范围**：侧栏还停在「深度工作」，列表里没有它是**对的**。
-     * 上一版在这里就地读那一行，红成 `element(s) not found` —— 那是探针跟着筛选跑，
-     * 不是产品没换归属。所以这一格要两条一起才完整：① 原清单里确实没了它；
-     * ② 回收集箱之后它在，且徽标说的是「收集箱」。
-     */
+    // 再开一次：同一枚应当自报「取消置顶」——键盘用户也读得到当前态。
+    await page.locator('[data-testid^="task-row-"]').filter({ hasText: '交房租' }).first().evaluate((el) => {
+      (el as HTMLElement).focus();
+    });
+    await page.keyboard.press('Shift+F10');
     await expect(
-      page.locator('[data-testid^="task-item-"]').filter({ hasText: '写周报' }),
-      '移进收集箱之后，「深度工作」这一档范围里不该再有这一行',
-    ).toHaveCount(0);
-    await backToInbox(page);
-    await expect(
-      metaFor(page, '写周报').first(),
-      '键盘选完归属没变成收集箱',
-    ).toContainText('收集箱');
+      page.getByTestId('task-row-menu-pin'),
+      '已置顶的行，菜单里那一项该说「取消置顶」',
+    ).toContainText('取消置顶');
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('task-row-menu'), 'Esc 该收掉菜单').toHaveCount(0);
     await parkCursor(page);
-    await page.screenshot({ path: 'test-results/dida-keyboard-move.png' });
+    await page.screenshot({ path: 'test-results/dida-keyboard-pin.png' });
   });
 
   test('⑤ 暗色下：那两句说明、回收站那一行、逾期那一格的色都还在原位', async ({ page }) => {
@@ -275,16 +275,11 @@ test.describe('滴答对齐：逾期色 / 工具条 / 分组说明', () => {
   });
 
   /**
-   * ⑥ 阶段 2 那五项的**鼠标腿**（④ 是键盘腿，量的是同一批控件的另一条通路）。
-   *
-   * 单测（`apps/web/tests/task-row-menu.spec.tsx`）证的是"点这一项 ⇒ 该发的那个回调带着
-   * 那个参数被发了"；这一条证的是"真浏览器里这一项点得到、点完之后行上真的变了"。
-   * 两半合起来才回答验收里那句「右键菜单所有新项功能正常」。
-   *
-   * ⚠️ 标签那一枚**按 testID 前缀现读**，不写死 id：id 是运行时生成的，
-   * 抄进测试里就是抄一份必然漂的件。
+   * ⑥ 行菜单**鼠标腿**（④ 是键盘腿）。R1 收敛之后行菜单只剩
+   * 打开详情 / 置顶 / 添加子任务 / 放弃 / 删除；「优先级 / 标签」改在**面单**（唯一编辑落点）。
+   * 这一条同时量两件事：行菜单里还在的项点得动、字段层改在面单里能落到行上。
    */
-  test('⑥ 鼠标右键：优先级 / 标签 / 子任务 / 置顶四项点得动，且行上读得出来', async ({ page }) => {
+  test('⑥ 鼠标右键：置顶 / 添加子任务点得动；优先级 / 标签改在面单（唯一编辑落点）', async ({ page }) => {
     await openApp(page);
     await createCategory(page, '新建标签', TAG, '创建标签');
     await backToInbox(page);
@@ -295,57 +290,39 @@ test.describe('滴答对齐：逾期色 / 工具条 / 分组说明', () => {
     const rows = page.locator('[data-testid^="task-row-"]');
     await expect(rows.first(), '未置顶时第一行应当是先进的那条').toContainText('写周报');
 
-    // ── B1 优先级：右键 → 优先级 → 高 ────────────────────────────────
-    const row = rowFor(page, '写周报');
-    await row.click({ button: 'right' });
-    await expect(page.getByTestId('task-row-menu'), '右键没打开行菜单').toBeVisible();
-    await page.getByTestId('task-row-menu-priority').click();
-    // `Priority.High = 3`（`packages/domain/src/entities.ts`）—— 档位数字来自枚举，不是猜的。
-    await page.getByTestId('task-row-menu-priority-3').click();
-    await expect(
-      metaFor(page, '写周报').first(),
-      '选完「高」，行上没有「高优先级」那一格',
-    ).toContainText('高优先级');
-
-    // ── B3 标签：勾上 → 行上长出标签 chip；再点开 → aria-pressed 说的是"已带" ──
-    await row.click({ button: 'right' });
-    await page.getByTestId('task-row-menu-tags').click();
-    const tagOption = page.locator('[data-testid^="task-row-menu-tag-"]').first();
-    const tagTestId = await tagOption.getAttribute('data-testid');
-    expect(tagTestId, '标签子菜单里没有可勾的那一枚').not.toBeNull();
-    await page.getByTestId(tagTestId as string).click();
-    await expect(row, '勾了标签，行上却没有它').toContainText(TAG);
-
-    await row.click({ button: 'right' });
-    await page.getByTestId('task-row-menu-tags').click();
-    await expect(
-      page.getByTestId(tagTestId as string),
-      '这一行已经带着这条标签，但菜单里那一枚没说"已选"',
-    ).toHaveAttribute('aria-pressed', 'true');
-
-    // ── B2 子任务：这一项的目的地是那条任务的面单（行内编辑器已收进面单）──
-    await page.getByTestId('task-row-menu-add-subtask').click();
-    await expect(page.getByTestId('task-row-menu'), '点完之后菜单该收掉').toHaveCount(0);
-    await expect(
-      page.getByTestId('task-pane'),
-      '「添加子任务」应当打开这条任务的面单（子任务那一格住在里面）',
-    ).toBeVisible();
-
-    // ── B5 置顶：把第二条提到最前，且再开菜单时那一项自己说"取消置顶" ──
+    // ── 置顶（行菜单里仍在的一项）─────────────────────────────────
     await rowFor(page, '交房租').click({ button: 'right' });
+    await expect(page.getByTestId('task-row-menu'), '右键没打开行菜单').toBeVisible();
     await page.getByTestId('task-row-menu-pin').click();
+    await expect(page.getByTestId('task-row-menu'), '选完置顶菜单该收掉').toHaveCount(0);
     await expect(rows.first(), '置顶后第一条应当是「交房租」').toContainText('交房租');
 
-    await rowFor(page, '交房租').click({ button: 'right' });
+    // ── 添加子任务：目的地是面单（行内编辑器已收进面单）────────────
+    await rowFor(page, '写周报').click({ button: 'right' });
+    await page.getByTestId('task-row-menu-add-subtask').click();
+    await expect(page.getByTestId('task-row-menu'), '点完之后菜单该收掉').toHaveCount(0);
+    const pane = page.getByTestId('detail-column').getByTestId('task-pane');
+    await expect(pane, '「添加子任务」应当打开这条任务的面单').toBeVisible();
+
+    // ── 优先级：面单顶栏改 ⇒ 落到行元信息槽（行菜单已不收这个字段）──
+    await pane.getByTestId('task-priority-select').selectOption('3');
     await expect(
-      page.getByTestId('task-row-menu-pin'),
-      '已置顶的行，菜单里那一项该说「取消置顶」',
-    ).toContainText('取消置顶');
-    // 🔴 等菜单自己的入场动画落位再拍：刚点开就拍，图里那一片是**半透明的过渡帧**，
-    // 人看不出这一排项的对比度到底是多少（§6.2 要的是"人能看懂的那张图"）。
-    await waitForOverlaySettled(page, 'task-row-menu');
+      metaFor(page, '写周报').first(),
+      '面单里选的优先级没落到行上',
+    ).toContainText('高优先级');
+
+    // ── 标签：面单里勾 ⇒ 面单标签条读得出（行菜单的标签子菜单已删）──
+    await pane.getByTestId('task-detail-tag-trigger').click();
+    const pop = pane.getByTestId('task-detail-popover');
+    await expect(pop, '点标签按钮没长出标签浮层').toBeVisible();
+    await pop.getByRole('checkbox', { name: new RegExp(TAG) }).first().click();
+    await expect(
+      pane.getByTestId('task-detail-tags-strip'),
+      '面单里勾了标签，标签条里却没有它',
+    ).toContainText(TAG);
+
     await parkCursor(page);
-    await page.screenshot({ path: 'test-results/dida-row-menu-browser.png' });
+    await page.screenshot({ path: 'test-results/dida-row-menu-and-detail-fields.png' });
     await page.keyboard.press('Escape');
     await expect(page.getByTestId('task-row-menu'), 'Esc 该收掉菜单').toHaveCount(0);
   });
@@ -388,75 +365,19 @@ test.describe('滴答对齐：逾期色 / 工具条 / 分组说明', () => {
     await expect(page.getByTestId('trash-board'), '窄屏点那一行该进回收站').toBeVisible();
   });
 
-  /**
-   * ⑧ 右键菜单里**就地新建标签**（B3 的另一半）—— 这一条走的是键盘与浮层交接那一格。
+  /*
+   * ⑧「行菜单里就地新建标签」已随 R1 收敛整体移除 —— 标签的建立只剩侧栏 `+` 一个入口，
+   * 那条用例断言的入口已不存在，没有可迁移的新落点，故随功能一并退休。
    *
-   * 单测能证"点了新建会长出输入框、提交会发那两个意图"，但**只有真浏览器**量得到这三件事：
-   * ① 点开草稿后焦点**已经在框里**（不然用户还得再按一次 Tab）；
-   * ② 在框里敲字母时，菜单的类型查找不许把焦点抢走（共享层 `nestedOpen` 让位那一格）；
-   * ③ 按 Esc **只退一层**：草稿收掉、菜单留着 —— 治的是这一轮刚发现的那枚**死键**
-   *    （草稿不接键盘 + 共享层让位 = 按 Esc 屏幕上什么都不发生）。
-   */
-  test('⑧ 就地新建标签：焦点进框、打字不被抢、Esc 只退一层、建完行上有 chip', async ({ page }) => {
-    await openApp(page);
-    await addTask(page, '写周报');
-    const row = rowFor(page, '写周报');
-
-    await row.click({ button: 'right' });
-    await page.getByTestId('task-row-menu-tags').click();
-    await expect(
-      page.getByTestId('task-row-menu-new-tag'),
-      '一条标签都没有时，子菜单里也该有「新建」那一枚',
-    ).toBeVisible();
-
-    await page.getByTestId('task-row-menu-new-tag').click();
-    const input = page.getByTestId('task-row-menu-new-tag-input');
-    await expect(input, '点了新建却没长出输入框').toBeVisible();
-    const focusTestId = () =>
-      page.evaluate(() => (document.activeElement as HTMLElement | null)?.getAttribute('data-testid') ?? '');
-    await expect
-      .poll(focusTestId, { message: '草稿没拿到焦点 = 用户还得再按一次 Tab 才能打字' })
-      .toBe('task-row-menu-new-tag-input');
-
-    // ② 敲一个字母：焦点必须还在框里（类型查找抢走的话，名字根本打不进去）。
-    await page.keyboard.press('a');
-    await expect(focusTestId(), '按字母之后焦点被菜单的类型查找抢走了').resolves.toBe('task-row-menu-new-tag-input');
-
-    // ③ Esc 只退一层。
-    await input.fill('报销');
-    await expect(input).toHaveValue('报销');
-    await page.keyboard.press('Escape');
-    await expect(page.getByTestId('task-row-menu-new-tag-input'), 'Esc 之后草稿还在').toHaveCount(0);
-    await expect(page.getByTestId('task-row-menu'), '一次 Esc 不该把整层菜单一起抹掉').toBeVisible();
-    await expect(
-      page.getByTestId('task-row-menu-new-tag'),
-      '退掉草稿之后该回到那一枚入口',
-    ).toBeVisible();
-
-    // 真的建一条：菜单收走、行上有 chip、侧栏那一格里也长出它（同一条 op 的两个消费者）。
-    await page.getByTestId('task-row-menu-new-tag').click();
-    await page.getByTestId('task-row-menu-new-tag-input').fill('报销');
-    await page.getByTestId('task-row-menu-new-tag-submit').click();
-    await expect(page.getByTestId('task-row-menu'), '建完勾完该收走菜单').toHaveCount(0);
-    await expect(row, '新建的标签没挂到这条任务上').toContainText('报销');
-    await expect(page.locator('nav.ht-sidebar').getByText('报销', { exact: true })).toBeVisible();
-
-    await parkCursor(page);
-    await page.screenshot({ path: 'test-results/dida-new-tag-inline.png' });
-  });
-
-  /**
-   * ⑨ 滚页面 ⇒ 菜单收走（这一条是给 ⑧ 那次修复兜底的）。
-   *
-   * 锚点是 `position: fixed` 钉在视口上的，列表一滚，锚点与那一行的关系就断了 ⇒
-   * 菜单必须收走（留在错的地方比关掉更坏）。⑧ 修的是**反方向**那一格（面板内部的滚动
-   * 不该关）—— 那一格由 ⑧ 的"打字不关菜单"来证：这里刻意**不**写"给面板 scrollTop 赋值"
-   * 那种判据，面板今天没有溢出滚动，那样一条**永远不会红**（比没有判据更糟）。
+   * ⑨ 滚页面 ⇒ 行菜单收走：锚点是 `position: fixed` 钉在视口上的，列表一滚，
+   * 锚点与那一行的关系就断了 ⇒ 菜单必须收走。判据必须让列表**真的溢出可滚**，
+   * 否则 scroll 事件根本不发、这条判据就空转（比没有判据更糟）。
    */
   test('⑨ 滚页面之后菜单收走（锚点失效就不该留在错的地方）', async ({ page }) => {
     await openApp(page);
-    // 播够一屏任务，页面才真的能滚（否则 scroll 事件根本不发，这条判据就是空转）。
-    for (const title of ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸']) {
+    // 压矮视口 + 播足任务，保证任务列表真的溢出、能滚出 scroll 事件。
+    await page.setViewportSize({ width: 1280, height: 480 });
+    for (const title of ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸', '子', '丑', '寅', '卯']) {
       await addTask(page, `滚动判据${title}`);
     }
     const row = rowFor(page, '滚动判据甲');
@@ -466,9 +387,21 @@ test.describe('滴答对齐：逾期色 / 工具条 / 分组说明', () => {
     const panel = page.getByTestId('task-row-menu');
     await expect(panel, '右键没打开菜单').toBeVisible();
 
-    // 真滚一下：鼠标停在列表区，滚轮走的是那一片的滚动容器。
-    await page.mouse.move(600, 500);
-    await page.mouse.wheel(0, 240);
+    // 真滚一下：先找**任务列表那个真正可滚的容器**（不是写死坐标靠运气），滚它；
+    // 菜单的 window 捕获监听据此收走。找不到可滚容器 ⇒ 算前置没成立，如实红。
+    const scrolled = await page.evaluate(() => {
+      const els = Array.from(document.querySelectorAll<HTMLElement>('*')).filter((e) => {
+        const s = getComputedStyle(e);
+        return (s.overflowY === 'auto' || s.overflowY === 'scroll') && e.scrollHeight - e.clientHeight > 40;
+      });
+      const target = els.sort(
+        (a, b) => (b.scrollHeight - b.clientHeight) - (a.scrollHeight - a.clientHeight),
+      )[0];
+      if (!target) return false;
+      target.scrollTop = target.scrollTop + 400;
+      return true;
+    });
+    expect(scrolled, '任务列表根本没溢出可滚，这条判据会空转').toBe(true);
     await expect(panel, '滚了页面菜单还留着 = 它会画在一个错的锚点上').toHaveCount(0);
   });
 });

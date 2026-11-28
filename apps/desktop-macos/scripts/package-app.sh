@@ -212,6 +212,9 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     </dict>
   </array>
   <key>LSMinimumSystemVersion</key><string>14.0</string>
+  <!-- 🔴 单实例：防止用户/脚本再起第二个进程去抢同一份本地库（第二个必然「无法初始化本地存储」）。
+       自检要跑第二份进程时用 HEYTA_ALLOW_SECOND_INSTANCE=1 绕过（仍走隔离库）。 -->
+  <key>LSMultipleInstancesProhibited</key><true/>
   <key>NSHighResolutionCapable</key><true/>
   <key>NSHumanReadableCopyright</key><string>Xiaoli Creativity Culture Industry Development (beijing) Co., Ltd.</string>
 </dict>
@@ -262,8 +265,12 @@ SELFIE="$OUT_DIR/packaged-first-run.png"
 # 打包自检只读写独立数据库；改名 QA.app 本身不会隔离 Application Support。
 PACKAGE_SMOKE_DB_DIR="$(mktemp -d "${TMPDIR:-/tmp}/heyta-package-smoke.XXXXXX")"
 echo "  自检数据库：${PACKAGE_SMOKE_DB_DIR}（保留供验收）"
-if HEYTA_SHELL_DB_DIR="$PACKAGE_SMOKE_DB_DIR" HEYTA_NO_FOCUS=1 HEYTA_SELF_CAPTURE="$SELFIE" "$APP/Contents/MacOS/HeytaMac" 2>&1 | awk '{print "  " $0}'; then
+if HEYTA_ALLOW_SECOND_INSTANCE=1 HEYTA_SHELL_DB_DIR="$PACKAGE_SMOKE_DB_DIR" HEYTA_NO_FOCUS=1 HEYTA_SELF_CAPTURE="$SELFIE" "$APP/Contents/MacOS/HeytaMac" 2>&1 | awk '{print "  " $0}'; then
   :
+fi
+if [ ! -f "$SELFIE" ] && [ -f "$SELFIE.webview.png" ]; then
+  echo "  ⚠️ 窗口服务器未授权 ScreenCaptureKit，退回 WebView 快照（$SELFIE.webview.png）作启动取证"
+  cp "$SELFIE.webview.png" "$SELFIE"
 fi
 [ -f "$SELFIE" ] || { echo "  🔴 打包后的 .app 没能自截屏 —— 它跑不起来或渲染失败"; exit 1; }
 

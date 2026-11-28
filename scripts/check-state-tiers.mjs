@@ -84,6 +84,7 @@ const TIERS = new Map([
   ['apps/web/src/features/habits/HabitsView.tsx', ['page']],
   ['apps/web/src/features/focus/FocusDetailPane.tsx', ['section']],
   ['apps/mobile/src/screens/SessionsSection.tsx', ['section']],
+  ['apps/mobile/src/screens/FocusScreen.tsx', ['section', 'section']],
   ['apps/mobile/src/screens/SecurityScreen.tsx', ['section']],
   // ── 一行档（辅助信息，住在分组标签 / 设置行下面）
   ['apps/web/src/features/settings/InboundAutomationSettings.tsx', ['line', 'line']],

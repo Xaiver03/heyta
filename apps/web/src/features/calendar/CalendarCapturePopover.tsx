@@ -4,14 +4,15 @@ import { X } from 'lucide-react';
 import { ICON_SIZE } from '@heyta/design-system';
 import { useI18n } from '@heyta/i18n';
 import { placeAnchoredPanel } from '@heyta/ui';
-import type { LocalDate } from '@heyta/domain';
+import type { LocalDate, LocalTime } from '@heyta/domain';
 import { CaptureComposer } from '../capture/CaptureComposer.js';
 import { useDirtyDismissGuard } from '../../lib/form/useDirtyDismissGuard.js';
 import { Button } from '../../components/hta/index.js';
 
 /** A date-anchored editor; opening or dismissing it never writes a task. */
-export function CalendarCapturePopover({ date, title, onClose }: {
+export function CalendarCapturePopover({ date, time, title, onClose }: {
   date: LocalDate;
+  time?: LocalTime | undefined;
   title: string;
   onClose: () => void;
 }): React.JSX.Element {
@@ -35,7 +36,10 @@ export function CalendarCapturePopover({ date, title, onClose }: {
   useLayoutEffect(() => {
     const panel = panelRef.current;
     if (!panel) return;
-    const trigger = document.querySelector<HTMLElement>(`[data-testid="calendar-cell-${date}"]`)
+    const trigger = (time !== undefined
+      ? document.querySelector<HTMLElement>(`[data-testid="calendar-board-day-slot-${time.slice(0, 2)}-${time.slice(3, 5)}"]`)
+      : null)
+      ?? document.querySelector<HTMLElement>(`[data-testid="calendar-cell-${date}"]`)
       ?? document.querySelector<HTMLElement>('[data-testid="calendar-capture-toggle"]');
     const previousFocus = document.activeElement;
     const place = (): void => {
@@ -69,7 +73,7 @@ export function CalendarCapturePopover({ date, title, onClose }: {
       // Selecting another date while the editor is open is an intentional re-anchor,
       // not an outside dismissal. `onSelectDay` keeps the popover open and the
       // effect below measures the new cell after React commits the date change.
-      if (event.target instanceof Element && event.target.closest('[data-testid^="calendar-cell-"]')) return;
+      if (event.target instanceof Element && (event.target.closest('[data-testid^="calendar-cell-"]') || event.target.closest('[data-testid^="calendar-board-day-slot-"]'))) return;
       requestDismiss('scrim');
     };
     const escape = (event: KeyboardEvent): void => {
@@ -95,12 +99,15 @@ export function CalendarCapturePopover({ date, title, onClose }: {
       if (trigger?.isConnected) trigger.focus();
       else if (previousFocus instanceof HTMLElement && previousFocus.isConnected) previousFocus.focus();
     };
-  }, [date, onClose, requestDismiss]);
+  }, [date, time, onClose, requestDismiss]);
   return createPortal(
     <>
       <div ref={panelRef} className="ht-content__calendar-capture" data-testid="calendar-capture" role="dialog" aria-label={title}>
         <div className="ht-content__calendar-capture-heading">
           <span className="ht-type-row-title">{title}</span>
+          {time !== undefined ? (
+            <span className="ht-type-caption" data-testid="calendar-capture-slot-time">{time}</span>
+          ) : null}
           <Button
             tone="ghost"
             aria-label={t('web.calendar.capture.close')}
@@ -114,7 +121,7 @@ export function CalendarCapturePopover({ date, title, onClose }: {
           读成"点了外面"，于是弹出「放弃这次的修改？」—— 用户点的是日子，不是出口。
           判据：`e2e/tests/capture-due-capsule.spec.ts` 的「日历落点」那一条。
         */}
-        <CaptureComposer anchorDate={date} inlineDuePanel />
+        <CaptureComposer anchorDate={date} anchorTime={time} inlineDuePanel />
       </div>
       {guard}
     </>, document.body,

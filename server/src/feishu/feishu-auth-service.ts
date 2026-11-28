@@ -25,6 +25,7 @@
 
 import type { FeishuAuthErrorCode, FeishuAuthScope } from '@heyta/shared-schema';
 
+import { normalizeEmail } from '../account/email-normalize.js';
 import type { FeishuProfile } from './feishu-oauth-client';
 
 /** 仓储读出来的账号（只含归属判定需要的字段，不含 passwordHash 等）。 */
@@ -134,7 +135,7 @@ export async function resolveFeishuLogin(args: {
   }
 
   // 3) 普通面：邮箱撞车不认领。
-  const feishuEmail = profile.email ? profile.email.trim().toLowerCase() : '';
+  const feishuEmail = profile.email ? normalizeEmail(profile.email) : '';
   if (feishuEmail && isValidEmail(feishuEmail)) {
     const byEmail = await repo.findByEmail(feishuEmail);
     if (byEmail) return { ok: false, code: 'email_taken' };

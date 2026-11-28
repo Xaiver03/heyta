@@ -46,10 +46,12 @@ import {
   emptyPreferenceSet,
   groupTasksByDate,
   groupTasksBySection,
+  indexTags,
   inferFeedbackPreferences,
   inferPreferences,
   presentPreferenceIds,
   renderPreferenceHints,
+  resolveTags,
   Quadrant,
   isAbandoned,
   isPinned,
@@ -92,7 +94,6 @@ import {
 import { cssVar } from '@heyta/design-system';
 
 import {
-  selectQuadrantCounts,
   selectVisibleTasks,
   useTaskStore,
   type TaskFilter,
@@ -134,6 +135,11 @@ import {
   ReorderHandle,
   makeManualSortRowWrapper,
 } from './features/tasks/ManualSortDnd.js';
+import {
+  TASK_DRAG_MIME,
+  executeWorkspaceTaskDrop,
+  resolveWorkspaceDropTarget,
+} from './features/tasks/task-workspace-drop.js';
 import { FilterPanel } from './features/tasks/FilterPanel.js';
 import { savedFilterNameOf } from './features/tasks/saved-filters.js';
 import { CaptureComposer } from './features/capture/CaptureComposer.js';
@@ -234,10 +240,10 @@ import { useSignOutStore } from './features/settings/signOutStore.js';
 import { CloseAccountPanel } from './features/settings/CloseAccountPanel.js';
 import { DataSettingsPanel } from './features/settings/DataSettingsPanel.js';
 import { SettingsAccountGate } from './features/settings/SettingsAccountGate.js';
+import { SettingsInfoTip } from './features/settings/SettingsInfoTip.js';
 // 个人信息（R10）：昵称与头像的增删改查。入口在头像菜单的「编辑个人信息」，
 // 面板本体开在设置浮层第一段 —— 它需要令牌，而令牌就住在同步设置里。
 import { ProfilePanel } from './features/settings/ProfilePanel.js';
-import { SettingsInfoTip } from './features/settings/SettingsInfoTip.js';
 import { ProfileOverview } from './features/settings/ProfileOverview.js';
 // 隐私同意的**撤回**入口（PIPL 第 15 条：撤回要比同意更容易做到）。
 // 同意面板只在首启弹一次，之后用户要改只能从这里改 —— 没有它，一次点击就成了永久决定。
@@ -299,6 +305,7 @@ import { isAppLockEnabled } from './lib/app-lock.js';
 import './styles/app.css';
 
 import {
+  COMPLETED_NAV_ENTRY,
   QUADRANT_NAV,
   PRIMARY_NAV,
   SORT_LABEL,
@@ -558,7 +565,6 @@ export function App(): React.JSX.Element {
    * 直到真实用户旅程测试第一次去挂它。典型的"每一段都绿、接起来断"。
    */
   const visible = useTaskStore(useShallow(selectVisibleTasks));
-  const counts = useTaskStore(useShallow(selectQuadrantCounts));
   /**
    * 详情面的**选中态**（W1）。它住 `@heyta/app-host`，web 只有这一行胶水。
    *
@@ -636,12 +642,13 @@ export function App(): React.JSX.Element {
       // 只给列表不给计数，侧栏就会出现"标签写 3、点进去 5"的读数。
       filterTasks(tasks, filter, { now: store.now, tags: store.entities.tags }).length;
     return {
+      all: count({ kind: 'all' }),
       today: count({ kind: 'today' }),
       tomorrow: count({ kind: 'tomorrow' }),
       next7Days: count({ kind: 'next7Days' }),
       completed: count({ kind: 'completed' }),
-    } as Record<'today' | 'tomorrow' | 'next7Days' | 'completed', number>;
-  }, [store.entities.tasks, store.now]);
+    } as Record<'all' | 'today' | 'tomorrow' | 'next7Days' | 'completed', number>;
+  }, [store.entities.tasks, store.entities.tags, store.now]);
 
   /**
    * 智能清单渲染顺序 = 用户配置的顺序，且只留可见项（#18）。
@@ -985,10 +992,77 @@ export function App(): React.JSX.Element {
    * 所以**不需要"切档时归位"那一轮 N 条写入**。
    */
   const manualSortActive = effectiveTaskSort === 'manual';
-  /** 行外面那一层（只有手动档才需要；其余档位传 `undefined` ⇒ 共享层原样返回行）。 */
+  const activeWorkspaceDropElRef = useRef<HTMLElement | null>(null);
+  const clearWorkspaceDropOver = useCallback(() => {
+    if (activeWorkspaceDropElRef.current !== null) {
+      activeWorkspaceDropElRef.current.removeAttribute('data-workspace-drop-over');
+      activeWorkspaceDropElRef.current = null;
+    }
+  }, []);
+  const handleAppDragOver = useCallback(
+    (event: React.DragEvent<HTMLDivElement>) => {
+      const types = Array.from(event.dataTransfer.types ?? []);
+      if (!types.includes(TASK_DRAG_MIME) && !types.includes('text/plain')) return;
+      const drop = resolveWorkspaceDropTarget(
+        event.target,
+        toLocalDate(useTaskStore.getState().now),
+        useCalendarViewStore.getState().cursor,
+      );
+      if (drop === undefined) {
+        clearWorkspaceDropOver();
+        return;
+      }
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'move';
+      if (activeWorkspaceDropElRef.current !== drop.element) {
+        clearWorkspaceDropOver();
+        drop.element.setAttribute('data-workspace-drop-over', 'true');
+        activeWorkspaceDropElRef.current = drop.element;
+      }
+    },
+    [clearWorkspaceDropOver],
+  );
+  const handleAppDrop = useCallback(
+    (event: React.DragEvent<HTMLDivElement>) => {
+      clearWorkspaceDropOver();
+      const rawTaskId =
+        event.dataTransfer.getData(TASK_DRAG_MIME) ||
+        event.dataTransfer.getData('text/plain');
+      const taskId = rawTaskId.trim();
+      if (taskId === '' || useTaskStore.getState().entities.tasks[taskId] === undefined) return;
+      const drop = resolveWorkspaceDropTarget(
+        event.target,
+        toLocalDate(useTaskStore.getState().now),
+        useCalendarViewStore.getState().cursor,
+      );
+      if (drop === undefined) return;
+      event.preventDefault();
+      void executeWorkspaceTaskDrop(taskId, drop);
+    },
+    [clearWorkspaceDropOver],
+  );
+  /** 行外面那一层（手动档走 dnd-kit；其余档位提供跨工作区原生拖拽包装）。 */
   const manualRowWrapper = useMemo(
-    () => (manualSortActive ? makeManualSortRowWrapper() : undefined),
-    [manualSortActive],
+    () =>
+      manualSortActive
+        ? makeManualSortRowWrapper()
+        : (row: SharedTaskRow, node: React.ReactNode) => (
+            <div
+              className="ht-row__universal-drag"
+              draggable
+              data-testid={`task-draggable-${row.id}`}
+              data-drag-task-id={row.id}
+              onDragStart={(event) => {
+                event.dataTransfer.setData(TASK_DRAG_MIME, row.id);
+                event.dataTransfer.setData('text/plain', row.id);
+                event.dataTransfer.effectAllowed = 'move';
+              }}
+              onDragEnd={clearWorkspaceDropOver}
+            >
+              {node}
+            </div>
+          ),
+    [clearWorkspaceDropOver, manualSortActive],
   );
   const changeTaskSort = useCallback((next: TaskSortKey) => {
     const currentFilter = useTaskStore.getState().filter;
@@ -2020,28 +2094,90 @@ export function App(): React.JSX.Element {
    * 🔴 也不再把控件留在 web 侧手写整行：行的骨架、触控区、排序、无障碍 role/state
    * 仍然只有共享 `TaskList` 一份实现。
    */
+  const [editingRowTaskId, setEditingRowTaskId] = useState<string | null>(null);
+  const inlineRenameSettledRef = useRef(false);
+  if (editingRowTaskId !== null && editingRowTaskId !== selectedTaskId) {
+    setEditingRowTaskId(null);
+  }
+
+  const commitInlineRowRename = useCallback(
+    (taskId: string, nextTitle: string, prevTitle: string) => {
+      if (inlineRenameSettledRef.current) return;
+      inlineRenameSettledRef.current = true;
+      setEditingRowTaskId(null);
+      const trimmed = nextTitle.trim();
+      if (trimmed === '' || trimmed === prevTitle) return;
+      void store.renameTask(taskId, trimmed);
+    },
+    [store],
+  );
+
+  const renderTaskTitle = useCallback(
+    (row: SharedTaskRow): React.ReactNode | undefined => {
+      if (editingRowTaskId !== row.id) return undefined;
+      return (
+        <input
+          data-testid={`task-row-title-input-${row.id}`}
+          className="ht-row__title-input"
+          aria-label={t('web.ai.capture.field.titleAria')}
+          autoFocus
+          defaultValue={row.title}
+          onFocus={(event) => {
+            const len = event.currentTarget.value.length;
+            event.currentTarget.setSelectionRange(len, len);
+          }}
+          onBlur={(event) => {
+            commitInlineRowRename(row.id, event.currentTarget.value, row.title);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              commitInlineRowRename(row.id, event.currentTarget.value, row.title);
+            } else if (event.key === 'Escape') {
+              event.preventDefault();
+              inlineRenameSettledRef.current = true;
+              setEditingRowTaskId(null);
+            }
+          }}
+        />
+      );
+    },
+    [commitInlineRowRename, editingRowTaskId, t],
+  );
+
   const renderTaskTrailing = useCallback(
     (row: SharedTaskRow): React.ReactNode => {
       const task = row.source;
       return (
         <span className="ht-row-badges" data-testid={`task-trailing-${task.id}`}>
-          <NoteBadge task={task} />
           <SubtaskBadge task={task} />
-          <TagChips task={task} />
           <RepeatChip task={task} now={store.now} />
           <ReminderBadge task={task} />
-          {/*
-            手动排序档位下多一枚拖拽手柄（R4①）。
-            🔴 它**自带"在不在拖放范围里"的判断**（`ReorderHandle` 没有上下文就返回
-            `null`），所以这里不必再传一个 `manual` 布尔 —— 少一个"两处判断不一致"的机会。
-            徽标那一列是只读的，手柄是这一格里唯一可交互的东西，且它只在
-            「手动拖拽」那一档出现（其它档位拖拽没有意义：顺序不由用户决定）。
-          */}
           <ReorderHandle label={t('web.tasks.reorder.handle')} />
         </span>
       );
     },
     [store.now, t],
+  );
+
+  const renderTaskSubline = useCallback(
+    (row: SharedTaskRow): React.ReactNode => {
+      const task = row.source;
+      const hasNote = task.note !== undefined && task.note.trim() !== '';
+      const hasTags = resolveTags(task.tagIds, indexTags(projects.tags)).length > 0;
+      if (!hasNote && !hasTags) return null;
+      return (
+        <div className="ht-row__subline" data-testid={`task-subline-${task.id}`}>
+          <NoteBadge task={task} />
+          {hasTags ? (
+            <div className="ht-row__tags">
+              <TagChips task={task} />
+            </div>
+          ) : null}
+        </div>
+      );
+    },
+    [projects.tags],
   );
 
 
@@ -2137,6 +2273,44 @@ export function App(): React.JSX.Element {
       openRowMenuFromRow(hit.taskId, hit.row, hasPointer ? event.clientX : undefined, hasPointer ? event.clientY : undefined);
     },
     [openRowMenuFromRow],
+  );
+
+  const handleTaskContentClick = useCallback(
+    (event: React.MouseEvent<HTMLDivElement>) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const hit = taskIdFromEventTarget(target);
+      if (hit === null) return;
+      if (bulkSelecting) return;
+      const onTitle = target.closest('[data-testid^="task-title-"]') !== null;
+      if (onTitle && taskPaneWillShow && selectedTaskId === hit.taskId) {
+        inlineRenameSettledRef.current = false;
+        setEditingRowTaskId(hit.taskId);
+        return;
+      }
+      if (
+        target.closest(
+          'button, [role="button"], [role="checkbox"], input, textarea, select, a, summary',
+        ) === null
+      ) {
+        openTask(hit.taskId);
+      }
+    },
+    [bulkSelecting, openTask, selectedTaskId, taskPaneWillShow],
+  );
+
+  const handleTaskContentDoubleClick = useCallback(
+    (event: React.MouseEvent<HTMLDivElement>) => {
+      const target = event.target;
+      if (!(target instanceof Element) || bulkSelecting || !taskPaneWillShow) return;
+      if (target.closest('[data-testid^="task-title-"]') === null) return;
+      const hit = taskIdFromEventTarget(target);
+      if (hit === null) return;
+      selection.select('task', hit.taskId);
+      inlineRenameSettledRef.current = false;
+      setEditingRowTaskId(hit.taskId);
+    },
+    [bulkSelecting, taskPaneWillShow],
   );
 
   const handleTaskRowKeyDown = useCallback(
@@ -2940,6 +3114,13 @@ export function App(): React.JSX.Element {
         // 关掉后选中态天然恢复 —— 选中住在 store 里，从未被清。它与 `data-detail-empty`
         // 是**两条规则**：那条说"没内容"，这条说"有内容也要让位给浮层"。
         data-detail-suppressed={view === 'settings' ? '' : undefined}
+        onDragOver={handleAppDragOver}
+        onDragLeave={(event) => {
+          if (event.relatedTarget === null || !(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) {
+            clearWorkspaceDropOver();
+          }
+        }}
+        onDrop={handleAppDrop}
       >
       {/*
         ═══════════════════════════════════════════════════════════════════════
@@ -3047,21 +3228,23 @@ export function App(): React.JSX.Element {
                `overflow-x` 变成 `clip`，而把手的命中带有 4px 骑在右边缘之外，会被裁掉一半。
           */}
           <div className="ht-sidebar__body">
-            <div className="ht-nav">
+            <div className="ht-nav ht-sidebar__primary">
               {visiblePrimaryNav.map((entry) => (
                 <NavButton
                   key={entry.labelKey}
                   entry={entry}
                   count={
-                    entry.filter.kind === 'today'
-                      ? navCounts.today
-                      : entry.filter.kind === 'tomorrow'
-                        ? navCounts.tomorrow
-                        : entry.filter.kind === 'next7Days'
-                        ? navCounts.next7Days
-                        : entry.filter.kind === 'completed'
-                          ? navCounts.completed
-                          : undefined
+                    entry.filter.kind === 'all'
+                      ? navCounts.all
+                      : entry.filter.kind === 'today'
+                        ? navCounts.today
+                        : entry.filter.kind === 'tomorrow'
+                          ? navCounts.tomorrow
+                          : entry.filter.kind === 'next7Days'
+                            ? navCounts.next7Days
+                            : entry.filter.kind === 'completed'
+                              ? navCounts.completed
+                              : undefined
                   }
                   active={isActive(store.filter, entry.filter)}
                   onClick={() => goToFilter(entry.filter)}
@@ -3069,46 +3252,18 @@ export function App(): React.JSX.Element {
               ))}
             </div>
 
-            {/*
-              侧栏这一节就叫**「四象限」** —— 它列的就是那四个象限，名字直说。
+            <ProjectsPanel
+              onFilterWith={goToFilter}
+              betweenSections={<FilterPanel onApplyFilter={goToFilter} />}
+            />
 
-              ⚠️ 这里一度被我改成「按象限筛选」，理由是它与 rail 里的**四象限视图**同名。
-              产品负责人当场否掉：**侧栏列的是四个象限，叫「四象限」才对**。
-              ⇒ 我记下的"同名冲突"确实存在（点它会 `setView('tasks')`，得到的是
-              任务列表的一个筛选，不是那个 2×2 网格视图），但**解法不是改名字**。
-              真要动，动的是**行为**（或者让 rail 的那个视图换个名字），
-              而不是把用户认得的词从侧栏拿掉。
-            */}
-            <div className="ht-nav__section ht-type-group-label">{t('web.shell.nav.quadrantSection')}</div>
-            <div className="ht-nav">
-              {QUADRANT_NAV.map((entry) => (
-                <NavButton
-                  key={entry.labelKey}
-                  entry={entry}
-                  count={
-                    entry.filter.kind === 'quadrant'
-                      ? counts[entry.filter.quadrant]
-                      : undefined
-                  }
-                  active={isActive(store.filter, entry.filter)}
-                  onClick={() => goToFilter(entry.filter)}
-                />
-              ))}
-            </div>
-            <ProjectsPanel onFilterWith={goToFilter} />
-
-            {/*
-              侧栏底部「工具」= **回收站**（2026-11-04 滴答对齐 D2，从 rail 贴底那段搬过来）。
-              形状照这一列自己的导航行（`NavButton` 那一族：同一个 `.ht-nav__item`），
-              所以它与「已完成」看起来就是一组并列的行。
-
-              🔴 **它不是 `role="tab"`**：rail 那一段才是"视图标签组"（一组互斥、方向键漫游），
-              这一列的行点的是**筛选与目的地**，原生按钮 + `aria-current` 才是对的语义。
-              ⚠️ 搬过来的代价写在 `view-tabs.ts` 的 `SIDEBAR_TOOL_TABS` 文件头：
-              这一列只在**任务视图**存在，所以在习惯 / 便签 这些视图里回收站没有导航行，
-              那两条路是先回任务视图点这一行、或在搜索的「快速跳转」里打「回收站」。
-            */}
             <div className="ht-nav ht-sidebar__tools" role="group" aria-label={t('web.shell.views.groupTools')}>
+              <NavButton
+                entry={COMPLETED_NAV_ENTRY}
+                count={navCounts.completed}
+                active={isActive(store.filter, COMPLETED_NAV_ENTRY.filter)}
+                onClick={() => goToFilter(COMPLETED_NAV_ENTRY.filter)}
+              />
               {SIDEBAR_TOOL_TABS.map((tab) => (
                 <button
                   key={tab.key}
@@ -3123,10 +3278,6 @@ export function App(): React.JSX.Element {
                 </button>
               ))}
             </div>
-            {/* D1 已存视图：侧栏底部入口，与回收站同一形状。
-                区块头 + 列表 + 创建表单都在 `FilterPanel` 里，这里只接线。
-                `goToFilter` = 切回任务视图 + 落筛选（与点清单/标签同一条路）。 */}
-            <FilterPanel onApplyFilter={goToFilter} />
           </div>
           {/* 右边缘的拖拽手柄（绝对定位在这一列上，不占布局）。 */}
           <SidebarResizer />
@@ -3551,6 +3702,8 @@ export function App(): React.JSX.Element {
         */}
         <div
           className="ht-content"
+          onClick={handleTaskContentClick}
+          onDoubleClick={handleTaskContentDoubleClick}
           onContextMenu={handleTaskContextMenu}
           onKeyDown={handleTaskRowKeyDown}
         >
@@ -3679,7 +3832,7 @@ export function App(): React.JSX.Element {
                         />
                         {!collapsedGroups.has(skey) && (
                           <ManualSortWrapper manual={manualSortActive} tasks={group.tasks} onSetOrder={(id, order) => useTaskStore.getState().setOrder(id, order)}>
-                            <TaskList tasks={group.tasks} sort={effectiveTaskSort} density="dense" {...(manualRowWrapper === undefined ? {} : { renderRowWrapper: manualRowWrapper })} onOpenTask={openTask} activeTaskId={selectedTaskId} selectedTaskIds={bulkSelecting ? selectedTaskIds : undefined} selectionMode={bulkSelecting} onToggleTask={(taskId) => { if (bulkSelecting) { toggleBulkSelection(taskId); } else { void store.toggleComplete(taskId); } }} labels={taskRowLabels} renderMeta={renderTaskMeta} renderTrailing={renderTaskTrailing} {...(rowIconColorOf === undefined ? {} : { iconColorOf: rowIconColorOf })} rowDividers testID={`task-list-section-${skey}`} />
+                            <TaskList tasks={group.tasks} sort={effectiveTaskSort} density="dense" {...(manualRowWrapper === undefined ? {} : { renderRowWrapper: manualRowWrapper })} onOpenTask={openTask} activeTaskId={selectedTaskId} selectedTaskIds={bulkSelecting ? selectedTaskIds : undefined} selectionMode={bulkSelecting} onToggleTask={(taskId) => { if (bulkSelecting) { toggleBulkSelection(taskId); } else { void store.toggleComplete(taskId); } }} labels={taskRowLabels} renderTitle={renderTaskTitle} renderMeta={renderTaskMeta} renderTrailing={renderTaskTrailing} renderSubline={renderTaskSubline} {...(rowIconColorOf === undefined ? {} : { iconColorOf: rowIconColorOf })} rowDividers testID={`task-list-section-${skey}`} />
                           </ManualSortWrapper>
                         )}
                       </HeytaUiProvider>
@@ -3711,8 +3864,10 @@ export function App(): React.JSX.Element {
                   }
                 }}
                 labels={taskRowLabels}
+                renderTitle={renderTaskTitle}
                 renderMeta={renderTaskMeta}
                 renderTrailing={renderTaskTrailing}
+                renderSubline={renderTaskSubline}
                 {...(rowIconColorOf === undefined ? {} : { iconColorOf: rowIconColorOf })}
                 rowDividers
                 testID="task-list"
@@ -3792,8 +3947,10 @@ export function App(): React.JSX.Element {
                             }
                           }}
                           labels={taskRowLabels}
+                          renderTitle={renderTaskTitle}
                           renderMeta={renderTaskMeta}
                           renderTrailing={renderTaskTrailing}
+                          renderSubline={renderTaskSubline}
                           {...(rowIconColorOf === undefined ? {} : { iconColorOf: rowIconColorOf })}
                           rowDividers
                           testID={`task-list-${key}`}

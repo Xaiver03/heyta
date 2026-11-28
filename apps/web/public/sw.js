@@ -1,6 +1,6 @@
 "use strict";
 (() => {
-  // ../../packages/widget-core/dist/index.js
+  // packages/widget-core/dist/index.js
   var ADAPTIVE_CARD_KINDS = ["today", "quadrant", "habits", "focus"];
   var ADAPTIVE_CARD_SCHEMA = "http://adaptivecards.io/schemas/adaptive-card.json";
   var ADAPTIVE_CARD_VERSION = "1.5";
@@ -156,7 +156,7 @@
     }
   };
 
-  // src/pwa/sw-core.ts
+  // apps/web/src/pwa/sw-core.ts
   var WIDGET_TAG_PREFIX = "heyta-";
   function widgetTag(kind) {
     return `${WIDGET_TAG_PREFIX}${kind}`;
@@ -227,7 +227,7 @@
     return null;
   }
 
-  // src/pwa/sw.ts
+  // apps/web/src/pwa/sw.ts
   var sw = self;
   var DB_NAME = "heyta-widget";
   var DB_VERSION = 1;

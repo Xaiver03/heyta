@@ -296,6 +296,7 @@ export function captureDue(
   parsed: CaptureParse,
   override: CaptureOverride | undefined,
   anchor?: LocalDate,
+  anchorTime?: LocalTime,
 ): CaptureDue {
   const signature = captureFragmentSignature(parsed);
   if (captureOverrideValid(override, signature)) {
@@ -304,7 +305,7 @@ export function captureDue(
   if (parsed.dueDate !== undefined) {
     return { date: parsed.dueDate, time: parsed.dueTime, source: 'parsed' };
   }
-  if (anchor !== undefined) return { date: anchor, time: undefined, source: 'anchor' };
+  if (anchor !== undefined) return { date: anchor, time: anchorTime, source: 'anchor' };
   return { date: undefined, time: undefined, source: 'none' };
 }
 
@@ -498,15 +499,16 @@ export function toCaptureSubmitPlan(
   parsed: CaptureParse,
   anchor?: LocalDate,
   override?: CaptureOverride,
+  anchorTime?: LocalTime,
 ): CaptureSubmitPlan | undefined {
   if (!captureCanSubmit(parsed)) return undefined;
-  const due = captureDue(parsed, override, anchor);
+  const due = captureDue(parsed, override, anchor, anchorTime);
   return {
     title: parsed.title,
     /*
      * 时刻与日期**成对**来自同一次 {@link captureDue} 解析，所以这里不需要
      * 再判"锚点补的日期能不能配解析出的时刻"——`captureDue` 在 `source === 'anchor'`
-     * 那一档就把 `time` 写成了 `undefined`。（写成三元判断会是给一条不存在的分支上锁。）
+     * 那一档只取 `anchorTime`（未传时为 `undefined`）。（写成三元判断会是给一条不存在的分支上锁。）
      */
     ...(due.date !== undefined ? { dueDate: dueDateToEpoch(due.date, due.time) } : {}),
     ...(parsed.priority !== undefined ? { priority: parsed.priority } : {}),

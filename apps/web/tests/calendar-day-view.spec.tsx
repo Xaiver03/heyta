@@ -449,4 +449,28 @@ describe('现在线', () => {
     await flush();
     expect(q('calendar-board-day-now-line'), '现在线跟着游标一起翻到别的日子去了').toBeNull();
   });
+
+  it('🔴 日视图每小时包含 4 个 15 分钟槽位，点击槽位渲染定位草稿条并打开带时刻的捕获框', async () => {
+    await mount();
+    await openCalendar();
+    await selectDayView();
+
+    expect(q('calendar-board-day-slot-09-00')).not.toBeNull();
+    expect(q('calendar-board-day-slot-09-15')).not.toBeNull();
+    expect(q('calendar-board-day-slot-09-30')).not.toBeNull();
+    expect(q('calendar-board-day-slot-09-45')).not.toBeNull();
+
+    const slot1400 = q('calendar-board-day-slot-14-00')!;
+    expect(slot1400).not.toBeNull();
+    await act(async () => {
+      slot1400.click();
+    });
+    await flush();
+
+    const draftSlot = q('calendar-board-day-draft-slot');
+    expect(draftSlot, '点击 14:00 槽位后未渲染草稿条').not.toBeNull();
+    expect(draftSlot!.textContent).toContain('☐ 14:00');
+    const slotTimeBadge = document.body.querySelector('[data-testid="calendar-capture-slot-time"]');
+    expect(slotTimeBadge?.textContent).toBe('14:00');
+  });
 });

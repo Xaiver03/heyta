@@ -162,13 +162,11 @@ describe('任务行的形状 = 共享契约', () => {
   it('那两处**真实发生过的**漂移不许回来', () => {
     const css = taskSection();
 
-    // 勾选框曾经抄的是 `--ht-icon-md`（20px）+ 圆形；共享行是
-    // `size.checkbox`（22px）+ `radius.sm`。
+    // 勾选框曾经抄的是 `--ht-icon-md`（20px）；共享行是 `size.checkbox`（22px）。
+    // 圆角自 `c9cf0242`（R3a，对齐提醒事项）起两边**都是**圆形（`radius.full`），
+    // 所以"圆形"不再是漂移 —— 上面的契约比对已经钉住了 `var(--ht-radius-full)` 必须在。
     expect(css, '勾选框又抄成 --ht-icon-md 了（共享行用的是 size.checkbox）').not.toContain(
       'var(--ht-icon-md)',
-    );
-    expect(css, '勾选框又抄成圆形了（共享行用的是 radius.sm）').not.toContain(
-      'var(--ht-radius-full)',
     );
 
     // 标题曾经抄成 `--ht-font-size-sm`；`row-title` 是 `font-size.base`。

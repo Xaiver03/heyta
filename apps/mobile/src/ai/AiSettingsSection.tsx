@@ -44,7 +44,7 @@ import {
 import { LOCAL_API_TOOLS } from '@heyta/local-api';
 import { useI18n, type MessageKey } from '@heyta/i18n';
 
-import { Button, Card, Checkbox, Chip, SectionHeader, Stack, Text, TextField } from '../ui/kit';
+import { Button, Card, Chip, Divider, SectionHeader, Stack, Text, TextField } from '../ui/kit';
 import { readSyncConfig } from '../sync/config';
 import { useMobileSync } from '../sync/store';
 import { useTokens } from '../theme';
@@ -252,65 +252,53 @@ export function AiSettingsSection(): React.JSX.Element {
 
   return (
     <Stack gap="loose" testID="ai-settings-section">
-      <SectionHeader title={t('web.ai.settings.title')} />
-
       {savedWithoutKey ? (
         <Text variant="row-meta" tone="warning">
           {t('mobile.ai.saveFailed')}
         </Text>
       ) : null}
 
-      {/* 自动收集这一趟做完了什么 —— 手机上此前没有任何一面说得出这句话，
-          队列空与"根本没在跑"在界面上长得一样。 */}
-      {inboundReadiness !== undefined && inboundReadiness !== 'ready' ? (
-        <Text variant="row-meta" tone="warning" testID="inbound-readiness">
-          {t(INBOUND_READINESS_COPY_KEY[inboundReadiness])}
+      {/* 自动收集状态与设备边界 */}
+      <Card gap="tight">
+        {inboundReadiness !== undefined && inboundReadiness !== 'ready' ? (
+          <Text variant="row-meta" tone="warning" testID="inbound-readiness">
+            {t(INBOUND_READINESS_COPY_KEY[inboundReadiness])}
+          </Text>
+        ) : null}
+        {inboundCycle === undefined ? null : (
+          <Text variant="row-meta" testID="inbound-cycle-state">
+            {t(INBOUND_CYCLE_COPY_KEY[inboundCycle.state])}
+          </Text>
+        )}
+        <Text variant="caption" tone="subtle" testID="inbound-boundary">
+          {t(INBOUND_BOUNDARY_COPY_KEY)}
         </Text>
-      ) : null}
-      {inboundCycle === undefined ? null : (
-        <Text variant="row-meta" testID="inbound-cycle-state">
-          {t(INBOUND_CYCLE_COPY_KEY[inboundCycle.state])}
-        </Text>
-      )}
-      {/*
-        那句边界两壳共用同一颗 key：哪台设备才处理、要常年接收该把 worker 放哪。
-        
-        ⚠️ 2026-11-14 我一度把它收进组标题的「?」，被
-        `inbound-cycle-display.spec.ts` 挡回来了 —— 那条判据要求这段文案
-        **在界面上渲出来**（它守的是"两壳同一条 key、界面里不许第二份字面量"）。
-        收进气泡虽然符合 Material 的"长解释放第二层"，但违背了"这条边界必须可见"：
-        用户需要知道**哪台设备在处理他的任务**，这不是可以点开才看的事。
-      */}
-      <Text variant="row-meta" testID="inbound-boundary">
-        {t(INBOUND_BOUNDARY_COPY_KEY)}
-      </Text>
-      {/* 规则清单（只读）：手机上以前连"我有几条规则、它们谁在处理"都说不出。 */}
-      {inboundRules === undefined || inboundRules.length === 0 ? null : (
-        <Card gap="tight">
-          <Text testID="inbound-rules-title">{t('web.ai.inbound.title')}</Text>
-          {inboundRules.map((rule) => (
-            <Text key={rule.id} variant="row-meta" testID={`inbound-rule-${rule.id}`}>
-              {`${rule.keyId} · ${t(rule.enabled ? 'web.ai.inbound.enabled' : 'web.ai.inbound.disabled')} · ${t(rule.hostedExtraction ? 'web.ai.inbound.hosted.stateHosted' : 'web.ai.inbound.hosted.stateDevice')}`}
-            </Text>
-          ))}
-        </Card>
-      )}
+        {inboundRules === undefined || inboundRules.length === 0 ? null : (
+          <>
+            <Divider />
+            <Text variant="row-title" testID="inbound-rules-title">{t('web.ai.inbound.title')}</Text>
+            {inboundRules.map((rule) => (
+              <Text key={rule.id} variant="row-meta" testID={`inbound-rule-${rule.id}`}>
+                {`${rule.keyId} · ${t(rule.enabled ? 'web.ai.inbound.enabled' : 'web.ai.inbound.disabled')} · ${t(rule.hostedExtraction ? 'web.ai.inbound.hosted.stateHosted' : 'web.ai.inbound.hosted.stateDevice')}`}
+              </Text>
+            ))}
+          </>
+        )}
+      </Card>
 
       {/* ── 闸 1：总开关 ─────────────────────────────────────────────── */}
-      <Card gap="loose">
+      <Card gap="default">
         <GateRow
           label={t('web.ai.settings.enabled.label')}
-          note={t('web.ai.settings.enabled.note')}
           on={routing.enabled}
           testID="ai-gate-enabled"
           onToggle={() => {
             commit({ ...routing, enabled: !routing.enabled });
           }}
         />
-        {/* ── 闸 2：允许远程 ───────────────────────────────────────── */}
+        <Divider />
         <GateRow
           label={t('web.ai.settings.allowRemote.label')}
-          note={t('web.ai.settings.allowRemote.note')}
           on={routing.allowRemote}
           testID="ai-gate-remote"
           onToggle={() => {
@@ -326,10 +314,9 @@ export function AiSettingsSection(): React.JSX.Element {
             {t('web.ai.settings.remote.tail')}
           </Text>
         ) : null}
-        {/* ── 闸 4：记忆层（ADR-0014：必填且默认关，fail-closed） ─── */}
+        <Divider />
         <GateRow
           label={t('web.ai.settings.memory.label')}
-          note={t('web.ai.settings.memory.note')}
           on={settings.memoryEnabled}
           testID="ai-gate-memory"
           onToggle={() => {
@@ -339,17 +326,9 @@ export function AiSettingsSection(): React.JSX.Element {
         />
       </Card>
 
-      {/* ── 供给模式：我自己的端点 / heyta 托管 ─────────────────────────
-          🔴 它**必须在端点列表之前**：这是"请求发给谁"的第一层选择。
-          托管档的地址**不在这里配** —— 它来自「同步」里那台服务器
-          （`withManagedEndpoint` 在构造路由配置那一刻合成），所以换服务器
-          这一档跟着换，用户不需要、也不应该在这里再填一次地址。
-          ⚠️ 与 web 的差别只在**控件形态**（这里是开关、那边是二选一单选），
-          **判断与后果必须一致**（同一个 `routing.mode`、同一批词条）。 */}
-      <Card gap="loose">
+      <Card gap="default">
         <GateRow
           label={t('web.ai.settings.supply.managed')}
-          note={t('web.ai.settings.supply.note')}
           on={routing.mode === 'managed'}
           testID="ai-gate-managed"
           onToggle={() => {
@@ -361,12 +340,6 @@ export function AiSettingsSection(): React.JSX.Element {
             {t('web.ai.settings.supply.managedPending')}
           </Text>
         ) : null}
-        {/*
-          「本周期已用 X / 300」—— 三分支**分开说**（见上面 `usage` 的注释）：
-          有权益报数 / 没权益说"没有这一期"（**不是 0/300**）/ 读不到说"读不到"。
-          ⚠️ `Text` 刻意不带 `testID`（那个原语不接它，也不该为此改 kit）——
-          判据改断言**用户读到的那句话本身**，那比一个 testID 更硬。
-        */}
         {usageCopy !== undefined ? (
           <Text variant="row-meta" tone="subtle">
             {t(usageCopy.key, usageCopy.vars)}
@@ -375,8 +348,8 @@ export function AiSettingsSection(): React.JSX.Element {
       </Card>
 
       {/* ── 端点 ─────────────────────────────────────────────────────── */}
+      <SectionHeader title={t('web.ai.settings.endpoints.title')} />
       <Card gap="loose">
-        <Text variant="row-title">{t('web.ai.settings.endpoints.title')}</Text>
         {routing.endpoints.length === 0 ? (
           <Text variant="row-meta" tone="subtle">
             {t('web.ai.settings.endpoints.empty')}
@@ -385,7 +358,6 @@ export function AiSettingsSection(): React.JSX.Element {
           routing.endpoints.map((endpoint) => {
             const now = Date.now();
             const health = fromHealthSnapshot(settings.health, now)[endpoint.id];
-            // 还没有任何一次调用记录时没有可说的话。
             const healthLine =
               health === undefined
                 ? undefined
@@ -393,7 +365,7 @@ export function AiSettingsSection(): React.JSX.Element {
             const remote = classifyDestination({ mode: 'own', endpoint: endpoint.endpoint }) !== 'none';
             const usable = isAvailable(health, now);
             return (
-              <View key={endpoint.id} testID={`ai-endpoint-${endpoint.id}`}>
+              <Stack key={endpoint.id} gap="tight" testID={`ai-endpoint-${endpoint.id}`}>
                 <Text variant="row-title" numberOfLines={1}>
                   {endpoint.label}
                 </Text>
@@ -425,7 +397,7 @@ export function AiSettingsSection(): React.JSX.Element {
                     removeEndpoint(endpoint.id);
                   }}
                 />
-              </View>
+              </Stack>
             );
           })
         )}
@@ -445,19 +417,6 @@ export function AiSettingsSection(): React.JSX.Element {
             );
           })}
         </HStackish>
-        {AI_ENDPOINT_PRESETS.map((preset) => (
-          <Text key={preset.id} variant="caption" tone="subtle">
-            {(() => {
-              const copy = PRESET_COPY_KEYS[preset.id as keyof typeof PRESET_COPY_KEYS];
-              const label = copy === undefined ? preset.label : t(copy.label);
-              const prerequisite =
-                copy?.prerequisite === undefined
-                  ? preset.prerequisite ?? ''
-                  : t(copy.prerequisite);
-              return `${label}：${prerequisite}`;
-            })()}
-          </Text>
-        ))}
 
         <TextField
           label={t('web.ai.settings.field.name')}
@@ -491,12 +450,6 @@ export function AiSettingsSection(): React.JSX.Element {
           hint={t('mobile.ai.keyNotice')}
           testID="ai-endpoint-key"
         />
-        {/*
-          🔴 能力声明这一格：`ai-endpoint-cap-<capability>`（`CAP_TESTID`）由
-          `check:mobile-ai-anchors` 判据 ⑨ 钉住 —— 锚点挂在 **Chip**（= Pressable）上，
-          不挂在包装 `View` 上：iOS 只为带 trait 的宿主视图发 `AXUniqueId`，
-          `<View testID>` 在那一端等于没写（traps #348）。
-        */}
         <Stack gap="tight">
           <Text variant="caption" tone="subtle">
             {t('web.ai.settings.field.capability')}
@@ -529,8 +482,8 @@ export function AiSettingsSection(): React.JSX.Element {
       </Card>
 
       {/* ── 逐功能：路由 + 出境授权 ─────────────────────────────────── */}
+      <SectionHeader title={t('web.ai.settings.features.title')} />
       <Card gap="loose">
-        <Text variant="row-title">{t('web.ai.settings.features.title')}</Text>
         <Text variant="caption" tone="subtle">
           {t('web.ai.settings.features.hintLead')}
           <Text variant="caption" tone="warning">
@@ -538,37 +491,35 @@ export function AiSettingsSection(): React.JSX.Element {
           </Text>
           {t('web.ai.settings.features.hintTail')}
         </Text>
-        {FEATURE_ORDER.map((feature) => {
+        {FEATURE_ORDER.map((feature, featureIndex) => {
           const destination = destinationForFeature(feature, routing);
           const needs = requiresEgressConsent(destination);
           const granted = settings.consents.some(
             (consent) => consent.feature === feature && consent.destination === destination,
           );
           return (
-            <View key={feature} testID={`ai-feature-${feature}`}>
-              <HStackish>
-                {routing.endpoints.map((endpoint, index) => (
-                  <Chip
-                    key={endpoint.id}
-                    /* 🔴 `ai-route-<功能>-<下标>`：iOS 载体按它逐枚点某一档的端点
-                       （`verify-mobile-ios-ai.sh:739/990/1107`），下标 = 这一排从左到右
-                       的可见次序（端点的随机 id 载体拿不到，所以不用它）。
-                       ⚠️ 它随 `Chip` 透到 Pressable 那一层，见 `ui/kit.tsx` 的 `testID`
-                       注释 —— 挂在非可点的包装层上会"在树里但按不动"。 */
-                    testID={`ai-route-${feature}-${index}`}
-                    label={endpoint.label}
-                    selected={(routing.routes[feature] ?? []).some(
-                      (target) => target.endpointId === endpoint.id,
-                    )}
-                    onPress={() => {
-                      toggleRoute(feature, endpoint.id);
-                    }}
-                  />
-                ))}
-              </HStackish>
-              <Text variant="caption" tone="subtle">
+            <Stack key={feature} gap="tight" testID={`ai-feature-${feature}`}>
+              {featureIndex > 0 ? <Divider /> : null}
+              <Text variant="row-title">
                 {t(AI_FEATURE_LABEL_KEY[feature])}
               </Text>
+              {routing.endpoints.length === 0 ? null : (
+                <HStackish>
+                  {routing.endpoints.map((endpoint, index) => (
+                    <Chip
+                      key={endpoint.id}
+                      testID={`ai-route-${feature}-${index}`}
+                      label={endpoint.label}
+                      selected={(routing.routes[feature] ?? []).some(
+                        (target) => target.endpointId === endpoint.id,
+                      )}
+                      onPress={() => {
+                        toggleRoute(feature, endpoint.id);
+                      }}
+                    />
+                  ))}
+                </HStackish>
+              )}
               {needs ? (
                 <Button
                   label={granted ? t('web.ai.settings.revoke') : t('web.ai.settings.grant')}
@@ -580,14 +531,14 @@ export function AiSettingsSection(): React.JSX.Element {
                   }}
                 />
               ) : null}
-            </View>
+            </Stack>
           );
         })}
       </Card>
 
-      {/* ── 逐工具授权（本机 API / 内置 AI 共用同一份表，ADR-0035） ── */}
-      <Card gap="loose">
-        <Text variant="row-title">{t('web.ai.settings.localApi.title')}</Text>
+      {/* ── 逐工具授权 ─────────────────────────────────────────────── */}
+      <SectionHeader title={t('web.ai.settings.localApi.title')} />
+      <Card gap="default">
         <Text variant="caption" tone="subtle">
           {t('web.ai.settings.localApi.hintLead')}
           <Text variant="caption" tone="warning">
@@ -607,54 +558,40 @@ export function AiSettingsSection(): React.JSX.Element {
             setSavedWithoutKey(!wrote);
           }}
         />
-        {/*
-          🔴 逐工具**默认全关**（ADR-0011 §3.1）。这里出现"全部打开"的按钮就是违规 ——
-          一次点击放开 26 个工具，等于把逐工具授权这件事作废。
-        */}
-        {/*
-          🔴 2026-11-14 看图重写。这一列原来长这样：12 个**空心圆** + 12 个英文
-          snake_case 工具名 + 12 遍重复的「会改数据」。
-          
-          三个问题，按严重度：
-          1. **空心圆 = 单选组的语义**，而这是 12 个彼此独立的开关 —— 与上一处
-             `GateRow` 同一个错（§6b：同一语义两种控件）。
-          2. **「会改数据」印了 12 遍**。它是对**这一整组**的说明，不是每一行的属性。
-             重复 12 次之后，有用的信息（哪个工具能改数据）反而读不出来 ——
-             读者的眼睛会自动跳过重复的尾巴。
-          3. 工具名是给用户看的，`set_task_estimate` 这种标识符对谁都不可读；
-             但改名要 12 条新文案，不在这一屏的范围内，登记待办。
-        */}
+        <Divider />
         <Text variant="caption" tone="subtle">
           {t('web.ai.settings.localApi.kind.write')}
         </Text>
-        {LOCAL_API_TOOLS.map((tool) => {
+        {LOCAL_API_TOOLS.map((tool, index) => {
           const on = settings.localApi.grants?.[tool.name] === true;
           return (
-            <View
-              key={tool.name}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: tokens['space.2'] }}
-            >
-              <Text variant="row-meta" grow numberOfLines={2}>
-                {tool.name}
-              </Text>
-              <Switch
-                value={on}
-                onValueChange={() => {
-                  const wrote = saveAiSettings({
-                    ...settings,
-                    localApi: {
-                      ...settings.localApi,
-                      grants: { ...settings.localApi.grants, [tool.name]: !on },
-                    },
-                  });
-                  setSavedWithoutKey(!wrote);
-                }}
-                trackColor={{ false: tokens['color.border'], true: tokens['color.primary'] }}
-                thumbColor={tokens['color.surface']}
-                accessibilityLabel={tool.name}
-                testID={`ai-tool-grant-${tool.name}`}
-              />
-            </View>
+            <React.Fragment key={tool.name}>
+              {index > 0 ? <Divider /> : null}
+              <View
+                style={{ flexDirection: 'row', alignItems: 'center', minHeight: tokens['touch-target.min'], gap: tokens['space.2'] }}
+              >
+                <Text variant="row-title" grow numberOfLines={2}>
+                  {tool.name}
+                </Text>
+                <Switch
+                  value={on}
+                  onValueChange={() => {
+                    const wrote = saveAiSettings({
+                      ...settings,
+                      localApi: {
+                        ...settings.localApi,
+                        grants: { ...settings.localApi.grants, [tool.name]: !on },
+                      },
+                    });
+                    setSavedWithoutKey(!wrote);
+                  }}
+                  trackColor={{ false: tokens['color.border'], true: tokens['color.primary'] }}
+                  thumbColor={tokens['color.surface']}
+                  accessibilityLabel={tool.name}
+                  testID={`ai-tool-grant-${tool.name}`}
+                />
+              </View>
+            </React.Fragment>
           );
         })}
       </Card>
@@ -662,7 +599,7 @@ export function AiSettingsSection(): React.JSX.Element {
   );
 }
 
-/** 一行闸门：文字 + 说明 + 勾选框。**危险状态用文字说，不只用颜色。** */
+/** 一行闸门：文字 + 可选地址信息 + 标准滑块开关。 */
 function GateRow({
   label,
   note,
@@ -671,31 +608,21 @@ function GateRow({
   testID,
 }: {
   label: string;
-  note: string;
+  note?: string;
   on: boolean;
   onToggle: () => void;
   testID: string;
 }): React.JSX.Element {
   const tokens = useTokens();
-  /*
-   * 🔴 2026-11-14：`Checkbox`（空心圆）→ RN 原生 `Switch`。
-   *
-   * 看图才发现的：这一屏四个"开关"画成**四个空心圆**。圆在 UI 惯例里表示
-   * **单选组**（这一组里选一个），而这里是四个**彼此独立**的开关。
-   * 于是用户读到的是"这四个里只能选一个"，且看不出当前是开还是关。
-   *
-   * 这是 `ux-principles` §6b 的又一次违反：同一个"开/关"语义，
-   * 设置页用开关、这里用复选框。
-   *
-   * 用 RN 内置 `Switch`：零新依赖，两端都是平台标准外观（Android 上就是 Material 开关）。
-   */
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: tokens['space.3'] }} testID={testID}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', minHeight: tokens['touch-target.min'], gap: tokens['space.3'] }} testID={testID}>
       <Stack gap="tight" style={{ flex: 1 }}>
         <Text variant="row-title">{label}</Text>
-        <Text variant="caption" tone="subtle">
-          {note}
-        </Text>
+        {note === undefined ? null : (
+          <Text variant="caption" tone="subtle">
+            {note}
+          </Text>
+        )}
       </Stack>
       <Switch
         value={on}

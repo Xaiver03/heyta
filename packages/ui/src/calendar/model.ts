@@ -34,9 +34,11 @@ import {
   DAYS_PER_WEEK,
   diffDays,
   eventOccurrencesInRange,
+  isoWeekday,
   MONTHS_PER_YEAR,
   parseLocalDate,
   startOfMonth,
+  startOfWeek,
   startOfYear,
   toLocalDate,
   dueLocalDate,
@@ -45,6 +47,7 @@ import {
   startLocalDate,
   type CountdownEvent,
   type LocalDate,
+  type MonthGridCell,
   type Task,
 } from '@heyta/domain';
 import type { TokenName } from '@heyta/design-system';
@@ -112,6 +115,23 @@ export type CalendarCellBar = {
    * 于是**不传这个选项的调用点行为逐字节不变**（web 现在就是这种情况）。
    */
   readonly quadrant?: Quadrant | undefined;
+  /**
+   * 这一条的**类型**（2026-11-25）。
+   *
+   * 月格里的条原来只有"任务 / 倒数日"两档，靠 `event` 布尔区分。可是重复任务
+   * 与普通任务在格子里长得一模一样，读者要打开详情才知道它会重复 —— 而"这条
+   * 会不会重复"是翻月历时最先要认出来的一件事。所以把类型显式带上：
+   *
+   *   · `'task'`   —— 普通任务（含已完成）；
+   *   · `'repeat'` —— 带重复规则的任务（`repeatRule`，以及历史/上游数据里的
+   *                   `repeat` 字段）；
+   *   · `'event'`  —— 倒数日 / 纪念日（与 `event` 布尔同源）；
+   *   · `'habit'`  —— 宿主自己投影的习惯条（本层目前不产出，但契约先留位）。
+   *
+   * ⚠️ **可选**：老调用点（自己拼 `CalendarCellBar` 的宿主）不传也照旧编译，
+   *   不传时渲染与改动前逐字节相同（§9.1：新字段一律可选）。
+   */
+  readonly kind?: 'task' | 'repeat' | 'habit' | 'event' | undefined;
   /**
    * 这一条的色条用哪个 token（由宿主按 `quadrant` 解析好传下来）。
    * `undefined` = 用默认色（逾期/完成/主色那条既有优先级）。
@@ -201,6 +221,22 @@ export function groupTasksByCalendarDate(
 }
 
 /**
+ * 这条任务会不会重复。
+ *
+ * 本仓的权威字段是 `Task.repeatRule`（RFC 5545 RRULE 串）。同时认一个
+ * 历史的 / 上游形状的 `repeat` 字段（可为 `null`）：导入与旧快照里出现过，
+ * 而"格子里这条是不是重复任务"不该因为字段来源不同就判错。
+ *
+ * ⚠️ `false` 当"没有重复"：它只可能是"关掉了"的显式写法；把 `false`
+ *   当成重复会让普通任务莫名其妙长出循环图标。
+ */
+function taskRepeats(task: Task): boolean {
+  if (task.repeatRule !== undefined && task.repeatRule !== null) return true;
+  const legacyRepeat = (task as Task & { readonly repeat?: unknown }).repeat;
+  return legacyRepeat !== undefined && legacyRepeat !== null && legacyRepeat !== false;
+}
+
+/**
  * 把当天的任务（和倒数日）折成"可见条 + 被折叠数"。
  *
  * 排序是**有内容的**：逾期 → 未做 → 已做 → 倒数日。
@@ -263,6 +299,7 @@ export function calendarCellBars(
         title: task.title,
         done,
         overdue: !done && date < today,
+        kind: taskRepeats(task) ? 'repeat' : 'task',
         ...(spanKind === undefined ? {} : { span: spanKind }),
         ...(options?.now === undefined
           ? {}
@@ -285,6 +322,7 @@ export function calendarCellBars(
         done: false,
         overdue: false,
         event: true,
+        kind: 'event',
       },
       laneStart: date,
       multiDay: false,
@@ -480,7 +518,7 @@ export function calendarSelectedForCursor(
  * 🔴 为什么"整除"是硬规矩而不是好看：12 张卡摆 5 列会剩两张孤零零挂在最后一行，
  *   而那块空白在界面上读起来像"这一年只有 12 个月里的 10 个月有东西、剩下两格坏了"。
  *   这不是审美：日历上任何一处"看着像缺了什么"都会被当成数据没了 ——
- *   本仓为这一类症状记过一整页（`labels.footnote` 存在的理由就是它）。
+ *   本仓为这一类症状记过一整页。
  *   所以候选只有 1 / 2 / 3 / 4 / 6 / 12（12 的约数），取**装得下的那个里最大的**。
  *
  * ⚠️ 入参 `fits` 是宿主量出来的"这一宽能塞几张"（见 `CalendarYearBoard` 文件头：
@@ -721,13 +759,6 @@ export interface CalendarBoardLabels {
    * 真机上就是「11月15日 星期日 …… 0」—— 没单位没标签，读者要猜它是什么。
    */
   readonly dayCount: (count: number) => string;
-  /**
-   * 页脚那句"这一页看不到什么"。
-   *
-   * 🔴 它不是装饰：**没设截止时间的任务不会出现在日历上**，
-   * 不说清楚的话"任务没设时间"会被读成"任务丢了"。
-   */
-  readonly footnote: string;
   /** 当日列表里那些行自己的文案（勾选框读屏名等）—— 原样转交给共享 `TaskList`。 */
   readonly taskRow: TaskListLabels;
 }
@@ -763,8 +794,8 @@ export type CalendarToolbarLabels = Pick<
  * 而拼的过程中极易用上 UTC 口径 —— 结果是"凌晨到期的任务落到前一天"，
  * 且只对某些时区的用户复现。
  *
- * 没有截止但有排期起点的任务落在起点日；两者都没有才不进入日期格。
- * `labels.footnote` 仍要说明未排期任务不在日历上。
+ * 没有截止但有排期起点的任务落在起点日；两者都没有才不进入日期格 ——
+ * 这种任务不在日历上，它们在「任务」页的收集箱里（界面不再用一句话说明这件事）。
  */
 export function groupTasksByDueDate(tasks: readonly Task[]): Map<LocalDate, Task[]> {
   const map = new Map<LocalDate, Task[]>();
@@ -921,4 +952,63 @@ export function calendarEventBarTitle(
   const phrase =
     event.days === 0 ? labels.today : event.days > 0 ? labels.until(event.days) : labels.since(-event.days);
   return `${event.title} · ${phrase}`;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * ── 多日 / 多周网格（2026-11-25）──
+ *
+ * 🔴 与 `monthGrid` / `weekGrid` 同一条纪律：**日期算术全在 `@heyta/domain`**，
+ *   这里只决定"取哪些格、取几格"。本文件是多写者共享文件，所以这块只能追加。
+ * ───────────────────────────────────────────────────────────────────────── */
+
+/**
+ * 从 `cursor` 起连续 `days` 天。
+ *
+ * `weekStartsOn` 是**对齐**参数，不是"整体平移"：
+ *   · 不传（默认）—— 就从 `cursor` 当天开始，适合"日档往后看三天"这类连续段；
+ *   · `1` —— 回到这一周的**周一**再开始（月历/周历的列头是周一开头）；
+ *   · `7` —— 回到这一周的**周日**再开始。
+ *
+ * ⚠️ `days` 非整数/负数/非有限值一律按 0 处理（返回空数组）。
+ *   负数天不是"往前取"—— 那会让调用方以为自己在写一个区间，实际得到空，
+ *   而"日历少了一整段"在界面上会被读成数据没了。往前取请传更早的 `cursor`。
+ */
+export function multiDayGrid(
+  cursor: LocalDate,
+  days: number,
+  weekStartsOn?: 1 | 7,
+): readonly LocalDate[] {
+  const count = Number.isFinite(days) ? Math.floor(days) : 0;
+  if (count <= 0) return [];
+  // 通用公式对两档都成立：周一档回退 isoWeekday-1 天，周日档回退 isoWeekday%7 天。
+  const start =
+    weekStartsOn === undefined
+      ? cursor
+      : addDays(cursor, -((isoWeekday(cursor) - weekStartsOn + DAYS_PER_WEEK) % DAYS_PER_WEEK));
+  const dates: LocalDate[] = [];
+  for (let i = 0; i < count; i += 1) dates.push(addDays(start, i));
+  return dates;
+}
+
+/**
+ * 从 `cursor` 所在周的周一，连续铺 `weeks * 7` 格。
+ *
+ * 每格的 `inMonth` 与 `weekGrid` 同一口径：**属于 `cursor` 那个月吗** ——
+ * 不是"属于这一行的月"。理由见 `@heyta/domain` 的 `weekGrid`：一段周区间
+ * 本来就会跨月，逐行换参照会让同一个月在相邻两行里一半亮一半淡。
+ *
+ * ⚠️ `weeks` 非整数/负数/非有限值同样按 0 处理（空数组）；不在这里替调用方
+ *   截断成"最多几周"—— 视口能放几周是宿主的事（与 `calendarYearColumns` 同一条）。
+ */
+export function multiWeekGrid(cursor: LocalDate, weeks: number): readonly MonthGridCell[] {
+  const count = Number.isFinite(weeks) ? Math.floor(weeks) : 0;
+  if (count <= 0) return [];
+  const start = startOfWeek(cursor);
+  const prefix = cursor.slice(0, 7);
+  const cells: MonthGridCell[] = [];
+  for (let i = 0; i < count * DAYS_PER_WEEK; i += 1) {
+    const date = addDays(start, i);
+    cells.push({ date, inMonth: date.slice(0, 7) === prefix });
+  }
+  return cells;
 }

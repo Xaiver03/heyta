@@ -290,6 +290,11 @@ export type TextStyleName = keyof typeof TEXT_STYLES;
 
 /** 解析后的样式：可直接展开进 React Native 的 `Text` style。 */
 export interface RnTextStyle {
+  /**
+   * 字体族。**只有宿主打包了自定义字体时才填**（`native.fontSans`），省略 = 系统字体。
+   * 2026-11-27 加：共享组件的 `<Text>` 直接吃这几档样式，字体必须并进样式才覆盖得到。
+   */
+  readonly fontFamily?: string;
   readonly fontSize: number;
   /**
    * RN 的 `fontWeight` 是字符串联合（`'400' | '500' | …`），

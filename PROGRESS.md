@@ -7884,3 +7884,104 @@ python3 research/tools/verify-inbound-check-chain.py --logs <dir> --from 100 --t
 
 
 
+
+---
+
+## 2026-11-27 · AI 生成用例可用性清单 + AI 生成代码检视规则（+ 机械校验门禁）
+
+> 基线数字都是本机现量。**脏工作树随别的会话在变**，凡有漂移都标了取数时刻；本轮**未丢弃、未提交**任何他人改动。
+
+### 任务 0 · 基线（实测，未改动任何人未提交的改动）
+
+| 项 | 取数命令 | 实测 |
+|---|---|---|
+| 起始脏改动 | `git status --porcelain | wc -l` | **137**（11:57 起跑前） |
+| 基线快照 | 同上另存 `/tmp/dirty_snapshot.txt`，12:18:12 | **145**（其中 5 项是本轮我新增/改动，另 **140 项他人/预存在**） |
+| 分支 | `git branch --show-current` | `feat/app-auto-update` |
+| AGENTS.md 字节 | `wc -c AGENTS.md` | 18708（基线）→ 19121（加一行后，仍 < 24 KiB） |
+| `pnpm -r test` | 见下 | 🔴 **红且不稳定**（同一工作树两次失败集合不同） |
+| `pnpm check` | 见下 | 🔴 红（链内 `pnpm -r test` 已红 + `check:doc-command-claims` 另一 doc 已红；均**预存在**，非本轮引入） |
+
+**`pnpm -r test` 两次运行（证据表明是"预存在、非我所为"）：**
+- 12:00 单跑：断在 `packages/domain` → `tests/lunar.spec.ts`「逐日往返 1901–2100」**5000ms 超时**（该文件单跑本身 7.7s > 5s 上限）。
+- 12:07 `--no-bail` 全跑：`domain` / `landing` **转为全绿**，但 `apps/mobile` 5 红、`apps/node-host` 3 红、`server` 2 红。
+- ⇒ 本轮只新增了不涉及测试的文件，两次失败**集合却不同** ⇒ 环境 / 并发编辑导致的**不稳定**，不是某个可复现的代码缺陷。
+- 全量用例数（12:07 `--no-bail` 逐包汇总）：**17,278 例**（10 红分布在 mobile / node-host / server）。
+
+**`pnpm check` 预存在的两处红（本轮未引入）：**
+- 链内含 `pnpm -r test`（上面已红）⇒ `pnpm check` 必然红。
+- `check:doc-command-claims`：`docs/plans/gap-closure-task-model-2026-11-24.md` 第 67 行把一个**不存在**的 pnpm 脚本键（`deploy:ssh`）陈述成现行命令；该文件是**已提交、干净**的（不在脏改动里），与本轮无关。
+
+### 交付物（本轮 + 只新增，不改任何既有测试）
+
+| # | 交付 | 路径/改动 |
+|---|---|---|
+| 1 | AI 生成代码检视规则 | 新增 `docs/agents/ai-generated-code-review.md`（含 幻觉依赖 / 越权 / 硬编码密钥-ID / 空断言 / 只测正常流 / 顺序依赖） |
+| 2 | AI 生成用例可用性清单（五条可勾选） | 新增 `docs/agents/ai-generated-test-usability-checklist.md` |
+| 3 | 机械校验门禁（`--self-test` 6 臂） | 新增 `scripts/check-ai-case-usability.mjs` |
+| 3b | 接入 `pnpm check` | `package.json`：新增定义 `check:ai-case-usability`；链中插入 `pnpm check:ai-case-usability`（位于 `pnpm screenshot:verify` 与 `pnpm -r test` 之间） |
+| 4 | 规则地图登记 | `AGENTS.md` §4 加一行（指向上面规则 + 清单） |
+
+### 机械校验门禁 · 判据与射程
+
+- 判三类：`EMPTY_ASSERTION`（空断言）/ `ORDER_DEPENDENCY`（顺序依赖：`.only` + 模块级可变状态跨用例）/ `HARDCODED_ENV`（本机绝对路径 / 密钥 / 带口令连接串）。
+- 射程：只判**带 `// @ai-generated-case` 标记**的用例（存量两万+人类用例不扫，避免"狼来了"式全红）⇒ 代价：不写标记的 AI 用例逃出射程，靠检视规则强制要求标记。
+- 非恒真：每趟真跑先跑**内置阴阳性对照**（合规样本须 0 违规、坏样本须命中），对照不过 `exit 2`。
+
+### 新 check · 正反两次运行（验收要求"贴两次输出"）
+
+**① 反例（不合规用例）→ 红（EXIT=1）**
+```
+🔴 .../bad/case.spec.ts
+   [ORDER_DEPENDENCY] 第 5 行：seen = seen + 1;  ← 模块级可变量 seen（第 3 行声明）在用例内被改，跨用例共享状态
+   [HARDCODED_ENV] 第 6 行：const p = '/Users/rocalight/x';  ← 本机绝对路径 /Users/…
+   [HARDCODED_ENV] 第 7 行：const k = 'sk-ABCDEFGHIJKLMNOPQRSTUVWX';  ← 疑似 API Key sk-…
+   [EMPTY_ASSERTION] 第 8 行：expect(true).toBe(true);  ← 两侧同一字面量，恒真
+   [EMPTY_ASSERTION] 第 9 行：expect(p + k);  ← expect(...) 没有匹配器
+🔴 AI 生成用例可用性：5 条违规，分布在已声明的用例里
+```
+
+**② 正例（合规用例）→ 绿（EXIT=0）**
+```
+✅ AI 生成用例可用性：扫 1 枚用例（--all：忽略标记） ｜ 违规 0（内置阴阳性对照已通过）
+```
+
+**③ `--self-test` 6 臂**
+```
+✅ ① 合规用例 ⇒ 零违规（防恒红）
+✅ ② 空断言用例 ⇒ 报 EMPTY_ASSERTION
+✅ ③ 顺序依赖用例 ⇒ 报 ORDER_DEPENDENCY
+✅ ④ 硬编码用例 ⇒ 报 HARDCODED_ENV
+✅ ⑤ 目录级 --all：四枚里恰好 3 枚违规（合规那枚不误报）  ｜ 得到 3
+✅ ⑥ 未知旗标必须被拒
+臂数 6 ｜ 不符 0   （EXIT=0）
+```
+
+### 脏改动分类（快照 2026-11-27 12:18:12，共 145；**只分类，未丢弃任何人的改动**）
+
+- **本轮我新增/改动（5 项 + 本文件）：** `A docs/agents/ai-generated-code-review.md`、`A docs/agents/ai-generated-test-usability-checklist.md`、`A scripts/check-ai-case-usability.mjs`、`M AGENTS.md`、`M package.json`、`M PROGRESS.md`。**无任何测试文件改动。**
+- **他人 / 预存在（140 项）：** `M` 139 + `??` 1。按顶层区域：
+
+| 区域 | 数量 | 示例 |
+|---|---|---|
+| apps/ | 96 | `apps/desktop/src/app-update*.ts`、`apps/landing/src/mockup/*`、多端图标/资源 |
+| packages/ | 20 | `packages/ai/tests/*`、`packages/app-host/tests/*`、`packages/design-system/src/*` |
+| scripts/ | 9 | `check-css-layers.mjs`、`check-empty-state.mjs`、`gen-app-icons.mjs` 等 |
+| e2e/ | 8 | `tests/detail-*.spec.ts`、`tests/d0-remediation.spec.ts` 等 |
+| server/ | 3 | `src/feishu/feishu-auth-service.ts`、`tests/validation.service.spec.ts`、`image-npm-tree.json` |
+| docs/ | 2 | `docs/plans/r14-entry-table.md`、未跟踪 `docs/plans/legal-tool-disclosure-2026-11-26.md` |
+| research/ | 1 | `licenses-inventory.generated.md` |
+| 根 | 1 | `pnpm-lock.yaml` |
+
+> 明细另存 `/tmp/dirty_snapshot.txt`。工作树随其他会话在变，此表是 12:18:12 的快照。
+
+### 验收自检
+
+| 验收项 | 结果 |
+|---|---|
+| 规则文件含 幻觉 / 越权 / 硬编码 / 空断言（各≥1） | ✅ |
+| 清单含五条（一次跑通 / 断言 / 负例 / 顺序依赖 / 硬编码） | ✅ |
+| 新 check `--self-test` 通过（坏红 / 好绿，两组输出见上） | ✅ 6/6 |
+| `check:gate-wiring` / `check:scripts-parse` / `check:docs` / `check:md-tables` / `check:ai-case-usability` | ✅ 全绿 |
+| `pnpm -r test` / `pnpm check` 全绿 | ⚠️ **基线即红且不稳定**（预存在，见任务 0）；本轮 0 新增失败、用例数不变（未新增测试） |
+| 本次不新增未提交的测试改动 | ✅ 未碰任何测试文件 |

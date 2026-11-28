@@ -11,6 +11,38 @@
  * 移动端塌缩成单栏 + 底部导航。
  */
 
+/*
+ * 统一 RN-Web 共享组件的字体到设计令牌。
+ * --------------------------------------
+ * `@heyta/ui` 的共享组件（设置里的「桌面小组件」、各处空态「还没有清单 / 标签 / 通知」等）
+ * 在 web 端是 react-native-web 渲染的。它的 `Text` 自带一条默认字体栈
+ * `-apple-system, system-ui, Segoe UI, Roboto…`——**首项不是苹方**，于是这些文字会和
+ * 全站 `--ht-font-sans`（苹方）割裂，看上去"字体不对"。
+ *
+ * 这里只兜「没有显式指定字体」的文本：带 `r-fontFamily-*` 原子类（代码块 mono 等）
+ * 或写了内联 `font-family` 的，都不在匹配范围内，照旧。
+ */
+body [class*='css-text-']:not([class*='r-fontFamily-']) {
+  font-family: var(--ht-font-sans);
+}
+
+/*
+ * 共享 `SettingsSection`（`@heyta/ui`，RN-Web 渲染）在 web 上补成与老 `.ht-settings`
+ * 卡片**同一规格**:描边 + 圆角 + 白底 + 16px 内边距。
+ * --------------------------------------------------------------------
+ * 页面底色与卡片同为白（`color.surface` ≈ `color.background`），不描边时"这里是一张卡"
+ * 与"这里是一整块"在图上没有区别 —— 与老 `.ht-settings` 卡片 2026-10-24 补描边同一个理由。
+ * 老面板走 `.ht-settings` 已有整套卡片规格，迁到共享组件的新面板只有 gap（`variant` 未传），
+ * 于是同屏里一半是卡片、一半是裸文字，读起来"脏乱"。这条规则让两种实现外观一致。
+ * 选择器只命中「分组下、RN-Web `View` 直接子节点」这张卡片根，不碰老的 `.ht-settings` 段。
+ */
+.ht-settings__group > div[class*='css-view-'] {
+  border: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+  border-radius: var(--ht-radius-lg);
+  background: var(--ht-color-surface);
+  padding: var(--ht-space-4);
+}
+
 .ht-app {
   display: grid;
   /*
@@ -148,7 +180,7 @@ html.heyta-shell:not(.heyta-shell--active) .ht-rail__top {
      详情页里"到期复习/记录列表"这类区块会往下长，不该把整页推走。 */
   block-size: 100dvh;
   overflow-y: auto;
-  border-left: 0;
+  border-left: var(--ht-border-width-thin) solid var(--ht-color-border);
   background: var(--ht-color-surface);
   /* 这一栏从 2026-10-04 起**有内容**（任务视图里是 AI 面），所以左右必须有留白：
      `.ht-ai-panel` 自己不带 inline padding，挂在零留白的栏里会贴住左边那条
@@ -355,8 +387,21 @@ html.heyta-shell:not(.heyta-shell--active) .ht-rail__top {
  * 承重判据在 `e2e/tests/detail-pane-task.spec.ts`（逐控件 containment）。
  */
 .ht-app__detail-task {
+  display: flex;
+  flex-direction: column;
+  min-block-size: 100%;
   overflow-wrap: anywhere;
   padding: var(--ht-space-4);
+}
+
+.ht-app__detail-task .ht-compose textarea.ht-input {
+  min-block-size: calc(var(--ht-touch-target-min) * 2);
+  border-color: transparent;
+  background: var(--ht-color-surface-subtle);
+}
+
+.ht-app__detail-task .ht-compose textarea.ht-input:hover {
+  background: var(--ht-color-hover);
 }
 
 .ht-app__detail-heading {
@@ -368,41 +413,153 @@ html.heyta-shell:not(.heyta-shell--active) .ht-rail__top {
   color: var(--ht-color-foreground);
 }
 
-/* 专注页的次级入口：默认只显示当前配置摘要，详情按需展开。 */
+/* 专注页：单轴沉浸容器 + 环上方目标轻入口 + 按需展开的时长设置。 */
+.ht-content:has(.ht-app__focus) {
+  min-block-size: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+@media (min-width: 64rem) {
+  .ht-app:has(.ht-app__focus):not([data-detail='collapsed']):not([data-detail-empty]):not([data-detail-suppressed]) {
+    --ht-detail-track: clamp(
+      var(--ht-layout-detail-width),
+      var(--ht-detail-width, 42vw),
+      var(--ht-layout-detail-max-width)
+    );
+  }
+}
+
+.ht-app__focus {
+  padding: var(--ht-space-6);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ht-space-4);
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  box-sizing: border-box;
+}
+
+.ht-app__focus-target-wrap {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  max-width: var(--ht-layout-sidebar-width);
+}
+
+.ht-app__focus-target {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ht-space-1);
+  min-block-size: var(--ht-touch-target-min);
+  padding-inline: var(--ht-space-4);
+  border: 0;
+  border-radius: var(--ht-radius-full);
+  background: transparent;
+  color: var(--ht-color-foreground);
+  font: inherit;
+  cursor: pointer;
+  max-inline-size: 100%;
+  transition: background-color var(--ht-duration-fast) var(--ht-ease-standard);
+}
+
+.ht-app__focus-target:hover:not(:disabled) {
+  background: var(--ht-color-hover);
+}
+
+.ht-app__focus-target:disabled {
+  color: var(--ht-color-foreground-muted);
+  cursor: default;
+}
+
+.ht-app__focus-target-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ht-app__focus-target-menu {
+  position: absolute;
+  inset-block-start: calc(100% + var(--ht-space-1));
+  inset-inline-start: 50%;
+  transform: translateX(-50%);
+  z-index: var(--ht-z-popover);
+  min-inline-size: var(--ht-layout-sidebar-width);
+  max-block-size: calc(var(--ht-touch-target-min) * 6);
+  overflow-y: auto;
+  padding: var(--ht-space-1);
+  border-radius: var(--ht-radius-lg);
+  background: var(--ht-color-surface);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+  box-shadow: var(--ht-shadow-md);
+  display: flex;
+  flex-direction: column;
+}
+
+.ht-app__focus-target-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ht-space-2);
+  min-block-size: var(--ht-touch-target-min);
+  padding-inline: var(--ht-space-3);
+  border: 0;
+  border-radius: var(--ht-radius-md);
+  background: transparent;
+  color: var(--ht-color-foreground);
+  font: inherit;
+  font-size: var(--ht-font-size-sm);
+  text-align: start;
+  cursor: pointer;
+}
+
+.ht-app__focus-target-option:hover {
+  background: var(--ht-color-hover);
+}
+
+.ht-app__focus-target-option[aria-selected='true'] {
+  color: var(--ht-color-primary);
+  font-weight: var(--ht-font-weight-medium);
+}
+
+.ht-app__focus-target-option-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .ht-app__focus-settings {
   width: 100%;
   max-width: var(--ht-layout-sidebar-width);
   border-block-start: 0;
-  padding-block-start: var(--ht-space-2);
 }
 
 .ht-app__focus-settings-toggle {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--ht-space-3);
+  justify-content: center;
+  gap: var(--ht-space-2);
   min-block-size: var(--ht-touch-target-min);
-  padding-inline: var(--ht-space-1);
-  border-radius: var(--ht-radius-md);
-  color: var(--ht-color-foreground-muted);
+  padding-inline: var(--ht-space-3);
+  border-radius: var(--ht-radius-full);
+  color: var(--ht-color-foreground-subtle);
   cursor: pointer;
   list-style: none;
-  font-size: var(--ht-font-size-sm);
+  font-size: var(--ht-font-size-xs);
+}
+
+.ht-app__focus-settings-toggle:hover {
+  color: var(--ht-color-foreground-muted);
+  background: var(--ht-color-hover);
 }
 
 .ht-app__focus-settings-toggle::-webkit-details-marker {
   display: none;
-}
-
-.ht-app__focus-settings-toggle::after {
-  content: '+';
-  color: var(--ht-color-foreground-subtle);
-  font-size: var(--ht-font-size-lg);
-  line-height: var(--ht-line-height-tight);
-}
-
-.ht-app__focus-settings[open] .ht-app__focus-settings-toggle::after {
-  content: '−';
 }
 
 .ht-app__focus-settings-summary {
@@ -417,9 +574,15 @@ html.heyta-shell:not(.heyta-shell--active) .ht-rail__top {
   min-inline-size: 0;
   margin-block-start: var(--ht-space-2);
   padding: var(--ht-space-3);
-  border: 0;
-  border-radius: var(--ht-radius-md);
-  background: var(--ht-color-background);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+  border-radius: var(--ht-radius-lg);
+  background: var(--ht-color-surface);
+}
+
+.ht-app__focus-settings-locked {
+  margin: 0;
+  font-size: var(--ht-font-size-xs);
+  color: var(--ht-color-foreground-muted);
 }
 
 .ht-app__focus-settings-legend {
@@ -431,58 +594,215 @@ html.heyta-shell:not(.heyta-shell--active) .ht-rail__top {
   white-space: nowrap;
 }
 
-.ht-app__focus-task {
-  width: 100%;
-}
-
-.ht-app__detail-cards {
+/* ── 今日 Hero ──────────────────────────────────────────────────────
+ * 🔴 这里曾经是 2×2 四个同款灰框：**今日实时**与**历史累计**拿到一模一样的
+ * 视觉权重。但这两件事的阅读频率差一个量级 —— 今天做了多少是每次打开都要看的，
+ * 累计是偶尔瞟一眼的账。现在 hero 只装"今天"，账本降级成一行（见下面的 ledger）。
+ */
+.ht-app__detail-hero {
   display: grid;
-  /* 两列等宽；`minmax(0, 1fr)` 让长数字（"12 小时 30 分钟"）不会把列撑破。 */
+  /* 两格等宽并排：它们是同一个问题的两个面（做了几轮 / 做了多久），不是两张卡。 */
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--ht-space-3);
+  gap: var(--ht-space-4);
+  margin: 0;
+  padding: var(--ht-space-4);
+  border-radius: var(--ht-radius-lg);
+  /* 主色浅底 + 主色读数：这是整栏唯一的"有颜色"区域，层级靠颜色与字号一起表达。 */
+  background: var(--ht-color-primary-subtle);
+  border: var(--ht-border-width-thin) solid transparent;
 }
 
-.ht-app__detail-card {
+.ht-app__detail-hero-cell {
   display: flex;
   flex-direction: column;
   gap: var(--ht-space-1);
   min-inline-size: 0;
-  padding-block: var(--ht-space-2);
-  border-block-end: 0;
 }
 
-.ht-app__detail-card-label {
+.ht-app__detail-hero-label {
   /* 排版四件套来自语义档位类 `ht-type-caption`（JSX 与本类成对出现）。 */
   color: var(--ht-color-foreground-muted);
 }
 
-.ht-app__detail-card-value {
-  /* 🔴 `.tabular-nums` 不是装饰：番茄钟与统计数字不加它，
-     每次"25 → 24"这种变化都会让整列宽度抖一下（AGENTS §5 明列的常见错）。 */
-  font-size: var(--ht-font-size-xl);
-  font-weight: var(--ht-font-weight-semibold);
-  line-height: var(--ht-line-height-tight);
-  font-variant-numeric: tabular-nums;
+.ht-app__detail-hero-value {
+  /* 排版整条消费语义档位类 `ht-type-numeric-summary`（2xl / semibold / tight /
+     tabular-nums，JSX 与本类成对出现）。这里只留颜色 —— 自拼 `2xl+bold`
+     就是档位表外的第二套排版，而那张表"只许删不许加"。 */
+  margin: 0;
   color: var(--ht-color-foreground);
+  /* 长读数（"12 小时 30 分钟"）在两格里换行，而不是把格撑破。 */
+  overflow-wrap: anywhere;
 }
 
-.ht-app__detail-records {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ht-space-2);
+/* ── 七日脉搏 ──────────────────────────────────────────────────────
+ * 今天那一格在最右。强度只走 `data-level`（0..4），颜色映射在下面 ——
+ * 内联样式有配额（`check:l4` 断言 C），而且这层不该知道 token 叫什么。
+ */
+.ht-app__detail-pulse {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--ht-space-1);
   list-style: none;
   margin: 0;
   padding: 0;
 }
 
+.ht-app__detail-pulse-day {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+  min-inline-size: 0;
+}
+
+.ht-app__detail-pulse-bar {
+  display: block;
+  /* 12px 高：4px 时七格读起来像"一排虚线"，看不清这是一条随时间走的带子。 */
+  block-size: var(--ht-space-3);
+  border-radius: var(--ht-radius-sm);
+  /* 🔴 空格子**也有底色**（heat-0）：'那天没专注'与'没画这一格'必须是
+     两件看得出来的事 —— 与 `.ht-habit__dot` 同一条契约。 */
+  background: var(--ht-color-heat-0);
+}
+
+.ht-app__detail-pulse-day[data-level='1'] .ht-app__detail-pulse-bar {
+  background: var(--ht-color-heat-1);
+}
+
+.ht-app__detail-pulse-day[data-level='2'] .ht-app__detail-pulse-bar {
+  background: var(--ht-color-heat-2);
+}
+
+.ht-app__detail-pulse-day[data-level='3'] .ht-app__detail-pulse-bar {
+  background: var(--ht-color-heat-3);
+}
+
+.ht-app__detail-pulse-day[data-level='4'] .ht-app__detail-pulse-bar {
+  background: var(--ht-color-heat-4);
+}
+
+/* 今天那一格加一圈描边：它是"今日 Hero"的时间锚点，而 hero 就在它上面。 */
+.ht-app__detail-pulse-day[data-today] .ht-app__detail-pulse-bar {
+  outline: var(--ht-border-width-thin) solid var(--ht-color-primary);
+  outline-offset: var(--ht-border-width-thin);
+}
+
+.ht-app__detail-pulse-legend {
+  /* 这是给屏幕阅读器/无颜色用户的文字事实，视觉上不占位。 */
+  position: absolute;
+  inline-size: var(--ht-space-1);
+  block-size: var(--ht-space-1);
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ── 累计账本 ──────────────────────────────────────────────────────
+ * 刻意**不是**卡片：没有底色、没有边框、一行左右对齐。
+ * 与上面的 hero 形成"实时 vs 账本"的层级差，这两个数不该跟今日抢注意力。
+ */
+.ht-app__detail-ledger {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+  margin: 0;
+  padding-block: var(--ht-space-1);
+  border-block-start: var(--ht-border-width-hairline) solid var(--ht-color-border-subtle);
+}
+
+.ht-app__detail-ledger-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--ht-space-3);
+  min-inline-size: 0;
+}
+
+.ht-app__detail-ledger-label {
+  /* 排版四件套来自语义档位类 `ht-type-row-meta`（JSX 与本类成对出现）。 */
+  color: var(--ht-color-foreground-muted);
+}
+
+.ht-app__detail-ledger-value {
+  margin: 0;
+  font-size: var(--ht-font-size-sm);
+  font-weight: var(--ht-font-weight-medium);
+  line-height: var(--ht-line-height-normal);
+  font-variant-numeric: tabular-nums;
+  color: var(--ht-color-foreground-muted);
+  white-space: nowrap;
+}
+
+/* ── 记录时间线 ────────────────────────────────────────────────────
+ * 左边一条竖线串起状态节点，右边是内容。原来是平铺的行，
+ * 读起来像一张表；时间线让"今天怎么过的"有先后感。
+ */
+.ht-app__detail-records {
+  display: flex;
+  flex-direction: column;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  /* 竖线画在节点列的中间（节点 8px ⇒ 中心 4px）。 */
+  position: relative;
+}
+
 .ht-app__detail-record {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: var(--ht-space-1) var(--ht-space-2);
-  align-items: baseline;
+  grid-template-columns: var(--ht-space-2) minmax(0, 1fr) auto;
+  gap: var(--ht-space-1) var(--ht-space-3);
+  align-items: start;
   padding-block: var(--ht-space-2);
-  border-block-start: 0;
-  /* 排版四件套来自语义档位类 `ht-type-row-meta`（JSX 与本类成对出现）。 */
+  /* 竖线：每一行画自己那一小段，最后一行靠 `last-child` 收尾（见下）。 */
+  position: relative;
+}
+
+.ht-app__detail-record:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  /* 对齐节点列的中心；从本行节点往下穿到下一行。 */
+  inset-inline-start: calc(var(--ht-space-1) - var(--ht-border-width-hairline));
+  inset-block: var(--ht-space-3) calc(-1 * var(--ht-space-3));
+  inline-size: var(--ht-border-width-hairline);
+  background: var(--ht-color-border-subtle);
+}
+
+.ht-app__detail-record-node {
+  /* 状态节点：完成 = 实心（主色），放弃 = 空心环（描边）。
+     🔴 与"未关联任务"那个词无关 —— 状态必须有一个不依赖文字的记号。 */
+  grid-column: 1;
+  inline-size: var(--ht-space-2);
+  block-size: var(--ht-space-2);
+  margin-block-start: var(--ht-space-1);
+  border-radius: var(--ht-radius-full);
+  background: var(--ht-color-primary);
+}
+
+.ht-app__detail-record[data-completed] .ht-app__detail-record-node {
+  /* 完成：实心。 */
+  background: var(--ht-color-primary);
+}
+
+.ht-app__detail-record:not([data-completed]) .ht-app__detail-record-node {
+  /* 中途放弃：空心环 —— 与完成在**形状**上就不同，不靠颜色区分。 */
+  background: transparent;
+  border: var(--ht-border-width-thin) solid var(--ht-color-foreground-muted);
+}
+
+.ht-app__detail-record-body {
+  grid-column: 2;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+  min-inline-size: 0;
+}
+
+.ht-app__detail-record-task {
+  /* 任务名是最长的一段，给它整行的省略权而不是把列撑破。 */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ht-color-foreground);
 }
 
 .ht-app__detail-record-time {
@@ -490,22 +810,60 @@ html.heyta-shell:not(.heyta-shell--active) .ht-rail__top {
   color: var(--ht-color-foreground-muted);
 }
 
+.ht-app__detail-record-tail {
+  grid-column: 3;
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+}
+
 .ht-app__detail-record-duration {
   font-variant-numeric: tabular-nums;
   color: var(--ht-color-foreground);
-}
-
-.ht-app__detail-record-task {
-  /* 任务名是最长的一段，给它整行的省略权而不是把列撑破。 */
-  grid-column: 1 / -1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--ht-color-foreground-muted);
 }
 
 .ht-app__detail-record-aborted {
   /* 排版四件套来自语义档位类 `ht-type-caption`（JSX 与本类成对出现）。 */
   color: var(--ht-color-foreground-muted);
+  white-space: nowrap;
+}
+
+/* 时长能量条：宽度按实际专注时长分档。
+ * 🔴 25 分钟与 50 分钟必须一眼分得开 —— 两行字排在一起时，
+ * 差一倍得靠读数字才看得出来，而这一栏的作用正是"扫一眼就知道今天怎么过的"。
+ * 档位只走 `data-level`（0..4），与七日脉搏同一个分档函数。 */
+.ht-app__detail-record-energy {
+  display: block;
+  inline-size: var(--ht-space-8);
+  block-size: var(--ht-space-1);
+  border-radius: var(--ht-radius-full);
+  /* 轨道也可见：'很短的一段'与'没画这条'要分得开。 */
+  background: var(--ht-color-heat-0);
+  overflow: hidden;
+}
+
+.ht-app__detail-record-energy-fill {
+  display: block;
+  block-size: 100%;
+  border-radius: inherit;
+  background: var(--ht-color-primary);
+  /* 默认 0 档：不画（但轨道还在，所以"没有"与"没画"仍然分得开）。 */
+  inline-size: 0;
+}
+
+.ht-app__detail-record-energy[data-level='1'] .ht-app__detail-record-energy-fill {
+  inline-size: 25%;
+}
+
+.ht-app__detail-record-energy[data-level='2'] .ht-app__detail-record-energy-fill {
+  inline-size: 50%;
+}
+
+.ht-app__detail-record-energy[data-level='3'] .ht-app__detail-record-energy-fill {
+  inline-size: 75%;
+}
+
+.ht-app__detail-record-energy[data-level='4'] .ht-app__detail-record-energy-fill {
+  inline-size: 100%;
 }

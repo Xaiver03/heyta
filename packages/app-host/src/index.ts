@@ -61,6 +61,8 @@ export {
  */
 export {
   focusOverview,
+  FOCUS_PULSE_DAYS,
+  type FocusDayPulse,
   type FocusOverview,
   type FocusRecord,
 } from './focus-overview.js';

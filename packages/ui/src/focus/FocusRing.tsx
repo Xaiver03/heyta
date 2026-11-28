@@ -172,7 +172,7 @@ export function FocusRing({
           r={radius}
           fill="none"
           stroke={tokens['color.border']}
-          strokeWidth={stroke}
+          strokeWidth={tokens['border-width.thick'] * 2}
         />
         {variant === 'dial' ? (
           <>

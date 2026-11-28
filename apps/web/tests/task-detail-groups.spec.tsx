@@ -1,18 +1,21 @@
 /**
- * 任务面单的四分组 + 「高级」折叠（工单 W6，审计 §4.6）
+ * 任务面单的三段式紧凑面单 + 按需浮层
  * ==========================================================
  *
- * 审计 §4.6 的原话是「详情列功能太全、层级不够」：七格字段一条纵向平铺，
- * 备注/子任务/清单/重复/RRULE/截止/提醒之间没有任何层级。整改两刀：
+ * 面单从「四分组纵向平铺」收紧成**三段式紧凑面单**：
  *
- *   1. **固定四组**：基本信息（标题/备注）→ 时间（截止/提醒）→
- *      组织（清单/标签/子任务/优先级）→ 自动化（重复），每组装一枚分组头；
- *   2. **原始 RRULE 收进「高级」**：预设与当前规则常驻可见，自定义 RRULE
- *      的文本框放进默认折叠的 `<details>`，展开后校验行为不变。
+ *   · 头部：标题 + 备注（`task-detail-header`，标题 → 备注）；
+ *   · 正文：默认**不常驻**任何编辑器 —— 截止 / 提醒 / 重复 / 子任务各由
+ *     一枚触发器（`task-detail-*-trigger`）按需弹出浮层（`task-detail-popover`），
+ *     同一时刻只允许一只浮层；`Escape` 即关；
+ *   · 底栏工具条（`task-detail-toolbar`）。
  *
- * 这一层钉的是**排布本身**（分组头存在、有序、字段住进语义正确的组），
+ * 这一层钉的是**默认形态与浮层的开关**（默认不铺编辑器、浮层互斥、Escape 即关），
  * 不重复钉各格的提交语义（那是 `task-detail-card.spec.tsx` 与
  * `task-detail-edit.spec.tsx` 的地盘 —— 本刀是纯排布：不新增字段、不改接线）。
+ *
+ * 原始 RRULE 仍收在重复浮层里的「高级」折叠中：默认收起、预设单选在外，
+ * 展开后校验行为不变。
  *
  * 零 mock：走真 op-log（fake-indexeddb），与既有面单套件同一形状。
  */
@@ -69,6 +72,27 @@ async function addTask(title: string): Promise<string> {
 
 const pane = () => document.querySelector('[data-testid="task-pane"]');
 
+/** b 在 a 之后（同一棵子树里用文档位置比，不猜 DOM 结构）。 */
+const follows = (a: Element, b: Element): boolean =>
+  (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+
+/** 全文档里的浮层（可能被 Portal 到 body，所以从 document 取）。 */
+const popovers = (): HTMLElement[] => [
+  ...document.querySelectorAll<HTMLElement>('[data-testid="task-detail-popover"]'),
+];
+
+function triggerEl(testId: string): HTMLElement {
+  const el = document.querySelector<HTMLElement>(`[data-testid="${testId}"]`);
+  if (el === null) throw new Error(`没找到触发器 ${testId} ⇒ 判据在空转`);
+  return el;
+}
+
+async function click(el: HTMLElement): Promise<void> {
+  await act(async () => {
+    el.click();
+  });
+}
+
 beforeEach(async () => {
   (globalThis as unknown as { indexedDB: IDBFactory }).indexedDB = new IDBFactory();
   (globalThis as unknown as { IDBKeyRange: typeof IDBKeyRange }).IDBKeyRange = IDBKeyRange;
@@ -91,104 +115,88 @@ afterEach(() => {
   selection.clear();
 });
 
-describe('四分组（W6，审计 §4.6）', () => {
-  /** b 在 a 之后（同一棵子树里用文档位置比，不猜 DOM 结构）。 */
-  const follows = (a: Element, b: Element): boolean =>
-    (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
-
-  it('🔴 四个分组头按序渲染（基本信息 → 时间 → 组织 → 自动化），且各恰好一枚', async () => {
-    const id = await addTask('分组甲');
-    selection.select('task', id);
-    mount();
-    const box = pane();
-    if (box === null) throw new Error('栏里没画面单 ⇒ 这一族判据在空转');
-    const groups = [...box.querySelectorAll<HTMLElement>('h3[data-testid="task-detail-group"]')].map(
-      (h) => h.textContent,
-    );
-    expect(groups, '四个分组头没按序画出来').toEqual([
-      zhCN['web.tasks.detail.section.basic'],
-      zhCN['web.tasks.detail.section.time'],
-      zhCN['web.tasks.detail.section.organize'],
-      zhCN['web.tasks.detail.section.automation'],
-    ]);
-  });
-
-  it('🔴 每个字段住进语义正确的组：组头在组员之前、下一组头之前住完（优先级在「组织」）', async () => {
-    const id = await addTask('分组乙');
+describe('三段式紧凑面单：默认不铺编辑器', () => {
+  it('🔴 普通任务默认态：分组/截止/提醒/重复/协作/空附件态一律不渲染，头部四处按序', async () => {
+    const id = await addTask('紧凑甲');
     selection.select('task', id);
     mount();
     const box = pane();
     if (box === null) throw new Error('栏里没画面单 ⇒ 这一族判据在空转');
 
-    const g = (key: 'basic' | 'time' | 'organize' | 'automation'): Element => {
-      const el = [...box.querySelectorAll('h3[data-testid="task-detail-group"]')].find(
-        (h) => h.textContent === zhCN[`web.tasks.detail.section.${key}`],
-      );
-      if (el === undefined) throw new Error(`没找到「${key}」分组头 ⇒ 判据在空转`);
-      return el;
-    };
-    const field = (selector: string): Element => {
-      const el = box.querySelector(selector);
-      if (el === null) throw new Error(`没找到 ${selector} ⇒ 判据在空转`);
-      return el;
-    };
+    // 默认态是紧凑的：这些常驻块/编辑器一个都不该挂出来。
+    expect(document.querySelectorAll('h3[data-testid="task-detail-group"]'), '不该再有四分组头').toHaveLength(0);
+    expect(document.querySelectorAll('[data-testid="date-picker"]'), '截止编辑器不该常驻').toHaveLength(0);
+    expect(document.querySelectorAll('[data-testid^="reminder-list-"]'), '提醒列表不该常驻').toHaveLength(0);
+    expect(document.querySelectorAll('input[type="radio"]'), '重复预设不该常驻').toHaveLength(0);
+    expect(document.querySelectorAll('[data-testid="task-detail-collaboration"]'), '协作区不该常驻').toHaveLength(0);
+    expect(document.querySelectorAll('[data-testid="task-attachments-empty"]'), '空附件态不该常驻').toHaveLength(0);
 
-    const basic = g('basic');
-    const time = g('time');
-    const organize = g('organize');
-    const automation = g('automation');
-
-    // 基本信息：备注（标题 h2 在四枚组头之前，是统领元素不是组员）。
-    expect(follows(basic, field('[data-testid="task-note-input"]')), '备注不在基本信息组').toBe(true);
-    // 时间：截止月历 + 提醒列表。
-    expect(follows(time, field('[data-testid="date-picker"]')), '截止不在时间组').toBe(true);
-    expect(follows(time, field(`[data-testid="reminder-list-${id}"]`)), '提醒不在时间组').toBe(true);
-    // 组织：清单下拉 + 子任务 select + 优先级 select（🔴 优先级归组织不归时间，
-    // 裁决理由在 TaskDetailCard 文件头 —— 判据钉的就是这条裁决本身）。
-    expect(follows(organize, field('[data-testid="organize-project-select"]')), '清单不在组织组').toBe(true);
-    expect(follows(organize, field(`[data-testid="subtask-select-${id}"]`)), '子任务不在组织组').toBe(true);
-    expect(
-      follows(organize, field('[data-testid="task-priority-select"]')),
-      '优先级不在组织组（它不是时间量，W6 把它从截止/提醒之间挪了过来）',
-    ).toBe(true);
-    // 自动化：重复的预设单选。
-    expect(follows(automation, field('[data-testid="task-repeat-custom-input"]')), '重复不在自动化组').toBe(true);
-
-    // 组员必须**住在本组里**：出现在下一枚组头之前（不许跨组串门）。
-    // `follows(member, next)` = 组员在下一枚组头**之前**（本文件 follows 的唯一语义，
-    // 与上面全部正向断言一致）——住对了组它就是 true；写反成 false 会让循环在
-    // 第一个组员就红（2026-10-06 实测：断言 authoring bug，非实现 bug）。
-    for (const [group, member] of [
-      [basic, field('[data-testid="task-note-input"]')],
-      [time, field('[data-testid="date-picker"]')],
-      [time, field(`[data-testid="reminder-list-${id}"]`)],
-      [organize, field('[data-testid="organize-project-select"]')],
-      [organize, field(`[data-testid="subtask-select-${id}"]`)],
-      [organize, field('[data-testid="task-priority-select"]')],
-    ] as const) {
-      const next =
-        group === basic ? time : group === time ? organize : automation;
-      expect(
-        follows(member, next),
-        '字段没能在下一枚组头之前住完（跨组串门 / 组序错位）',
-      ).toBe(true);
+    // 头部四处按文档顺序：header → title → note-input → toolbar。
+    const header = box.querySelector('[data-testid="task-detail-header"]');
+    const title = box.querySelector('[data-testid="task-detail-title"]');
+    const note = box.querySelector('[data-testid="task-note-input"]');
+    const toolbar = box.querySelector('[data-testid="task-detail-toolbar"]');
+    if (header === null || title === null || note === null || toolbar === null) {
+      throw new Error('头部四处没画全 ⇒ 这一族判据在空转');
     }
+    expect(follows(header, title), '标题不在头部之后').toBe(true);
+    expect(follows(title, note), '备注不在标题之后').toBe(true);
+    expect(follows(note, toolbar), '工具条不在备注之后').toBe(true);
   });
 });
 
-describe('RRULE 收进「高级」（W6，审计 §4.6）', () => {
-  it('🔴 默认折叠：`<details>` 在栏里但 open=false；预设单选不被藏（radio 不在折叠里）', async () => {
+describe('按需浮层：四个触发器，任意时刻只有一只浮层', () => {
+  it('🔴 依次展开截止/提醒/重复/子任务 ⇒ 浮层互斥；Escape 关闭', async () => {
+    const id = await addTask('浮层甲');
+    selection.select('task', id);
+    mount();
+    if (pane() === null) throw new Error('栏里没画面单 ⇒ 这一族判据在空转');
+
+    const cases = [
+      { trigger: 'task-detail-due-trigger', editor: '[data-testid="date-picker"]', name: '截止' },
+      { trigger: 'task-detail-reminder-trigger', editor: '[data-testid^="reminder-list-"]', name: '提醒' },
+      { trigger: 'task-detail-repeat-trigger', editor: '[data-testid="task-repeat-advanced"]', name: '重复' },
+      { trigger: 'task-detail-subtask-trigger', editor: '[data-testid^="subtask-select-"]', name: '子任务' },
+    ] as const;
+
+    for (const item of cases) {
+      await click(triggerEl(item.trigger));
+      const open = popovers();
+      expect(open, `点了「${item.name}」后浮层数不对（应恰好一只）`).toHaveLength(1);
+      expect(open[0]!.querySelector(item.editor), `「${item.name}」浮层里没有对应编辑器`).not.toBeNull();
+    }
+
+    // 最后一只（子任务）用 Escape 关掉 —— 键盘关闭与真浏览器同一条路。
+    const last = popovers()[0];
+    if (last === undefined) throw new Error('最后一只浮层不见了 ⇒ 判据在空转');
+    await act(async () => {
+      last.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    });
+    expect(popovers(), 'Escape 之后浮层还在').toHaveLength(0);
+  });
+});
+
+describe('RRULE 收进「高级」（默认折叠，展开后校验照旧）', () => {
+  /** 点重复触发器打开浮层，再把「高级」折叠交给调用方。 */
+  async function openRepeatPopover(): Promise<{ popover: HTMLElement; advanced: HTMLDetailsElement }> {
+    await click(triggerEl('task-detail-repeat-trigger'));
+    const popover = document.querySelector<HTMLElement>('[data-testid="task-detail-popover"]');
+    if (popover === null) throw new Error('重复浮层没打开 ⇒ 判据在空转');
+    const advanced = popover.querySelector<HTMLDetailsElement>('[data-testid="task-repeat-advanced"]');
+    if (advanced === null) throw new Error('浮层里没有「高级」折叠 ⇒ 判据在空转');
+    return { popover, advanced };
+  }
+
+  it('🔴 默认折叠：`<details>` 在浮层里但 open=false；预设单选不被藏（radio 不在折叠里）', async () => {
     const id = await addTask('高级甲');
     selection.select('task', id);
     mount();
-    const box = pane();
-    if (box === null) throw new Error('栏里没画面单 ⇒ 这一族判据在空转');
-    const advanced = box.querySelector<HTMLDetailsElement>('[data-testid="task-repeat-advanced"]');
-    if (advanced === null) throw new Error('栏里没有「高级」折叠 ⇒ 判据在空转');
+
+    const { popover, advanced } = await openRepeatPopover();
     expect(advanced.open, '「高级」默认就该收起').toBe(false);
     expect(advanced.querySelector('summary')?.textContent).toBe(zhCN['web.tasks.detail.advanced']);
     // 预设常驻可见：预设单选在折叠**外面**（藏在折叠里 = 主编辑器默认看不见）。
-    const radios = [...box.querySelectorAll<HTMLInputElement>('input[type="radio"]')];
+    const radios = [...popover.querySelectorAll<HTMLInputElement>('input[type="radio"]')];
     expect(radios.length, '预设单选没画出来').toBeGreaterThan(2);
     expect(radios.every((r) => !advanced.contains(r)), '预设单选被藏进了「高级」').toBe(true);
   });
@@ -197,10 +205,8 @@ describe('RRULE 收进「高级」（W6，审计 §4.6）', () => {
     const id = await addTask('高级乙');
     selection.select('task', id);
     mount();
-    const box = pane();
-    if (box === null) throw new Error('栏里没画面单 ⇒ 这一族判据在空转');
-    const advanced = box.querySelector<HTMLDetailsElement>('[data-testid="task-repeat-advanced"]');
-    if (advanced === null) throw new Error('栏里没有「高级」折叠 ⇒ 判据在空转');
+
+    const { advanced } = await openRepeatPopover();
 
     // jsdom 实现 summary 的激活行为：点 summary 翻转 open —— 与真浏览器同一条路。
     await act(async () => {

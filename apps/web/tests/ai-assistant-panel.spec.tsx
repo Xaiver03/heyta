@@ -323,11 +323,12 @@ describe('🔴 一次性披露在循环之前', () => {
 
   it('🔴 未确认的提案卡同样带显式标识（提案文字是模型写的）', async () => {
     const host = fakeHost();
+    // 任务写已改为免确认自动执行；用**非任务**（记忆，必须确认）来覆盖提案卡路径。
     const { impl } = scriptedFetch([
-      { kind: 'call', id: 'c1', name: 'complete_task', args: '{"taskIds":["t1","t2"]}' },
+      { kind: 'call', id: 'c1', name: 'remember_memory', args: '{"text":"我偏好早上做难事"}' },
     ]);
     const el = await render({ host, fetchImpl: impl });
-    await type(el, '把买咖啡和写周报都完成');
+    await type(el, '记住我偏好早上做难事');
     await click(el, 'ai-assistant-send-button');
     await click(el, 'ai-assistant-send');
 
@@ -581,13 +582,18 @@ describe('🔴 助手请求竞态：一次发送、一次运行、一次会话',
 });
 
 describe('Chatbot IA：历史列与中央空态', () => {
-  it('空会话把新会话、历史、问候和紧凑建议收进同一个 Chatbot', async () => {
+  it('空会话显示行动号召与紧凑建议，点建议把整句填进输入框', async () => {
     const el = await render({ host: fakeHost(), fetchImpl: scriptedFetch([{ kind: 'text', text: '好。' }]).impl });
     expect(el.querySelector('[data-testid="ai-assistant-history"]')).not.toBeNull();
-    expect(el.querySelector('[data-testid="ai-assistant-greeting"]')).toBeNull();
+    expect(el.querySelector('[data-testid="ai-assistant-greeting"]')?.textContent).toContain('马上行动起来吧');
     expect(el.querySelector('[data-testid="ai-assistant-new-session"]')).not.toBeNull();
-    expect(el.querySelectorAll('[data-testid^="ai-assistant-suggestion-"]')).toHaveLength(0);
+    expect(el.querySelectorAll('[data-testid^="ai-assistant-suggestion-"]')).toHaveLength(4);
     expect(el.querySelector('[data-testid="ai-assistant-input"]')).not.toBeNull();
+
+    // 点一枚建议 ⇒ 把整句**填进输入框**（不直接发送，也不产生请求）。
+    await click(el, 'ai-assistant-suggestion-today');
+    const input = el.querySelector<HTMLTextAreaElement>('[data-testid="ai-assistant-input"]');
+    expect(input?.value).toContain('今天');
   });
 
   /**
@@ -631,13 +637,13 @@ describe('🔴 写：低风险自动执行，高风险提案确认', () => {
     expect(host.submits).toBe(1);
   });
 
-  it('高风险批量完成任务 ⇒ 按下确认才落库：submit 从 0 变 1', async () => {
+  it('非任务的高风险写（记忆）⇒ 按下确认才落库：submit 从 0 变 1', async () => {
     const host = fakeHost();
     const { impl } = scriptedFetch([
-      { kind: 'call', id: 'c1', name: 'complete_task', args: '{"taskIds":["t1","t2"]}' },
+      { kind: 'call', id: 'c1', name: 'remember_memory', args: '{"text":"我偏好早上做难事"}' },
     ]);
     const el = await render({ host, fetchImpl: impl });
-    await type(el, '记一下 买咖啡');
+    await type(el, '记住我偏好早上做难事');
     await click(el, 'ai-assistant-send-button');
     await click(el, 'ai-assistant-send');
     await click(el, 'ai-chat-confirm');
@@ -649,12 +655,12 @@ describe('🔴 写：低风险自动执行，高风险提案确认', () => {
   it('🔴 提案之后**没有第二次模型调用**（模型看不到它被批准）', async () => {
     const host = fakeHost();
     const { impl, bodies } = scriptedFetch([
-      { kind: 'call', id: 'c1', name: 'complete_task', args: '{"taskIds":["t1","t2"]}' },
+      { kind: 'call', id: 'c1', name: 'remember_memory', args: '{"text":"我偏好早上做难事"}' },
       // 故意留一条：循环没停在提案上就会消费它、请求数变成 2。
       { kind: 'text', text: '我还想再问一句' },
     ]);
     const el = await render({ host, fetchImpl: impl });
-    await type(el, '记一下 买咖啡');
+    await type(el, '记住我偏好早上做难事');
     await click(el, 'ai-assistant-send-button');
     await click(el, 'ai-assistant-send');
     await click(el, 'ai-chat-confirm');

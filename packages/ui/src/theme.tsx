@@ -311,6 +311,27 @@ export function resolveHeytaUiTheme(options?: {
     options?.fontScale !== undefined && options.fontScale !== 1
       ? scaleFontSizeTokens(tokens, options.fontScale)
       : tokens;
+  const native = resolveNativeAccessors(tokens, options?.packagedFonts ?? DEFAULT_PACKAGED_FONTS);
+  const baseText = resolveAllTextStyles(scaledTokens);
+  /**
+   * 🔴 2026-11-27：把 `fontSans` 写进**每一档文字样式**。
+   *
+   * 共享组件（如设置行 `SettingsRow`）直接用 `react-native` 的 `<Text>` + `text['row-title']`，
+   * 不走移动端 kit 的 `<Text>` —— 所以宿主打包了字体（`packagedFonts`）后，只靠 kit 那一层
+   * 加 `fontFamily` **覆盖不到共享组件**：实测设置行仍是系统字体（截图逐行比对 0% 变化）。
+   * 把字体族并进文字样式表，则"所有用 `useHeytaText()` 的文字"一致命中。
+   * 没有打包字体时（`fontSans` 为 undefined）保持原样，系统字体行为不变。
+   */
+  const text: Record<TextStyleName, RnTextStyle> =
+    native.fontSans === undefined
+      ? baseText
+      : (Object.keys(baseText) as TextStyleName[]).reduce(
+          (acc, key) => {
+            acc[key] = { ...baseText[key], fontFamily: native.fontSans };
+            return acc;
+          },
+          {} as Record<TextStyleName, RnTextStyle>,
+        );
   return {
     theme,
     preset: options?.preset,
@@ -318,8 +339,8 @@ export function resolveHeytaUiTheme(options?: {
     reducedTransparency,
     tokens: scaledTokens,
     // 排版与主题无关 —— 换主题只该换颜色，不该让版面重排。
-    text: resolveAllTextStyles(scaledTokens),
-    native: resolveNativeAccessors(tokens, options?.packagedFonts ?? DEFAULT_PACKAGED_FONTS),
+    text,
+    native,
   };
 }
 

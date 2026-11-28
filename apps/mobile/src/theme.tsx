@@ -14,14 +14,17 @@
  * 名字**（16 个文件 `import … from '../theme'`），好让收敛不用改任何调用点。
  *
  * ─────────────────────────────────────────────────────────────────────────
- * 平台差异只剩一件：**打包了哪些字体**
+ * 平台差异只剩一件：**这一端可用的字体名**
  *
- * `@heyta/ui` 的 `native.fontSans` 需要一个"已打包字体"清单（`resolveFontFamily`
- * 只返回登记过的字体名，见那边 `DEFAULT_PACKAGED_FONTS` 的许可证说明）。
- * 移动端目前一个都没打包，而共享层的默认就是空清单（系统字体），
- * 所以这里连 prop 都不用传。
+ * `@heyta/ui` 的 `native.fontSans` 只认登记在 `packagedFonts` 里的真实字体名
+ * （见那边 `resolveFontFamily` 与 `DEFAULT_PACKAGED_FONTS` 的说明）。
  *
- * 将来真要打包品牌字体时，在 `app.tsx` 把清单传给 Provider
+ * 🔴 2026-11-27 定案：**Android 随包自带鸿蒙黑体**（`PLATFORM_PACKAGED_FONTS` 登记
+ * `HarmonyOS_Sans_SC`，文件在 `android/.../assets/fonts/`）；**iOS 不打包，走系统字**
+ * （产品口径：iOS 就用系统苹方）。清单在 iOS 上为空 → `fontSans` undefined → 系统字体
+ * （中文即 PingFang SC、拉丁 SF）。
+ *
+ * 将来真要打包自带字体（如思源黑体）时，同样在 `app.tsx` 把字体名加进清单
  * （`<HeytaUiProvider packagedFonts={…}>`）—— 但**不要**在这里重新解析 token。
  *
  * 🔴 门禁 `scripts/check-theme-single-source.mjs` 钉住这条边界：

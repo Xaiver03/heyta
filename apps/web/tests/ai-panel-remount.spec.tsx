@@ -448,13 +448,13 @@ describe('账号绑定：换账号不许带一个字', () => {
     let finish: ((result: { ok: true; taskId: string }) => void) | undefined;
     const host = { ...fakeHost(), submit: () => new Promise<{ ok: true; taskId: string }>((resolve) => { finish = resolve; }) } as LocalApiHost;
     const fetchImpl = (() => Promise.resolve(new Response(JSON.stringify({ choices: [{ message: {
-      role: 'assistant', content: '', tool_calls: [{ id: 'checklist', type: 'function', function: {
-        name: 'append_task_checklist', arguments: JSON.stringify({ taskId: 't1', items: ['待确认清单'] }),
+      role: 'assistant', content: '', tool_calls: [{ id: 'remember', type: 'function', function: {
+        name: 'remember_memory', arguments: JSON.stringify({ text: '我偏好早上做难事' }),
       } }],
     } }] }), { status: 200, headers: { 'content-type': 'application/json' } }))) as typeof fetch;
     setAccount('a@example.com');
     const el = await mount({ slot: 'detail', host, fetchImpl });
-    await type(el, '帮任务增加清单');
+    await type(el, '记住我偏好早上做难事');
     await click(el, 'ai-assistant-send-button');
     await click(el, 'ai-assistant-send');
     await click(el, 'ai-chat-confirm');

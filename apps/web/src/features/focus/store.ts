@@ -155,8 +155,12 @@ async function persist(session: FocusSession): Promise<void> {
 }
 
 /**
- * 空概览。只用于"引擎还没就绪时的那一份初值" —— 四个 0 与一个空列表，
+ * 空概览。只用于"引擎还没就绪时的那一份初值" —— 四个 0、空列表、空脉搏，
  * 不含任何口径（口径全在 `@heyta/app-host#focusOverview`）。
+ *
+ * ⚠️ `days` 是**空数组**而不是七格 0：这一段只活到第一次 `deriveOverview()` 为止，
+ * 而画七根空柱子会让首帧闪一下"这周什么都没做"。界面按 `length === 0` 不画脉搏条，
+ * 真数据到了再画（`focusOverview` 永远返回恰好 7 格）。
  */
 const EMPTY_OVERVIEW: FocusOverview = {
   todayCount: 0,
@@ -165,6 +169,7 @@ const EMPTY_OVERVIEW: FocusOverview = {
   totalCount: 0,
   totalFocusMs: 0,
   records: [],
+  days: [],
 };
 
 /** 从 op-log 现算概览四数与记录列表（本文件不做任何 reduce）。 */

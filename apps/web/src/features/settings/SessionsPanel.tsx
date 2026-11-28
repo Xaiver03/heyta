@@ -35,7 +35,6 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { SettingsInfoTip } from './SettingsInfoTip.js';
 
 import { AlertTriangle, CheckCircle2, Loader2, LogOut, RefreshCw } from 'lucide-react';
 
@@ -125,11 +124,6 @@ export function SessionsPanel({ active = true }: { active?: boolean }): React.JS
     <div className="ht-settings" data-testid="sessions-panel">
       <h2 className="ht-settings__title ht-type-section-title">
         {t('common.sessions.title')}
-        <SettingsInfoTip
-          testId="tip-sessions"
-          label={t('common.sessions.title')}
-          text={t('common.sessions.intro')}
-        />
       </h2>
 
       {!signedIn ? (

@@ -13798,3 +13798,19 @@ react-native-web / 共享包依赖。实测单文件 26 条用例：
     **判据（可复跑）**：`git push <remote> main` 若返回 `pre-receive hook declined`
     且带 `Repo size … exceeds quota`，则远端存储已死，本地再干净也推不动 ——
     处置只有三条：托管方 GC、换新仓、升级配额。**本地体积不是判据**，本地 116 MiB 时远端仍拒。
+
+689. 🔴 **Android 真机严禁 `adb uninstall`：会变成"首次安装未知来源"，ColorOS 弹安全验证/要密码**（2026-11-27 实测）
+
+    `adb uninstall com.heyta` 之后再 `adb install`，OPPO/ColorOS 会走「应用安全检测 / 纯净模式」首装校验：
+    安装器把包写进 `/data/app/vmdl*.tmp/base.apk` 后报 `Failed to open APK … I/O error`、临时包被清掉，
+    `adb install` 返回 `Failure [-99]`，`pm install` 则卡住等手机上的验证弹窗（要输密码）。
+    同一份**已固定签名**的包，在"已安装"状态下 `adb install -r` 覆盖更新是静默的。
+
+    **铁律**：
+    ① **严禁 `adb uninstall`**（任何理由都不行）。要在真机上出现当前产物，只用 `adb install -r`（同签名原地更新）。
+    ② Android release 签名唯一固定：`~/.heyta-signing/heyta-release.keystore`（alias=`heyta`，`CN=heyta`，
+       SHA-256 `c46d0386179c3cef12582d1347ed2f871eb03a64aaa2bff96511c1cb76062556`），Mac 与 `linux-dev` 同把；
+       构建后 `apksigner verify --print-certs` 核对，不许换/重签。
+    ③ Android 真机 adb / 安装在 `linux-dev` 上做（`ssh linux-dev 'adb …'`）；首次把本机
+       `~/.android/adbkey`+`adbkey.pub` 同步到 `linux-dev:~/.android/`，手机即视为同一台受信任电脑。
+    ④ 确需首装时，先在手机开发者选项打开「USB 安装 / Install via USB」（与「USB 调试」是两个开关），可免密静默装。

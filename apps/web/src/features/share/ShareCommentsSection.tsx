@@ -31,6 +31,8 @@ import { ensureWebShareSession, webShareSession } from './share-session.js';
 
 export interface ShareCommentsSectionProps {
   readonly taskId: string;
+  /** 可选区块标题：仅在共享评论真正可画（`host !== undefined`）时随线程一起渲染，避免非共享/未解锁任务底下悬空一枚空标题。 */
+  readonly heading?: string;
 }
 
 export function ShareCommentsSection(props: ShareCommentsSectionProps): React.JSX.Element | null {
@@ -113,6 +115,22 @@ export function ShareCommentsSection(props: ShareCommentsSectionProps): React.JS
 
   if (host === undefined) return null;
   const comments = host.commentsForTask(props.taskId) as unknown as CommentThreadProps['comments'];
+
+  if (props.heading !== undefined) {
+    return (
+      <div data-testid="task-detail-comments">
+        <h3 className="ht-type-caption ht-detail-section-title" data-testid="task-detail-collaboration">
+          {props.heading}
+        </h3>
+        <CommentThread
+          taskId={props.taskId}
+          comments={comments}
+          labels={labels}
+          onSubmit={onSubmit}
+        />
+      </div>
+    );
+  }
 
   return <CommentThread taskId={props.taskId} comments={comments} labels={labels} onSubmit={onSubmit} />;
 }

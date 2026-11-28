@@ -73,7 +73,7 @@ export function CalendarHubPanel(): React.JSX.Element | null {
   const clock = useClock(locale);
 
   const [range, setRange] = useState<AgendaRange>('today');
-  const [expandedId, setExpandedId] = useState<string | undefined>(undefined);
+  const [expandedRow, setExpandedId] = useState<string | undefined>(undefined);
   const [busy, setBusy] = useState(false);
   const [tagBusyId, setTagBusyId] = useState<string | undefined>(undefined);
   const [status, setStatus] = useState<PanelStatus | undefined>(undefined);
@@ -293,7 +293,7 @@ export function CalendarHubPanel(): React.JSX.Element | null {
                   <div className="ht-sidebar__agenda-day">{formatDayTitleText(group.date, t)}</div>
                   <ul className="ht-sidebar__agenda-list">
                     {group.events.map((event) => {
-                      const expanded = expandedId === event.id;
+                      const expanded = expandedRow === event.id;
                       const assignedTags = resolveTags(event.tagIds, tagIndex);
                       const effectiveTagIds = resolveTagIds(event.tagIds, tagIndex);
                       const detailId = `calendar-hub-detail-${event.id}`;

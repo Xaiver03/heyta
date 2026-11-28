@@ -537,7 +537,6 @@ const EMPTY_SITES = {
      * 这条已登记进 `docs/plans/site-and-parity-alignment.md` 的欠账。
      */
     'apps/web/src/features/notes/NotesView.tsx',
-    'apps/web/src/features/reminders/ReminderPanel.tsx',
     /**
      * 通知中心 + 活动（2026-09-29）。
      *

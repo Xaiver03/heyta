@@ -386,10 +386,15 @@ export function VaultSettingsSection({
 
   return (
     <Stack gap="loose" testID="mobile-vault-settings">
-      <SectionHeader title={t('mobile.vault.title')} />
-      <Text variant="caption" tone="subtle">
-        {t('mobile.vault.description')}
-      </Text>
+      <SectionHeader
+        title={t('mobile.vault.title')}
+        tip={
+          <SettingsInfoTip
+            text={t('mobile.vault.description')}
+            label={t('mobile.vault.title')}
+          />
+        }
+      />
       {loading ? <Text variant="caption" tone="subtle">{t('mobile.vault.busy')}</Text> : null}
       {scope === undefined ? (
         <Text variant="caption" tone="subtle">{t('mobile.vault.accountRequired')}</Text>
@@ -440,7 +445,6 @@ export function VaultSettingsSection({
               checked={rememberUnlock}
               onToggle={toggleRemember}
               label={t('mobile.vault.remember')}
-              caption={t('mobile.vault.remember')}
             />
             <Button
               label={t('mobile.vault.create')}
@@ -487,7 +491,6 @@ export function VaultSettingsSection({
               checked={rememberUnlock}
               onToggle={toggleRemember}
               label={t('mobile.vault.remember')}
-              caption={t('mobile.vault.remember')}
             />
           </Stack>
         </Card>
@@ -609,7 +612,6 @@ export function VaultSettingsSection({
               checked={rememberUnlock}
               onToggle={toggleRemember}
               label={t('mobile.vault.remember')}
-              caption={t('mobile.vault.remember')}
             />
             <TextField
               label={t('mobile.vault.newPassphrase')}

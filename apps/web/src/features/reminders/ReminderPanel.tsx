@@ -99,7 +99,7 @@ export function reminderListLabels(t: I18nValue['t'], locale: Locale): ReminderL
   const when = (at: number): string => formatReminderWhen(at, locale);
   return {
     title: t('reminder.title'),
-    empty: t('reminder.empty'),
+    empty: '',
     add: t('reminder.add'),
     // 🔴 顺序 = `REMINDER_OFFSET_PRESETS_MS` 的顺序（见上）。
     offsets: REMINDER_OFFSET_KEYS.map((key) => t(key)),

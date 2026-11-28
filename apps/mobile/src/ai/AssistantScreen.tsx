@@ -21,8 +21,6 @@ import {
   createManagedTransport,
 } from '@heyta/app-host';
 import {
-  authorizeEgress,
-  buildDisclosure,
   fromHealthSnapshot,
   IMAGE_BUDGET,
   toHealthSnapshot,
@@ -724,12 +722,13 @@ function DisclosureCard({ target, plan, hasImages, consents, onConfirm, onCancel
   // 🔴 「出境的是哪个功能」只在这一处取字面量：闸门、披露块与同意提示**同源**。
   //    三处各写一遍 `'tool-calling'` 的话，改了一处就会让提示念着别的功能。
   const feature = 'tool-calling' as const;
-  const disclosure = buildDisclosure({ feature, destination: target.destination, fields });
-  const decision = authorizeEgress({ feature, destination: target.destination, fields }, consents as Parameters<typeof authorizeEgress>[1]);
-  const destinationLabel = target.label;
   return (
-    <Stack gap="tight" testID="assistant-disclosure">
-      <Text variant="caption" tone="subtle">{destinationLabel}</Text>
+    <AiDisclosureBlock
+      testIdPrefix="assistant-disclosure"
+      target={target}
+      fields={fields}
+      retentionDisclosure={undefined}
+    >
       <HStack gap="tight" style={{ alignItems: 'center' }}>
         <Pressable
           accessibilityRole="button"
@@ -762,6 +761,6 @@ function DisclosureCard({ target, plan, hasImages, consents, onConfirm, onCancel
           <Text tone="subtle" style={{ fontSize: tokens['font-size.sm'] }}>{t('web.ai.action.cancel')}</Text>
         </Pressable>
       </HStack>
-    </Stack>
+    </AiDisclosureBlock>
   );
 }

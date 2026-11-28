@@ -18,5 +18,5 @@ export default defineConfig({
    * 一旦有人在 `src/task-list/model.ts` 里 import 了 RN，
    * 这个测试会立刻失败 —— 等于免费钉住了"model 必须保持宿主无关"。
    */
-  test: { globals: true, environment: 'node', include: ['tests/**/*.spec.ts'] },
+  test: { globals: true, environment: 'node', include: ['tests/**/*.spec.{ts,tsx}'] },
 });

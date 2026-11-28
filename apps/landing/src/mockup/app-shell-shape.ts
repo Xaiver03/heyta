@@ -133,8 +133,13 @@ export interface ShellPanelSection {
 export const SHELL_PRIMARY_NAV: readonly ShellPrimaryNavItem[] = [
   { labelKey: 'web.shell.nav.today', icon: 'sun' },
   { labelKey: 'web.shell.nav.next7Days', icon: 'calendar-range' },
-  { labelKey: 'web.shell.nav.completed', icon: 'check-circle' },
+  { labelKey: 'web.shell.nav.inbox', icon: 'inbox' },
 ];
+
+export const SHELL_COMPLETED_NAV: ShellPrimaryNavItem = {
+  labelKey: 'web.shell.nav.completed',
+  icon: 'check-circle',
+};
 
 /**
  * 四象限分区的**标题**。

@@ -117,10 +117,14 @@ interface TaskListSharedProps {
    */
   readonly swipeActions?: (row: TaskRowModel) => TaskRowSwipeSpec | null;
   readonly labels?: TaskListLabels;
-  /** 标题下方的元信息行（截止 / 优先级 / 重复…）。 */
+  /** 标题槽覆盖（如桌面端原位重命名输入框）。 */
+  readonly renderTitle?: (row: TaskRowModel) => React.ReactNode | undefined;
+  /** 行首行右侧的元信息（归属 / 截止 / 优先级…）。 */
   readonly renderMeta?: (row: TaskRowModel) => React.ReactNode;
-  /** 行尾的动作（比如删除按钮）。 */
+  /** 行尾的动作或标记。 */
   readonly renderTrailing?: (row: TaskRowModel) => React.ReactNode;
+  /** 标题正下方的离散副行（备注单行摘要 / 彩色标签胶囊）。 */
+  readonly renderSubline?: (row: TaskRowModel) => React.ReactNode;
   /**
    * 行首那枚「清单图标」的颜色（产品拍板：**只有清单图标着色**）。
    *
@@ -280,8 +284,10 @@ export function TaskList<TMeta = undefined>({
   onLongPressTask,
   swipeActions,
   labels,
+  renderTitle,
   renderMeta,
   renderTrailing,
+  renderSubline,
   busyTaskId,
   activeTaskId,
   selectedTaskIds,
@@ -443,8 +449,10 @@ export function TaskList<TMeta = undefined>({
           {...(onLongPressTask === undefined ? {} : { onLongPressTask })}
           {...(swipeActions === undefined ? {} : { swipeActions })}
           {...(labels === undefined ? {} : { labels })}
+          {...(renderTitle === undefined ? {} : { renderTitle })}
           {...(renderMeta === undefined ? {} : { renderMeta })}
           {...(renderTrailing === undefined ? {} : { renderTrailing })}
+          {...(renderSubline === undefined ? {} : { renderSubline })}
           {...(iconColorOf === undefined ? {} : { iconColorToken: iconColorOf(row) })}
           {...(listCard ? { rowSurfaceColor: tokens['color.surface'] } : {})}
         />
@@ -452,7 +460,7 @@ export function TaskList<TMeta = undefined>({
       // 省略插槽 ⇒ 原样返回那一枚行（移动端/四象限的行为逐字节不变）。
       return renderRowWrapper === undefined ? node : <>{renderRowWrapper(row, node)}</>;
     },
-    [busyTaskId, activeTaskId, labels, onOpenTask, onLongPressTask, swipeActions, onToggleTask, renderMeta, renderTrailing, density, selectedTaskIds, selectionMode, renderRowWrapper, iconColorOf, listCard, tokens],
+    [busyTaskId, activeTaskId, labels, onOpenTask, onLongPressTask, swipeActions, onToggleTask, renderTitle, renderMeta, renderTrailing, renderSubline, density, selectedTaskIds, selectionMode, renderRowWrapper, iconColorOf, listCard, tokens],
   );
 
   const renderItem = useCallback(

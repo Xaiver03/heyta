@@ -51,6 +51,7 @@
 import {
   findTool,
   isToolGranted,
+  packForTool,
   runReadTool,
   toWriteIntent,
   type LocalApiConfig,
@@ -86,51 +87,35 @@ export interface AiToolProposal {
 /** 执行档自动落地前必须保留确认的破坏性动作。 */
 export function aiToolProposalRequiresConfirmation(proposal: AiToolProposal): boolean {
   // 🔴 先读**目录里**的 risk（唯一声明处，见 `local-api/src/tools/shared.ts` 的 `ToolRisk`）。
-  //    破坏性档优先于下面的动作级判定：
+  //    破坏性档优先：
   //      · destructive-irreversible（彻底删除 purge）：永不由 AI 自动执行（D7）。
   //      · destructive-reversible（删除→回收站 / 归档 / 移动）：直接执行，靠 op-log 版本回溯兜底（D1）。
-  //    `write` / 未标注：沿用下面动作级判定（保持历史行为；迁到纯 risk 判定见 P1）。
   const risk = findTool(proposal.tool)?.risk;
   if (risk === 'destructive-irreversible') return true;
   if (risk === 'destructive-reversible') return false;
+
+  // 🔴 TASK 实体：读与写**一律自动执行**，不弹确认。
+  //    任务删除是软删（进回收站），所有写入都走 op-log、可整段撤销（产品裁决 D1），
+  //    用户随时能找回；每建/改一条任务都问一次"确认吗"是纯闹心（设闹钟不必确认）。
+  //    按 pack 的 entityType 判定 ⇒ 任务新增工具自动继承，不会漏配。
+  if (packForTool(proposal.tool)?.entityType === 'TASK') return false;
+
   switch (proposal.intent.action) {
-    case 'complete-tasks':
-      return true;
-    case 'append-task-checklist':
-      return true;
-    case 'set-task-priorities':
-      return true;
-    case 'set-task-estimate':
-      return true;
-    case 'set-task-tags':
-      return proposal.intent.tagIds.length === 0;
     // 记忆会进入之后每一轮 system prompt —— 写错一条不是一次答错，
     // 而是之后每一轮都带着错前提。必须确认，不由 AI 自动落库。
     case 'remember-memory':
       return true;
+    // 笔记/日程是**覆盖式**更新（可能抹掉用户原文），保留确认。
     case 'update-note':
     case 'update-event':
       return true;
-    case 'update-task': {
-      const fields = proposal.intent.fields;
-      const keys = Object.keys(fields);
-      return (
-        keys.length === 0 ||
-        keys.some(
-          (key) =>
-            !['title', 'completed', 'dueDate', 'priority'].includes(key) ||
-            fields[key] === null ||
-            fields[key] === undefined,
-        )
-      );
-    }
-    // 评论（COMMENT，P4）：写入落在**共享清单**、对协作成员可见。即使目录把
-    // 它标成 `write`（不是 purge），也一律要求确认 —— "一条别人会看见的评论"
-    // 不适合走低风险自动执行；用户按下确认前必须看见将要发出去的那句话。
+    // 评论（COMMENT）：写入落在**共享清单**、对协作成员可见，一律确认 ——
+    // 用户按下确认前必须看见将要发出去的那句话。
     case 'add-task-comment':
     case 'delete-task-comment':
       return true;
     default:
+      // 其余一律低风险自动执行（含全部 TASK 动作；含测试里 tool 用动作名、查不到 pack 的情形）。
       return false;
   }
 }

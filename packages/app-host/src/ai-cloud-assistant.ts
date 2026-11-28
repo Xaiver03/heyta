@@ -13,7 +13,7 @@ import type {
   EgressConsent,
   RoutedDeps,
 } from '@heyta/ai';
-import type { LocalApiConfig } from '@heyta/local-api';
+import { scopeToolsByIntent, type LocalApiConfig } from '@heyta/local-api';
 
 import { toCloudToolDescriptors, type CloudToolTransport } from './ai-cloud-tools.js';
 import { createRoutedModelCall, type RoutedInvoke } from './ai-routed-model.js';
@@ -70,7 +70,8 @@ export async function requestCloudAssistantTurn(
     ...(deps.toolChoice === undefined ? {} : { toolChoice: deps.toolChoice }),
     ...(deps.onToolCall === undefined ? {} : { onToolCall: deps.onToolCall }),
   });
-  const baseTools = toCloudToolDescriptors(deps.grants);
+  // 与原生循环同一条确定性意图收敛：按实体域缩小候选工具集，低置信回退全量。
+  const baseTools = scopeToolsByIntent(toCloudToolDescriptors(deps.grants), userText).tools;
   const useReports = deps.getReportState !== undefined;
   return runCloudAgentTurn(userText, {
     transport: useReports ? createReportAwareTransport(deps.transport, deps.getReportState!) : deps.transport,

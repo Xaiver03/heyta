@@ -344,7 +344,7 @@ describe('未登录 / 未配置时是明确的空状态', () => {
     const el = await renderPanel('en');
     const text = el.textContent ?? '';
 
-    expect(el.querySelector('.ht-auth-plan-illustration')).not.toBeNull();
+    expect(el.querySelector('.ht-auth-banner__img')).not.toBeNull();
     expect(CJK.test(text)).toBe(false);
   });
 });

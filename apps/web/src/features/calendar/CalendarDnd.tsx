@@ -30,7 +30,7 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core';
 
-import type { Task } from '@heyta/domain';
+import { Priority, type Task } from '@heyta/domain';
 
 import './calendar-dnd.css';
 
@@ -39,13 +39,19 @@ interface DayDropData {
   readonly type: 'day';
   readonly date: string;
 }
-/** 日档小时行的落点：落在哪一天的第几小时。 */
+/** 日档小时行/槽位的落点：落在哪一天的第几小时（可选分钟）。 */
 interface HourDropData {
   readonly type: 'hour';
   readonly date: string;
   readonly hour: number;
+  readonly minute?: number;
 }
-type DropData = DayDropData | HourDropData;
+/** 日档全天区的落点：把任务拖回全天（date-only）。 */
+interface AllDayDropData {
+  readonly type: 'allDay';
+  readonly date: string;
+}
+type DropData = DayDropData | HourDropData | AllDayDropData;
 
 /**
  * 一台 `DndContext`：包住整个共享日历板，托管拖拽状态与浮影。
@@ -57,11 +63,13 @@ export function CalendarDragProvider({
   tasksById,
   onReschedule,
   onSetTime,
+  onSetAllDay,
   children,
 }: {
   tasksById: ReadonlyMap<string, Task>;
   onReschedule: (taskId: string, targetDate: string) => void;
-  onSetTime: (taskId: string, targetDate: string, hour: number) => void;
+  onSetTime: (taskId: string, targetDate: string, hour: number, minute?: number) => void;
+  onSetAllDay?: (taskId: string, targetDate: string) => void;
   children: ReactNode;
 }): React.JSX.Element {
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -88,13 +96,21 @@ export function CalendarDragProvider({
         return;
       }
       if (data?.type === 'hour' && typeof data.date === 'string' && typeof data.hour === 'number') {
-        onSetTime(taskId, data.date, data.hour);
+        onSetTime(taskId, data.date, data.hour, data.minute);
+        return;
+      }
+      if (data?.type === 'allDay' && typeof data.date === 'string') {
+        onSetAllDay?.(taskId, data.date);
       }
     },
-    [onReschedule, onSetTime],
+    [onReschedule, onSetAllDay, onSetTime],
   );
 
-  const activeTitle = activeId === null ? undefined : tasksById.get(activeId)?.title;
+  const activeTask = activeId === null ? undefined : tasksById.get(activeId);
+  const activeChecklist = activeTask?.checklist ?? [];
+  const activeChecklistDone = activeChecklist.filter((item) => item.done).length;
+  const activePriority = activeTask?.priority;
+  const showPriority = activePriority !== undefined && activePriority !== Priority.None;
 
   return (
     <DndContext
@@ -106,9 +122,34 @@ export function CalendarDragProvider({
       onDragCancel={() => setActiveId(null)}
     >
       {children}
+      {/*
+        浮影 = 一张**缩小版任务卡**，不是一行字：主色左竖条 + 卡片底 + 柔和投影 +
+        微微放大 + `grabbing`。它是纯视觉克隆（`aria-hidden`），
+        读屏听到的仍然是拖拽源自己的可及名，不会把同一张卡念两遍。
+      */}
       <DragOverlay dropAnimation={null}>
-        {activeTitle === undefined ? null : (
-          <div className="ht-content__cal-drag-overlay">{activeTitle}</div>
+        {activeTask === undefined ? null : (
+          <div className="ht-content__cal-drag-overlay" aria-hidden="true">
+            <span className="ht-content__cal-drag-overlay-stripe" />
+            <span className="ht-content__cal-drag-overlay-body">
+              <span className="ht-content__cal-drag-overlay-title ht-type-body-sm">{activeTask.title}</span>
+              {activeChecklist.length === 0 && !showPriority ? null : (
+                <span className="ht-content__cal-drag-overlay-meta">
+                  {activeChecklist.length === 0 ? null : (
+                    <span className="ht-content__cal-drag-overlay-count">
+                      {activeChecklistDone}/{activeChecklist.length}
+                    </span>
+                  )}
+                  {showPriority ? (
+                    <span
+                      className="ht-content__cal-drag-overlay-priority"
+                      data-priority={String(activePriority)}
+                    />
+                  ) : null}
+                </span>
+              )}
+            </span>
+          </div>
         )}
       </DragOverlay>
     </DndContext>
@@ -154,6 +195,48 @@ export function CalendarDropHour({
   const { setNodeRef, isOver } = useDroppable({
     id: `hour:${date}:${String(hour)}`,
     data: { type: 'hour', date, hour } satisfies HourDropData,
+  });
+  return (
+    <div ref={setNodeRef} className="ht-content__cal-hour-drop" data-over={isOver ? 'true' : 'false'}>
+      {children}
+    </div>
+  );
+}
+
+/** 日档：25 分钟槽位投放目标（落在某天的 `hour:minute`）。 */
+export function CalendarDropSlot({
+  date,
+  hour,
+  minute,
+  children,
+}: {
+  date: string;
+  hour: number;
+  minute: number;
+  children: ReactNode;
+}): React.JSX.Element {
+  const { setNodeRef, isOver } = useDroppable({
+    id: `slot:${date}:${String(hour)}:${String(minute)}`,
+    data: { type: 'hour', date, hour, minute } satisfies HourDropData,
+  });
+  return (
+    <div ref={setNodeRef} className="ht-content__cal-slot-drop" data-over={isOver ? 'true' : 'false'}>
+      {children}
+    </div>
+  );
+}
+
+/** 日档：全天区投放目标（把带时刻的任务拖回全天 date-only）。 */
+export function CalendarDropAllDay({
+  date,
+  children,
+}: {
+  date: string;
+  children: ReactNode;
+}): React.JSX.Element {
+  const { setNodeRef, isOver } = useDroppable({
+    id: `allday:${date}`,
+    data: { type: 'allDay', date } satisfies AllDayDropData,
   });
   return (
     <div ref={setNodeRef} className="ht-content__cal-hour-drop" data-over={isOver ? 'true' : 'false'}>

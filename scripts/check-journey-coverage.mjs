@@ -206,6 +206,12 @@ const ENDPOINTS = [
       'W1–W6 全覆盖（真壳的真应用）：注册 → 登录（令牌落盘）→ 同步上行（服务端数 op）→ 新设备恢复 → 退出登录 → 失败可见 + 身份门',
   },
   {
+    end: 'desktop-linux-gtk3',
+    journeySpecs: [],
+    shellSpecs: [],
+    covers: '尚未验收（M0 目标只有可编译、可开窗；缺口见 REGISTERED_GAPS）',
+  },
+  {
     end: 'linux',
     journeySpecs: [],
     shellSpecs: ['scripts/check-linux-shell.mjs'],
@@ -304,6 +310,12 @@ const REGISTERED_GAPS = [
     expiry: '同上',
   },
   {
+    end: 'desktop-linux-gtk3',
+    missing: '尚无自动化旅程（注册/登录、同步、真实数据落库）',
+    why: '信创（麒麟 / 统信 UOS）GTK3 过渡壳，当前里程碑只到可编译、可开窗；与 `desktop-linux`（GTK4 + WebKitGTK 6.0）分开，是因为两者的系统库下限不同，不能共用同一个验收夹具',
+    expiry: 'M1（能起窗并渲染共享 Web UI）完成后补一条壳级冒烟；若该壳并入 `desktop-linux`，本条连同目录一起删掉',
+  },
+  {
     end: 'desktop',
     missing: '注册/登录（邮箱+口令、通行密钥）与同步设置 —— 壳里渲染的只有 HeytaUiProvider + TaskList，没有任何身份入口',
     why: 'ADR-0024 的原选型已降级为**过渡壳**，且**退役时点已定**（AGENTS §2 的仓库地图：等三个原生壳的壳级门禁替换掉 `e2e/tests/desktop-window.spec.ts` 的断言之后，见 multi-end-unified-strategy §6.3-T3）。给一条注定退役的路线补认证界面 = 再养一份与 `apps/web` 平行的表单接线，而它唯一不可替代的价值是当**自动化桌面 GUI 门禁的载体** —— 那个价值不需要登录态',
@@ -331,6 +343,7 @@ const END_TO_DIR = {
   macos: 'desktop-macos',
   windows: 'desktop-windows',
   linux: 'desktop-linux',
+  'desktop-linux-gtk3': 'desktop-linux-gtk3',
   'node-host': 'node-host',
   desktop: 'desktop',
 };

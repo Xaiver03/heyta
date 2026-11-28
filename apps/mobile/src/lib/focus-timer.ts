@@ -37,6 +37,7 @@ import {
   focusDisplayMs,
   initialFocusState,
   isFinished,
+  linkTask,
   pause as pauseFn,
   resume as resumeFn,
   selectKind,
@@ -203,7 +204,12 @@ export function setFocusWorkMinutes(minutes: number): boolean {
   if (!Number.isFinite(minutes) || minutes < 1 || minutes > 180) return false;
   const rounded = Math.round(minutes);
   const ok = writeDevicePref(PREF_KEY_FOCUS_WORK_MINUTES, String(rounded));
-  if (ok) cachedWorkMinutes = rounded;
+  if (ok) {
+    cachedWorkMinutes = rounded;
+    if (snapshot.state.phase === 'idle') {
+      publish({ state: selectKind(snapshot.state, snapshot.state.kind, getFocusConfig()), now: Date.now() });
+    }
+  }
   return ok;
 }
 
@@ -319,6 +325,13 @@ export function selectFocusKind(kind: FocusSessionKind): void {
 /** 切换计时模式（倒计时 / 正计时）。只在 idle 时生效（领域层负责这条约束）。 */
 export function selectFocusMode(mode: FocusMode): void {
   const next = selectModeFn(snapshot.state, mode);
+  if (next === snapshot.state) return;
+  publish({ state: next, now: Date.now() });
+}
+
+/** 关联下一轮任务（不启动计时）。只在 idle 时生效。 */
+export function linkFocusTask(taskId: string | undefined): void {
+  const next = linkTask(snapshot.state, taskId);
   if (next === snapshot.state) return;
   publish({ state: next, now: Date.now() });
 }

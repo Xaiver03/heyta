@@ -82,15 +82,19 @@ import { extractShareToken, searchWithoutShareToken } from '../share/join-link.j
 import { useTaskStore, type TaskFilter } from '../tasks/store.js';
 import { useSyncStore } from '../sync/store.js';
 import { useProjectStore } from './store.js';
+import { tagToneOf } from '../tasks/TaskOrganizer.js';
 import { tagRejectionMessageKey } from '../tags/rejection.js';
 import { UndoReceipt } from '../../lib/feedback/UndoReceipt.js';
 import { restoreOrRefuse, undoReceiptFor } from '../../lib/feedback/undo-receipt.js';
 
 export function ProjectsPanel({
   onFilterWith,
+  betweenSections,
 }: {
   /** 用户选了某个清单 / 标签。宿主负责切视图并落筛选（见文件头）。 */
   onFilterWith: (filter: TaskFilter) => void;
+  /** 插在「清单」与「标签」之间的侧栏区块（如「过滤器」），保持与侧栏左/右脊线同轴。 */
+  betweenSections?: React.ReactNode;
 }) {
   const { t } = useI18n();
   const projects = useProjectStore();
@@ -474,6 +478,8 @@ export function ProjectsPanel({
           )}
         </section>
 
+        {betweenSections}
+
         <section>
           <div className="ht-sidebar__organizer-heading">
             <h2 className="ht-nav__section ht-type-group-label">{t('web.tags.heading')}</h2>
@@ -534,7 +540,17 @@ export function ProjectsPanel({
             onRemove={(item) => {
               void projects.deleteTag(item.id);
             }}
-            renderLeading={() => <TagIcon size={ICON_SIZE.xs} aria-hidden="true" />}
+            renderLeading={(leadingItem) => {
+              const domainTag = projects.tags.find((tag) => tag.id === leadingItem.id);
+              const tone = tagToneOf({ name: leadingItem.name, color: domainTag?.color });
+              return (
+                <TagIcon
+                  size={ICON_SIZE.xs}
+                  className={`ht-row__tag-icon--${String(tone)}`}
+                  aria-hidden="true"
+                />
+              );
+            }}
             renderItemExtra={(item) => (
               <FolderPicker
                 item={item}

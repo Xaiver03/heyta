@@ -76,6 +76,7 @@ import {
   LOCAL_API_TOOLS,
   TOOL_ENVELOPE_EGRESS_FIELDS,
   findTool,
+  scopeToolsByIntent,
   type LocalApiConfig,
   type LocalApiHost,
   type LocalApiWriteResult,
@@ -685,7 +686,9 @@ export async function requestAssistantTurn(
   }
 
   const grants = assistantGrants();
-  const tools = toToolDescriptors(grants);
+  // 确定性意图分类只**收敛候选域**（按实体 pack）：命中哪个域就只把该域工具交给模型，
+  // 低置信/多域分散时原样全量。最终选哪个工具、传什么参数仍由模型 function-calling 决定。
+  const tools = scopeToolsByIntent(toToolDescriptors(grants), text).tools;
   if (tools.length === 0) {
     return {
       ok: false,

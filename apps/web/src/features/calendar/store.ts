@@ -29,6 +29,7 @@ import {
   startOfMonth,
   toLocalDate,
   type LocalDate,
+  type LocalTime,
   type TaskScope,
 } from '@heyta/domain';
 import {
@@ -44,6 +45,10 @@ import {
 } from '@heyta/ui';
 
 type ScopeKind = 'project' | 'tag';
+
+export type CalendarExtendedView = 'none' | 'agenda' | 'multiDay' | 'multiWeek';
+export type CalendarColorMode = 'project' | 'quadrant';
+export type CalendarDisplayStyle = 'classic' | 'modern';
 
 interface CalendarViewState {
   /** 正在显示的月份（用该月里任意一天表示，与共享板同一个约定）。 */
@@ -76,6 +81,8 @@ interface CalendarViewState {
    *   只服务一个视图的状态（本文件文件头记过这个理由）。
    */
   captureOpen: boolean;
+  /** 日档 25 分钟槽位点击触发捕获时的锚点时刻。 */
+  captureTime: LocalTime | undefined;
   /** 日历侧栏是否展开。筛选范围独立保留，收起侧栏不会让任务悄悄消失。 */
   calendarSidebarOpen: boolean;
   /**
@@ -93,6 +100,21 @@ interface CalendarViewState {
    * 默认 `true`（滴答默认开启，也是 web 接上倒数日之后的既有行为）。
    */
   showCountdown: boolean;
+  /** 扩展视图档位（日程 / 5天多日 / 2周多周）；`'none'` 时使用基础 `view`。 */
+  extendedView: CalendarExtendedView;
+  /** 日历着色方式：按清单或按四象限。 */
+  colorMode: CalendarColorMode;
+  /** 日历事件条视觉样式：经典或现代（左侧强调竖条）。 */
+  displayStyle: CalendarDisplayStyle;
+  /** 显示设置：是否显示检查事项、所有重复周期、习惯、专注记录、课程、辅助时区。 */
+  showChecklist: boolean;
+  showAllRepeats: boolean;
+  showHabits: boolean;
+  showFocus: boolean;
+  showCourses: boolean;
+  secondaryTimezone: boolean;
+  /** 分层卡片式「显示设置」弹窗开关。 */
+  displaySettingsOpen: boolean;
   /**
    * 显示设置：日历条目的**着色模式**（覆盖图谱 #40「配色」）。
    *
@@ -155,6 +177,8 @@ interface CalendarViewActions {
   drillIntoMonth: (monthFirstDay: LocalDate) => void;
   /** 开/关那一行输入。开着再点 `+` 就是收起 —— 一屏只有一行输入框。 */
   toggleCapture: () => void;
+  /** 在指定日期与时刻槽位打开捕获浮层。 */
+  openCaptureAtSlot: (date: LocalDate, time: LocalTime) => void;
   toggleCalendarSidebar: () => void;
   setCalendarSidebarOpen: (open: boolean) => void;
   /** 「显示设置」两个开关（阅读偏好，见 `showCompleted` / `showCountdown`）。 */
@@ -162,6 +186,16 @@ interface CalendarViewActions {
   setShowCountdown: (value: boolean) => void;
   /** 显示设置：着色模式（见 `colorBy`）。 */
   setColorBy: (value: CalendarColorBy) => void;
+  setExtendedView: (value: CalendarExtendedView) => void;
+  setColorMode: (value: CalendarColorMode) => void;
+  setDisplayStyle: (value: CalendarDisplayStyle) => void;
+  setShowChecklist: (value: boolean) => void;
+  setShowAllRepeats: (value: boolean) => void;
+  setShowHabits: (value: boolean) => void;
+  setShowFocus: (value: boolean) => void;
+  setShowCourses: (value: boolean) => void;
+  setSecondaryTimezone: (value: boolean) => void;
+  setDisplaySettingsOpen: (open: boolean) => void;
   /** 勾/去掉一条清单或一个标签。 */
   toggleScopeItem: (kind: ScopeKind, id: string) => void;
   /**
@@ -215,11 +249,22 @@ export const useCalendarViewStore = create<CalendarViewState & CalendarViewActio
   view: 'month',
   extraView: null,
   captureOpen: false,
+  captureTime: undefined,
   calendarSidebarOpen: true,
   // 显示设置三项：**从本机偏好读初始值**（刷新后仍在），读取失败退默认（见 readonly 文件头）。
   showCompleted: displayPref.showCompleted,
   showCountdown: displayPref.showCountdown,
   colorBy: displayPref.colorBy,
+  extendedView: 'none',
+  colorMode: 'project',
+  displayStyle: 'classic',
+  showChecklist: false,
+  showAllRepeats: true,
+  showHabits: true,
+  showFocus: true,
+  showCourses: true,
+  secondaryTimezone: false,
+  displaySettingsOpen: false,
   publicFactsEpoch: 0,
 
   setCursor: (date) => {
@@ -241,6 +286,7 @@ export const useCalendarViewStore = create<CalendarViewState & CalendarViewActio
     set((state) => ({
       selected: date,
       cursor: calendarCursorFor(state.extraView === 'timetable' ? 'week' : state.view, date),
+      captureTime: undefined,
     }));
   },
 
@@ -252,8 +298,8 @@ export const useCalendarViewStore = create<CalendarViewState & CalendarViewActio
   },
 
   setView: (view) => {
-    // 切到任何共享档都退出课程表 —— 分段控件里选中态只能有一个。
-    set((state) => ({ view, extraView: null, cursor: calendarCursorFor(view, state.selected) }));
+    // 切到任何共享档都退出课程表 / 扩展档 —— 分段控件里选中态只能有一个。
+    set((state) => ({ view, extraView: null, extendedView: 'none', cursor: calendarCursorFor(view, state.selected) }));
   },
 
   setExtraView: (extraView) => {
@@ -265,12 +311,61 @@ export const useCalendarViewStore = create<CalendarViewState & CalendarViewActio
     );
   },
 
+  setExtendedView: (extendedView) => {
+    set({ extendedView });
+  },
+
+  setColorMode: (colorMode) => {
+    set({ colorMode });
+  },
+
+  setDisplayStyle: (displayStyle) => {
+    set({ displayStyle });
+  },
+
+  setShowChecklist: (showChecklist) => {
+    set({ showChecklist });
+  },
+
+  setShowAllRepeats: (showAllRepeats) => {
+    set({ showAllRepeats });
+  },
+
+  setShowHabits: (showHabits) => {
+    set({ showHabits });
+  },
+
+  setShowFocus: (showFocus) => {
+    set({ showFocus });
+  },
+
+  setShowCourses: (showCourses) => {
+    set({ showCourses });
+  },
+
+  setSecondaryTimezone: (secondaryTimezone) => {
+    set({ secondaryTimezone });
+  },
+
+  setDisplaySettingsOpen: (displaySettingsOpen) => {
+    set({ displaySettingsOpen });
+  },
+
   drillIntoMonth: (monthFirstDay) => {
     set(() => ({ ...calendarMonthDrill(monthFirstDay), extraView: null }));
   },
 
   toggleCapture: () => {
-    set((state) => ({ captureOpen: !state.captureOpen }));
+    set((state) => ({ captureOpen: !state.captureOpen, captureTime: undefined }));
+  },
+
+  openCaptureAtSlot: (date, time) => {
+    set((state) => ({
+      selected: date,
+      cursor: calendarCursorFor(state.view, date),
+      captureTime: time,
+      captureOpen: true,
+    }));
   },
 
   toggleCalendarSidebar: () => {

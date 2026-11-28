@@ -43,10 +43,9 @@ import { AppWindow } from '../src/mockup/AppWindow.js';
 import {
   SHELL_HEADER_ACTIONS,
   SHELL_PRIMARY_NAV,
-  SHELL_QUADRANT_NAV,
   SHELL_VIEW_TABS,
 } from '../src/mockup/app-shell-shape.js';
-import { showcaseQuadrantCounts } from '../src/mockup/showcase-data.js';
+import { SHOWCASE_TASKS } from '../src/mockup/showcase-data.js';
 import { MOCK_TIMELINE_ROWS } from '../src/mockup/timeline-shape.js';
 import { codeOccurrences, readWebAppSource, stripComments } from './helpers/source-text.js';
 
@@ -250,23 +249,19 @@ describe('展厅复刻与应用一致', () => {
     }
   });
 
-  it('四象限显示计数，且计数是**从样例任务算出来的**（不是手写的那四个数）', () => {
-    const view = renderMockup();
-    // 🔴 这里曾经断言「一个计数都不显示」，理由是"真应用 QUADRANT_NAV 没有 count 字段"。
-    //    那是一条**钉住错误事实**的判据：字段确实不在 `QUADRANT_NAV` 上，但计数是
-    //    `selectQuadrantCounts()`（→ `bucketByQuadrant()`）在渲染时算出来、单独传进
-    //    `NavButton` 的；`NavButton` 只在 `count > 0` 时渲染，所以**空账号的截图里
-    //    一个数字都没有** —— 审计当时把"位在、值为 0"读成了"产品没有这个位"。
-    //    正确的修法不是删掉计数位，而是让它**从同一份样例任务派生**。
-    //    判据的权威版本在 `tests/mockup-shell-shape.spec.tsx`（用领域层重算）。
-    const counts = showcaseQuadrantCounts();
-    const rendered = [...view.querySelectorAll('.mk-sidebar .mk-nav__count')].map(
+  it('四象限看板的卡是**从样例任务算出来的**（不是手写的那几个数/名字）', () => {
+    const view = renderMockup('quadrant');
+    // 2026-11（滴答式组合筛选）：侧栏「四象限」快捷筛选段已撤掉，象限条件并入
+    // `FilterPanel`。象限的计数现在体现在**四象限看板**每一格的卡数上，卡由样例任务
+    // 派生（判据的权威版本在 `tests/mockup-shell-shape.spec.tsx`，用领域层重算）。
+    const rendered = [...view.querySelectorAll('.mk-quad__card')].map(
       (el) => el.textContent?.trim() ?? '',
     );
-    const expected = SHELL_QUADRANT_NAV.map((q) => counts[q.quadrant]).filter((n) => n > 0);
-    expect(rendered).toEqual(expected.map(String));
-    // 编造的那四个数不许作为一组回来。
-    expect(rendered.join(',')).not.toBe('3,5,2,1');
+    const knownTitles = new Set<string>(
+      SHOWCASE_TASKS.map((task) => zhCN[task.titleKey as keyof typeof zhCN]),
+    );
+    expect(rendered.length).toBeGreaterThan(0);
+    for (const title of rendered) expect(knownTitles.has(title)).toBe(true);
   });
 
   it('清单与标签两区都在，且是「静态行列表 + 标题级加号」的形态', () => {

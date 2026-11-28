@@ -1,0 +1,224 @@
+/**
+ * 日历「显示设置」弹窗（Web 壳）
+ * ==============================
+ *
+ * 分组卡片风：半透明遮罩 + 居中浮层，里面是四块白色圆角分组。
+ * 每行固定使用 `--ht-size-field-height`，所以颜色 / 样式 / 开关 / 时区
+ * 四块的节奏一致；组与组之间只靠 gap 分层，不再加分割标题。
+ *
+ * 🔴 这里**只用** `var(--ht-*)`：颜色、圆角、间距、字号、层级、动效全走
+ *    设计系统。`check:design` 会扫 CSS，裸值没有"只是这一处"的豁免。
+ */
+
+.ht-content__calendar-display-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: var(--ht-z-modal);
+  display: grid;
+  place-items: center;
+  padding: var(--ht-space-4);
+  background: var(--ht-color-overlay);
+  -webkit-backdrop-filter: blur(var(--ht-blur-sheet));
+  backdrop-filter: blur(var(--ht-blur-sheet));
+}
+
+.ht-content__calendar-display {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-4);
+  inline-size: min(var(--ht-layout-detail-max-width), calc(100vw - var(--ht-space-8)));
+  max-block-size: calc(100vh - var(--ht-space-8));
+  overflow: auto;
+  padding: var(--ht-space-6);
+  border-radius: var(--ht-radius-dialog);
+  background: var(--ht-color-surface-subtle);
+  box-shadow: var(--ht-shadow-xl);
+  color: var(--ht-color-foreground);
+  animation: ht-calendar-display-enter var(--ht-duration-normal) var(--ht-ease-enter);
+}
+
+.ht-content__calendar-display__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ht-space-3);
+}
+
+.ht-content__calendar-display__title {
+  margin: 0;
+  color: var(--ht-color-foreground);
+}
+
+.ht-content__calendar-display__close {
+  flex: none;
+  color: var(--ht-color-foreground-muted);
+}
+
+.ht-content__calendar-display__close:hover {
+  color: var(--ht-color-foreground);
+}
+
+.ht-content__calendar-display__groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-3);
+}
+
+.ht-content__calendar-display__group {
+  display: flex;
+  flex-direction: column;
+  padding-inline: var(--ht-space-4);
+  border-radius: var(--ht-radius-lg);
+  background: var(--ht-color-surface);
+}
+
+.ht-content__calendar-display__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ht-space-3);
+  min-inline-size: 0;
+  block-size: var(--ht-size-field-height);
+}
+
+.ht-content__calendar-display__row + .ht-content__calendar-display__row {
+  box-shadow: inset 0 var(--ht-border-width-thin) 0 var(--ht-color-border-subtle);
+}
+
+.ht-content__calendar-display__label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  min-inline-size: 0;
+  font-size: var(--ht-font-size-sm);
+  color: var(--ht-color-foreground);
+}
+
+.ht-content__calendar-display__segmented {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--ht-space-1);
+  padding: var(--ht-space-1);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface-subtle);
+}
+
+.ht-content__calendar-display__segment {
+  appearance: none;
+  margin: 0;
+  padding: 0 var(--ht-space-3);
+  border: 0;
+  border-radius: var(--ht-radius-sm);
+  block-size: calc(var(--ht-size-field-height) - var(--ht-space-2));
+  background: transparent;
+  color: var(--ht-color-foreground-muted);
+  font-family: inherit;
+  font-size: var(--ht-font-size-xs);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color var(--ht-duration-fast) var(--ht-ease-standard),
+    color var(--ht-duration-fast) var(--ht-ease-standard);
+}
+
+.ht-content__calendar-display__segment:hover {
+  color: var(--ht-color-foreground);
+}
+
+.ht-content__calendar-display__segment[aria-checked='true'] {
+  background: var(--ht-color-surface);
+  color: var(--ht-color-primary);
+  font-weight: var(--ht-font-weight-medium);
+  box-shadow: var(--ht-shadow-sm);
+}
+
+.ht-content__calendar-display__segment:focus-visible,
+.ht-content__calendar-display__help:focus-visible,
+.ht-content__calendar-display__close:focus-visible {
+  outline: var(--ht-border-width-thick) solid var(--ht-color-primary);
+  outline-offset: var(--ht-space-1);
+}
+
+.ht-content__calendar-display__help-wrap {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+}
+
+.ht-content__calendar-display__help {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: var(--ht-space-5);
+  block-size: var(--ht-space-5);
+  margin: 0;
+  padding: 0;
+  border: var(--ht-border-width-thin) solid var(--ht-color-border-strong);
+  border-radius: var(--ht-radius-full);
+  background: var(--ht-color-surface-raised);
+  color: var(--ht-color-foreground-subtle);
+  font-family: inherit;
+  font-size: var(--ht-font-size-2xs);
+  line-height: var(--ht-line-height-tight);
+  cursor: help;
+}
+
+.ht-content__calendar-display__help:hover {
+  border-color: var(--ht-color-primary);
+  color: var(--ht-color-primary);
+}
+
+.ht-content__calendar-display__tip {
+  position: absolute;
+  inset-block-start: calc(100% + var(--ht-space-2));
+  inset-inline-start: calc(-1 * var(--ht-space-4));
+  z-index: var(--ht-z-tooltip);
+  inline-size: calc(var(--ht-space-16) * 3);
+  padding: var(--ht-space-2) var(--ht-space-3);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface-raised);
+  box-shadow: var(--ht-shadow-lg);
+  color: var(--ht-color-foreground);
+  font-size: var(--ht-font-size-xs);
+  line-height: var(--ht-line-height-normal);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(calc(-1 * var(--ht-space-1)));
+  transition:
+    opacity var(--ht-duration-fast) var(--ht-ease-standard),
+    transform var(--ht-duration-fast) var(--ht-ease-standard),
+    visibility var(--ht-duration-fast) var(--ht-ease-standard);
+}
+
+.ht-content__calendar-display__help-wrap:hover .ht-content__calendar-display__tip,
+.ht-content__calendar-display__help-wrap:focus-within .ht-content__calendar-display__tip,
+.ht-content__calendar-display__help-wrap[data-open='true'] .ht-content__calendar-display__tip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+@keyframes ht-calendar-display-enter {
+  from {
+    opacity: 0;
+    transform: translateY(var(--ht-space-2));
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ht-content__calendar-display {
+    animation: none;
+  }
+
+  .ht-content__calendar-display__tip {
+    transition: none;
+  }
+}

@@ -86,7 +86,6 @@ import {
 import { useSyncStore } from '../sync/store.js';
 import { FormField } from '../../lib/form/FormField.js';
 import { EmailChangePanel } from './EmailChangePanel.js';
-import { SettingsInfoTip } from './SettingsInfoTip.js';
 import { loadAvatarImage, type AvatarFileError } from './avatar-encode.js';
 import { SettingsAccountGate } from './SettingsAccountGate.js';
 import { notifyAccountIdentityChanged } from './useAccountIdentity.js';
@@ -451,13 +450,6 @@ export function ProfilePanel({
           id="profile-nickname"
           label={t('common.profile.nickname.label')}
           layout="inline"
-          labelTip={
-            <SettingsInfoTip
-              label={t('common.profile.nickname.whyLabel')}
-              text={t('common.profile.nickname.why')}
-              testId="profile-nickname-why"
-            />
-          }
         >
           {(fieldProps) => (
             <div className="ht-input-field__fieldrow">

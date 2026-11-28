@@ -32,11 +32,17 @@
  */
 
 .ht-row__drag-handle {
-  /* 抓得住的手感：不是装饰，它告诉用户"这一格可以拖"。 */
+  /* 抓得住的手感：静止态收敛隐藏，悬停整行或聚焦时浮现，避免列表常驻抓手噪音。 */
   cursor: grab;
-  /* 🔴 触屏上必须关掉默认手势：否则纵向拖动会被浏览器读成页面滚动
-     （症状是"鼠标能拖、手指拖不动"，而桌面验收完全看不出来）。 */
   touch-action: none;
+  opacity: 0;
+  transition: opacity var(--ht-duration-fast) var(--ht-ease-standard);
+}
+
+.ht-content [data-testid^='task-item-']:hover .ht-row__drag-handle,
+.ht-row__drag-handle:focus-visible,
+.ht-row__drag-handle[data-dragging='true'] {
+  opacity: 1;
 }
 
 .ht-row__drag-handle[data-dragging='true'] {

@@ -12,8 +12,8 @@
     不再用于"内容 vs 卡片"，所以不再有"半吊子"的问题。
   */
   background: var(--ht-color-background);
-  /* 工作区靠底色与留白分层，拖拽时才显示手柄。 */
-  border-right: 0;
+  /* 侧栏与主列表之间用 1px 边框明确分栏；悬停边缘时拖拽条以主色加粗覆盖。 */
+  border-right: var(--ht-border-width-thin) solid var(--ht-color-border);
   /*
    * 🔴 2026-10-06（工单 H9 的第二刀）：这一列**自己必须有界**，滚动交给 `.ht-sidebar__body`。
    * 形状与理由逐字照 `.ht-sidebar--calendar`（`sidebar.css:225-239`，日历线已经踩过并写下来了）：
@@ -247,9 +247,15 @@
  * 清单很长时这一组被推到滚动区之下 —— 那是这一列本来就该有的行为，
  * 不是"入口丢了"（`overflow-y: auto` 在那条规则上）。
  */
+.ht-sidebar__primary {
+  padding-block-end: var(--ht-space-2);
+  border-block-end: var(--ht-border-width-thin) solid var(--ht-color-border);
+}
+
 .ht-sidebar__tools {
   margin-top: auto;
   padding-block-start: var(--ht-space-2);
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border);
 }
 
 /*

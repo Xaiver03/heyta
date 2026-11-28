@@ -141,6 +141,26 @@ describe('「换清单」这个动作在共享边界上摆不摆出来', () => {
     expect(el.querySelector('[data-testid="organize-move-blocked"]'), '没撞门就不许出现那句话').toBeNull();
   });
 
+  it('🔴 收集箱里的任务 + 尚未建任何清单（projects 为空）⇒ 不许误报成「共享清单」并灰掉', () => {
+    const now = 1_700_000_000_000;
+    const state = emptyState();
+    Object.assign(state.tasks as object, {
+      tInboxOnly: { id: 'tInboxOnly', title: '第一条任务', createdAt: now, updatedAt: now },
+    });
+    holder.state = state;
+    act(() => {
+      useProjectStore.setState({ projects: [], tags: [] });
+    });
+    const el = renderField((state.tasks as Record<string, Task>).tInboxOnly!);
+    const select = el.querySelector<HTMLSelectElement>('[data-testid="organize-project-select"]');
+    expect(select, '整理那一格里没有这枚下拉').not.toBeNull();
+    expect(select!.disabled, '没有任何自建清单时，收集箱任务不许被当成共享清单锁死').toBe(false);
+    expect(
+      el.querySelector('[data-testid="organize-move-blocked"]'),
+      '普通收集箱任务底下不许印出「共享清单里的任务暂时不能换清单」',
+    ).toBeNull();
+  });
+
   it('反向臂：个人任务那枚下拉照旧能用，只有共享那条目的地是灰的', () => {
     holder.state = viewState();
     seedProjectStore();

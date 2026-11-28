@@ -207,7 +207,6 @@ export const zhCN = {
   // 撤回之后（或从没决定过）界面必须留一条**能重新决定**的路，否则 PIPL 第 15 条
   // 只做到"能撤回"、没做到"撤回后还能方便地再同意"。
   'common.privacy.settings.chooseAgain': '重新作出选择',
-  'common.privacy.settings.chooseHint': '需要同步或登录时，可以在这里重新选择是否联网。打开选择面板不会改变当前权限。',
 
   // ── 落地页 · 通用 ─────────────────────────────────────────
   'landing.skipLink': '跳到主要内容',
@@ -636,24 +635,14 @@ export const zhCN = {
   'web.inbox.activity.invite.status.pending': '等待对方验证邮箱',
   'web.inbox.activity.invite.unknownName': '一位好友',
   'web.inbox.activity.invite.empty': '还没有邀请记录',
-  'web.shell.modules.intro': '关掉不用的模块，它就从左侧导航里消失。只影响这台设备。',
   'web.shell.modules.calendar.label': '日历',
-  'web.shell.modules.calendar.note': '按日期看哪天有什么事。',
   'web.shell.modules.quadrant.label': '四象限',
-  'web.shell.modules.quadrant.note': '按重要与紧急把任务分到四格。',
   'web.shell.modules.kanban.label': '看板',
-  'web.shell.modules.kanban.note': '按清单分列，拖动卡片换清单。',
   'web.shell.modules.habits.label': '习惯打卡',
-  'web.shell.modules.habits.note': '养成习惯，让自律成为日常。',
   'web.shell.modules.timeline.label': '时间线',
-  'web.shell.modules.timeline.note': '按日期把任务铺在一条时间轴上。',
   'web.shell.modules.focus.label': '番茄钟',
-  'web.shell.modules.focus.note': '用番茄计时保持专注。',
   'web.shell.modules.growth.label': '成长',
-  'web.shell.modules.growth.note': '看长期趋势与累计，而不是今天。',
   'web.shell.modules.notes.label': '便签',
-  'web.shell.modules.notes.note': '随时记一笔，不必先变成一条任务。',
-  'web.shell.modules.savedHint': '已保存 —— 左侧导航已经跟着变了。',
   'web.shell.views.groupMore': '更多',
   'web.shell.rail.customize': '自定义侧栏',
   'web.shell.rail.customizeDone': '完成自定义',
@@ -1115,7 +1104,6 @@ export const zhCN = {
   'web.settings.syncUx.lastSyncedNever': '还没有成功同步过。',
   'web.settings.syncUx.lastSynced': '上次成功同步：{at}',
   'web.settings.syncUx.localFirst': '数据先写在这台设备上，再同步到你的服务器；断网也能继续用。',
-  'web.settings.syncUx.statusHint': '先确认连接状态，再修改服务端或账号凭据。',
   'web.settings.syncUx.errorTitle': '同步需要处理',
   'web.settings.syncUx.accountTitle': '服务端与账号',
   'web.settings.syncUx.accountHint': '服务端地址决定数据发往哪里；登录或手动令牌只负责证明你可以访问它。未保存前，草稿不会改变当前连接。',
@@ -1767,6 +1755,9 @@ export const zhCN = {
   'web.focus.detail.recordsEmpty': '还没有专注记录。完成一轮就会出现在这里。',
   'web.focus.detail.unlinked': '未关联任务',
   'web.focus.detail.aborted': '中途放弃',
+  // 七日脉搏每一格的无障碍名（格子本身是颜色，这句是它被读出来的那份事实）。
+  // `{weekday}` 复用 `common.weekday.*`，不另开一套"周几"。
+  'web.focus.detail.pulseDay': '{weekday}，专注 {duration}',
 
   // ── Web · 习惯 ────────────────────────────────────────────
   /*
@@ -2181,7 +2172,7 @@ export const zhCN = {
   'web.organize.moveBlockedShared': '共享清单里的任务暂时不能换清单',
   'web.organize.tagsLegend': '标签',
   'web.organize.tagToggle': '给任务「{title}」加上或去掉标签「{name}」',
-  'web.organize.noTags': '还没有标签 —— 在左侧「标签」里新建一个。',
+  'web.organize.noTags': '还没有标签',
   // ── Web · 行尾「截止」控件（批一，多端入口覆盖 goal §2）──────────────
   //    日期措辞本身复用 common.date.* / common.weekday.*（共享 DatePicker
   //    的 monthTitle/dayLabel 由宿主拼），这里只有控件自己的话。
@@ -2791,6 +2782,7 @@ export const zhCN = {
   'web.ai.assistant.mcpSplit': '这里只管内置助手。「本机 API」下面那些开关管的是外部程序能不能调用工具，两边互不影响。',
   // ── 对话助手界面（W12 / ADR-0045）──────────────────────────────────
   'web.ai.chat.title': '对话助手',
+  'web.ai.chat.welcome.title': '马上行动起来吧',
   'web.ai.chat.tierLabel': '助手权限',
   'web.ai.chat.suggestion.today': '看看今天有什么任务',
   'web.ai.chat.suggestion.today.label': '今天有什么',
@@ -3107,7 +3099,7 @@ export const zhCN = {
   'web.subscription.renew.fail.unknown': '下单失败（{code}）。',
   // ── 订阅页（移动端，2026-10-24 独立成节）──────────────────────────
   // 与 Web 的「订阅」一节同构（状态 → 选档 → 下单 → 脚注），只是形态是原生卡片。
-  'mobile.settings.section.subscription': '订阅',
+  'mobile.settings.section.subscription': '订阅管理',
   /*
    * 🔴 2026-11-15：删掉前半句。
    *
@@ -3600,6 +3592,13 @@ export const zhCN = {
   'web.calendar.title': '日历',
   'web.calendar.prevMonth': '上个月',
   'web.calendar.nextMonth': '下个月',
+  // 高级视图下拉。月/周/日/年那几条在 `common.calendar.view.*`（两端共用），
+  // 这里只放 web 独有的档位与它的数量模板 —— 别再抄一份公用的。
+  'web.calendar.view.agenda': '日程',
+  'web.calendar.view.multiDay': '多日',
+  'web.calendar.view.multiWeek': '多周',
+  'web.calendar.view.multiDayValue': '{n}天',
+  'web.calendar.view.multiWeekValue': '{n}周',
   // 🔴 轴整列空白时必须说这一句：不说，"这天没定到具体时刻"与"日视图没接上数据"
   //    在界面上长得一模一样（后者本仓为它记过一整页账）。
   'web.calendar.weekShort': '{n}周',
@@ -3607,7 +3606,6 @@ export const zhCN = {
   'web.calendar.monthTitle': '{year}年{month}月',
   'web.calendar.dayTitle': '{month}月{day}日 星期{weekday}',
   'web.calendar.dayEmpty': '这一天没有到期的任务。',
-  'web.calendar.footnote': '未设截止时间的任务不在日历上，它们在「任务」页的收集箱里。',
   'web.calendar.a11y.dayWithTasks': '{date}，{count} 个任务',
   'web.calendar.a11y.dayWithTasksOne': '{date}，{count} 个任务',
   'web.calendar.a11y.dayNoTasks': '{date}，没有任务',
@@ -3638,6 +3636,7 @@ export const zhCN = {
   'web.calendar.display.colorByList': '按清单',
   'web.calendar.display.colorByPriority': '按优先级',
   'web.calendar.display.colorByOff': '不着色',
+  'web.calendar.more.openDisplaySettings': '显示设置…',
   'web.calendar.more.scopeSection': '显示范围',
   'web.calendar.more.editScope': '编辑显示范围…',
   'web.calendar.more.arrangeSection': '安排任务',
@@ -3649,6 +3648,24 @@ export const zhCN = {
   'web.calendar.more.subscribeHint': '需要服务端拉取 iCal / 第三方日历，暂未接入',
   'web.calendar.more.subscribe': '日历订阅…',
   'web.calendar.more.noTasksToday': '当天没有任务',
+  // 显示设置分层卡片：颜色 / 样式 / 开关 / 辅助时区，最后是卡片自己的返回与关闭。
+  'web.calendar.display.title': '显示设置',
+  'web.calendar.display.color': '颜色',
+  'web.calendar.display.colorByProject': '按清单',
+  'web.calendar.display.colorByQuadrant': '按象限',
+  'web.calendar.display.style': '样式',
+  'web.calendar.display.styleClassic': '经典',
+  'web.calendar.display.styleModern': '现代',
+  'web.calendar.display.showChecklist': '显示检查事项',
+  'web.calendar.display.showAllRepeats': '显示所有重复周期',
+  'web.calendar.display.showHabits': '显示习惯',
+  'web.calendar.display.showFocus': '显示专注记录',
+  'web.calendar.display.showFocusTip': '在日历中展示番茄专注时长记录',
+  'web.calendar.display.showCourses': '显示课程',
+  'web.calendar.display.secondaryTimezone': '辅助时区',
+  'web.calendar.display.secondaryTimezoneTip': '在日/周时间轴左侧增加第二时区刻度',
+  'web.calendar.display.back': '返回',
+  'web.calendar.display.close': '关闭',
 
   'mobile.weekday.mon': '一',
   'mobile.weekday.tue': '二',
@@ -3659,12 +3676,12 @@ export const zhCN = {
   'mobile.weekday.sun': '日',
 
   // ── 移动端 · 底部标签栏 ───────────────────────────────────
-  'mobile.tab.tasks': '任务',
-  'mobile.tab.calendar': '日历',
-  'mobile.tab.focus': '专注',
-  'mobile.tab.profile': '我的',
+  'mobile.tab.tasks': '任务清单',
+  'mobile.tab.calendar': '日历视图',
+  'mobile.tab.focus': '专注计时',
+  'mobile.tab.profile': '个人中心',
   'mobile.tab.categories': '统计',
-  'mobile.tab.ai': 'AI',
+  'mobile.tab.ai': 'AI 助手',
 
   // ── 移动端 · 分类时长 ──────────────────────────────────────
   // 🔴 这一组里**只许有事实句**：某类做了多久、这些时间怎么算出来的。
@@ -3959,7 +3976,6 @@ export const zhCN = {
   'mobile.calendar.view.3day': '3日',
   'mobile.calendar.view.timetable': '课表',
   'mobile.calendar.today': '今天',
-  'mobile.calendar.footnote': '未设截止时间的任务不在日历上，它们在「任务」页的收集箱里。',
   'mobile.calendar.a11y.dayWithTasks': '{date}，{count} 个任务',
   // 同 `mobile.common.badge.countOne`：中文无单复数，刻意逐字相同。
   'mobile.calendar.a11y.dayWithTasksOne': '{date}，{count} 个任务',
@@ -3967,6 +3983,9 @@ export const zhCN = {
   'mobile.calendar.a11y.moreTasks': '还有 {count} 项',
   'mobile.calendar.a11y.markDone': '标记完成：{title}',
   'mobile.calendar.a11y.unmarkDone': '取消完成：{title}',
+  // 拖拽改期：前一条是拖拽入口的说明/无障碍名，后一条是落下后的播报（`{date}` 已本地化）。
+  'mobile.calendar.dragReschedule': '拖动任务到日期格即可改期',
+  'mobile.calendar.rescheduledTo': '已改期至 {date}',
 
   // ── 移动端 · 日期选择器 ───────────────────────────────────
   'mobile.datePicker.clear': '清除',
@@ -4231,7 +4250,7 @@ export const zhCN = {
   // ── 标签 ───────────────────────────────────────────────────
   // 清单和标签在数据上是两个实体，在产品上是同一件事的两个面（组织任务）：
   // 清单回答"它属于哪个容器"（一个），标签回答"它还跟什么有关"（多个）。
-  'mobile.profile.section.tags': '标签',
+  'mobile.profile.section.tags': '标签管理',
   'common.organizer.tags.empty': '还没有标签',
   // 同 `lists.empty.hint`：web 有那枚 +，移动端没有（移动端是输入框 + 按钮）。
   'mobile.tags.nameLabel': '标签名称',
@@ -4343,13 +4362,13 @@ export const zhCN = {
   'mobile.profile.loading': '正在读取个人资料…',
   'mobile.profile.localOnly': '当前只用本机。可在设置的“同步与隐私”中允许联网后编辑个人资料。',
   'mobile.profile.retry': '重新读取',
-  'mobile.profile.title': '我的',
+  'mobile.profile.title': '个人中心',
   // 🔴 设置是**独立的第二层表面**（RN Modal），不是「我的」滚动流里的一段 ——
   //    对标 §11.5 的规律（次级表面独立成面）。入口行在「我的」上，内容在设置面里。
   // ── 设置分组的**意图命名**（2026-10-27 IA 迁移）────────────────────────────
   // 旧的 section.profile/general/sync/security 等键保留（深链与 e2e 还引用），
   // 但目录里显示的是下面这七条 —— 每一组回答"我要做的那件事属于哪一类"。
-  'mobile.settings.section.account': '账号',
+  'mobile.settings.section.account': '账号资料',
   'mobile.settings.section.notifications': '提醒与通知',
   // 🔴 这一格是**页面标题**（顶栏那行）。2026-11-14 之前叫「语言」，而那一页现在
   // 已经有两组：「外观」（三档手动主题）+「语言」。标题与内容对不上 ——
@@ -4368,13 +4387,15 @@ export const zhCN = {
    */
   'mobile.profile.entry.features': '全部功能',
   'mobile.profile.entry.stats': '统计与回顾',
-  'mobile.tabbarCustomize.title': '自定义底部导航',
+  'mobile.tabbarCustomize.title': '底部导航',
   'mobile.tabbarCustomize.hint': '选 {min}–{max} 个；「我的」固定在最后',
   'mobile.tabbarCustomize.up': '上移',
   'mobile.tabbarCustomize.down': '下移',
   'mobile.tabbarCustomize.restore': '恢复默认',
   'mobile.tabbarCustomize.error.min': '至少保留 {min} 个',
   'mobile.tabbarCustomize.error.max': '最多 {max} 个',
+  'mobile.tabbarCustomize.reorder': '拖动排序',
+  'mobile.settings.more': '更多设置',
   'mobile.settings.section.about': '关于与帮助',
   'mobile.settings.section.profile': '个人资料',
   'mobile.settings.section.general': '常规',
@@ -4391,7 +4412,7 @@ export const zhCN = {
   'mobile.settings.close': '关闭',
   'mobile.profile.entry.settings': '设置',
   'mobile.profile.entry.settings.hint': '个人资料、偏好、同步与安全',
-  'mobile.profile.section.sync': '同步',
+  'mobile.profile.section.sync': '同步状态',
   'mobile.profile.section.status': '状态',
   // 「我的」里那条托管同步权益。只有服务端**明确说**有才显示这一行
   // （`entitled` / `denied`），未配置与探测失败一律不显示 —— 见 `EntitlementSection.tsx`。
@@ -4403,7 +4424,7 @@ export const zhCN = {
   'mobile.profile.theme.system': '跟随系统',
   'mobile.profile.theme.light': '浅色',
   'mobile.profile.theme.dark': '深色',
-  'mobile.profile.section.lists': '清单',
+  'mobile.profile.section.lists': '清单管理',
   // 🔴 认证入口在这一屏的**顶部卡片**（一级可见）—— 规范 §3.1 的「前置」落点。
   //    底部标签必须保持 5 个（规范 §2-A8），所以它是入口卡片，不是第 6 个 tab。
   'mobile.profile.section.account': '账号',
@@ -4613,7 +4634,7 @@ export const zhCN = {
   // 移动端此前**没有**习惯屏（成长屏只读连续数字，连打卡都做不到），
   // 所以标签用「习惯」而不是「我的成长」—— 后者是回顾，这里是操作。
   // ⚠️ 入口放在「我的」的第二层、不加 tab（ADR-0015 §4 与 P10 的连带有判决）。
-  'mobile.habits.entry': '习惯',
+  'mobile.habits.entry': '习惯打卡',
   'mobile.habits.entry.hint': '打卡、连续天数与热力图',
   'mobile.growth.compare.note': '这里的数字只和过去的自己比，没有排行榜。',
 
@@ -4737,7 +4758,7 @@ export const zhCN = {
   //    web.inbox.* 同口径；服务端只存 kind + payload，话在这里说。
   'mobile.inbox.title': '通知中心',
   'mobile.inbox.back': '返回',
-  'mobile.inbox.trigger': '通知',
+  'mobile.inbox.trigger': '通知中心',
   'mobile.inbox.entry.hint': '系统消息与邀请好友活动',
   'mobile.inbox.badge.aria': '{count} 条未读',
   'mobile.inbox.tab.notifications': '通知',
@@ -6055,7 +6076,7 @@ export const zhCN = {
   // ⚠️ 与任务上的「备注」(`web.note.*` / `mobile.detail.field.note`) 是**两件事**：
   //    那是任务正文，这是独立的一条记录（可不挂清单、可钉到「今天」）。
   //    文案上刻意不叫「备注」，否则用户会以为它就是任务里那个。
-  'notes.title': '便签',
+  'notes.title': '便签记录',
   'notes.empty': '还没有便签',
   'notes.composer.placeholder': '写点什么…',
   'notes.add': '添加便签',

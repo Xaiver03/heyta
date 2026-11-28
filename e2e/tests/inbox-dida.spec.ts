@@ -52,8 +52,8 @@ test('收集箱：当前形态取证', async ({ page }) => {
    */
   await expect(
     page.locator('[data-testid="nav-scope-all"]'),
-    '侧栏不该再有「收集箱」那一行',
-  ).toHaveCount(0);
+    '侧栏左上角智能清单应包含「收集箱」那一行',
+  ).toBeVisible();
 
   const todayRow = page.locator('[data-testid="nav-scope-today"]');
   await expect(todayRow, '侧栏必须有「今天」').toBeVisible();

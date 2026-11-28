@@ -34,7 +34,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { adjustmentOn, canRescheduleByCalendarDrag, parseCategorySlot, planCalendarDrop, planCalendarTimeDrop, scopeTasks, toLocalDate, type LocalDate, type Task } from '@heyta/domain';
+import { adjustmentOn, canRescheduleByCalendarDrag, parseCategorySlot, planCalendarAllDayDrop, planCalendarDrop, planCalendarTimeDrop, scopeTasks, toLocalDate, type LocalDate, type LocalTime, type Task } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
 import { CATEGORY_SLOT_TOKEN_BY_SLOT, type TokenName } from '@heyta/design-system';
 import {
@@ -45,9 +45,10 @@ import {
 import { resolveCalendarBarAccent } from './calendar-display-pref.js';
 
 import { CalendarCapturePopover } from './CalendarCapturePopover.js';
-import { CalendarDragBar, CalendarDragProvider, CalendarDropDay, CalendarDropHour } from './CalendarDnd.js';
+import { CalendarDragBar, CalendarDragProvider, CalendarDropAllDay, CalendarDropDay, CalendarDropHour, CalendarDropSlot } from './CalendarDnd.js';
 import { CalendarTimetable } from './CalendarTimetable.js';
 import { CalendarTimetableImport } from './CalendarTimetableImport.js';
+import { CalendarDisplaySettingsModal } from './CalendarDisplaySettingsModal.js';
 import { useCountdownStore } from '../countdown/store.js';
 import { useTaskStore } from '../tasks/store.js';
 import { useProjectStore } from '../projects/store.js';
@@ -146,16 +147,28 @@ export function CalendarView(): React.JSX.Element {
     [store, tasksById],
   );
 
-  /** 日档拖到某小时：落点 → `planCalendarTimeDrop` → 一次 `setDueDate`（带时刻、清 date-only）。 */
+  /** 日档拖到某小时/槽位：落点 → `planCalendarTimeDrop` → 一次 `setDueDate`（带时刻、清 date-only）。 */
   const onSetTime = useCallback(
-    (taskId: string, targetDate: LocalDate, hour: number) => {
+    (taskId: string, targetDate: LocalDate, hour: number, minute = 0) => {
       const task = tasksById.get(taskId);
       if (task === undefined) return;
-      const plan = planCalendarTimeDrop(task, targetDate, hour);
+      const plan = planCalendarTimeDrop(task, targetDate, hour, minute);
       if (plan === undefined) return;
       void store.setDueDate(taskId, plan.dueDate).catch(() => {
         /* 同上，只防未处理的 rejection。 */
       });
+    },
+    [store, tasksById],
+  );
+
+  /** 日档拖回全天区：落点 → `planCalendarAllDayDrop` → 一次 `setDueDate`（清时刻、设 date-only）。 */
+  const onSetAllDay = useCallback(
+    (taskId: string, targetDate: LocalDate) => {
+      const task = tasksById.get(taskId);
+      if (!task) return;
+      const plan = planCalendarAllDayDrop(task, targetDate);
+      if (!plan) return;
+      void store.setDueDate(taskId, plan.dueDate, plan.dueDateLocal).catch(() => {});
     },
     [store, tasksById],
   );
@@ -295,7 +308,7 @@ export function CalendarView(): React.JSX.Element {
 
   return (
     <HeytaUiProvider>
-      <CalendarDragProvider tasksById={tasksById} onReschedule={onReschedule} onSetTime={onSetTime}>
+      <CalendarDragProvider tasksById={tasksById} onReschedule={onReschedule} onSetTime={onSetTime} onSetAllDay={onSetAllDay}>
       {/*
         🔴 这一层**必须把 `.ht-content` 的确定高度传下去**（R11 批一"日历只占一半"的宿主那一刀）。
         共享板的根有 `flexGrow: 1`，但 `flexGrow` 只在**弹性容器**里生效 ——
@@ -327,7 +340,7 @@ export function CalendarView(): React.JSX.Element {
         ) : (
           <>
         {view.captureOpen ? (
-          <CalendarCapturePopover date={view.selected} title={labels.dayTitle(view.selected)} onClose={view.toggleCapture} />
+          <CalendarCapturePopover date={view.selected} time={view.captureTime} title={labels.dayTitle(view.selected)} onClose={view.toggleCapture} />
         ) : null}
         <SharedCalendarBoard
           tasks={tasks}
@@ -336,6 +349,8 @@ export function CalendarView(): React.JSX.Element {
           selected={view.selected}
           onCursorChange={view.setCursor}
           onSelect={onSelectDay}
+          onSelectSlot={(day: LocalDate, time: LocalTime) => view.openCaptureAtSlot(day, time)}
+          activeSlot={view.captureOpen && view.captureTime !== undefined ? { day: view.selected, time: view.captureTime } : undefined}
           /*
             年档里点一张月卡（R13）。🔴 宿主**只做接线**，"去哪"由共享层决定
             （`calendarMonthDrill`）—— 移动端接同一档时抄的是同一个函数，
@@ -366,6 +381,9 @@ export function CalendarView(): React.JSX.Element {
           dayMarkerLabels={dayMarkerLabels}
           events={boardEvents}
           eventLabels={eventLabels}
+          /* 显示设置 → 颜色（按清单 / 按象限）与事件条样式（经典 / 现代）。 */
+          colorByQuadrant={view.colorMode === 'quadrant'}
+          displayStyle={view.displayStyle}
           /*
             拖拽改期（Web 独有）。三个注入点全在 `CalendarDnd.tsx`：
             每格日期包成投放目标、每条任务条包成拖拽源。共享层不认识 dnd-kit。
@@ -390,12 +408,24 @@ export function CalendarView(): React.JSX.Element {
               {node}
             </CalendarDropHour>
           )}
+          renderSlotWrapper={(hour, minute, node) => (
+            <CalendarDropSlot date={view.cursor} hour={hour} minute={minute}>
+              {node}
+            </CalendarDropSlot>
+          )}
+          renderAllDayWrapper={(node) => (
+            <CalendarDropAllDay date={view.cursor}>
+              {node}
+            </CalendarDropAllDay>
+          )}
           testID={BOARD_TEST_ID}
         />
           </>
         )}
       </div>
       </CalendarDragProvider>
+      {/* 分层卡片式「显示设置」弹窗：由 ⋮ 菜单的 entry 置 `displaySettingsOpen` 打开。 */}
+      <CalendarDisplaySettingsModal />
     </HeytaUiProvider>
   );
 }

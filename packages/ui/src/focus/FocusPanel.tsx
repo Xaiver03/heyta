@@ -58,8 +58,8 @@ import {
  * 而"状态 → 文案"的映射属于词条表那一侧。
  */
 export interface FocusPanelLabels {
-  /** 阶段行文案。 */
-  readonly phase: (state: FocusState) => string;
+  /** 阶段行文案。返回 undefined 或空串时不渲染 —— 空闲态无需废话解释。 */
+  readonly phase: (state: FocusState) => string | undefined;
   /** 主按钮可见文案。 */
   readonly primary: (action: FocusPrimaryAction, state: FocusState) => string;
   /** 主按钮无障碍名。省略时退回可见文案。 */
@@ -68,7 +68,7 @@ export interface FocusPanelLabels {
   readonly abort: string;
   /** 进度环的无障碍名，例如「进度 42%」。 */
   readonly ring: (percent: number) => string;
-  /** 本轮时长说明（「本轮 25 分钟」）。省略则不渲染 —— 两端当前只有手机显示它。 */
+  /** 本轮时长说明（「本轮 25 分钟」）。省略则不渲染。 */
   readonly roundLength?: string;
   /** 今日已完成（整句）。省略则不渲染。 */
   readonly completed?: string;
@@ -86,7 +86,13 @@ export interface FocusPanelProps {
   readonly onResume: () => void;
   /** 中止并落盘（记为未自然完成）。 */
   readonly onAbort: () => void;
-  /** 宿主特有的区块（web 的关联任务下拉与时长设置 / mobile 的类型胶囊…）。 */
+  /** 环正上方的目标/阶段轻入口（如 `专注 ›` / `{任务名} ›`），与环共处同一条居中轴。 */
+  readonly header?: React.ReactNode;
+  /** 空闲且倒计时模式下点击中央时间数字触发自定义时长。 */
+  readonly onTimePress?: () => void;
+  readonly timePressA11y?: string;
+  readonly timePressTestID?: string;
+  /** 宿主特有的区块。 */
   readonly children?: React.ReactNode;
   /**
    * 按钮组是否**撑满容器宽度**（主按钮 `flex:1`，中止按钮按内容）。
@@ -129,6 +135,10 @@ export function FocusPanel({
   onPause,
   onResume,
   onAbort,
+  header,
+  onTimePress,
+  timePressA11y,
+  timePressTestID,
   children,
   fillControls,
   onModeChange,
@@ -144,17 +154,20 @@ export function FocusPanel({
   const action = focusPrimaryAction(state);
   const primaryLabel = labels.primary(action, state);
   const primaryA11y = labels.primaryA11y?.(action, state) ?? primaryLabel;
+  const phaseText = labels.phase(state);
+  const canPressTime = onTimePress !== undefined && view.idle && view.mode === 'countdown';
 
   const styles = useMemo(
     () =>
       StyleSheet.create({
         root: {
           alignItems: 'center',
-          gap: tokens['space.4'],
+          gap: tokens['space.6'],
         },
         rootFill: {
           flex: 1,
           justifyContent: 'center',
+          gap: tokens['space.8'],
           minHeight: 0,
         },
         modeRow: {
@@ -180,9 +193,17 @@ export function FocusPanel({
           alignItems: 'center',
           gap: tokens['space.1'],
         },
+        timeHit: {
+          minHeight: tokens['touch-target.min'],
+          alignItems: 'center',
+          justifyContent: 'center',
+          paddingHorizontal: tokens['space.2'],
+          borderRadius: tokens['radius.md'],
+        },
         controls: {
           flexDirection: 'row',
-          gap: tokens['space.2'],
+          alignItems: 'center',
+          gap: tokens['space.3'],
         },
         controlsFill: {
           alignSelf: 'stretch',
@@ -196,8 +217,18 @@ export function FocusPanel({
           justifyContent: 'center',
           gap: tokens['space.2'],
           minHeight: tokens['touch-target.min'],
-          paddingHorizontal: tokens['space.4'],
-          borderRadius: tokens['radius.md'],
+          minWidth: tokens['space.12'] * 2 + tokens['space.6'],
+          paddingHorizontal: tokens['space.8'],
+          borderRadius: tokens['radius.full'],
+        },
+        abortButton: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: tokens['space.2'],
+          minHeight: tokens['touch-target.min'],
+          paddingHorizontal: tokens['space.5'],
+          borderRadius: tokens['radius.full'],
         },
         tabular: {
           // 数字等宽：计数变化时宽度不跳。`tabular-nums` 是唯一的字形特性。
@@ -213,30 +244,16 @@ export function FocusPanel({
     else onStart();
   };
 
+  const displayNode = (
+    <Text style={[text['focus-display'], { color: tokens['color.foreground'] }]}>
+      {focusDisplayText(state, now)}
+    </Text>
+  );
+
   return (
     <View style={[styles.root, fill === true ? styles.rootFill : null]} testID={testID}>
-      <FocusRing
-        progress={view.progress}
-        elapsedMs={focusElapsedMs(state, now)}
-        variant={view.mode === 'countup' ? 'dial' : 'progress'}
-        tone={view.tone}
-        label={labels.ring(view.percent)}
-        testID="focus-ring"
-      >
-        <View style={styles.face}>
-          {/* 大号计时数字。`focus-display` 带等宽数字 —— 否则秒数跳动时整块会左右抖。 */}
-          <Text style={[text['focus-display'], { color: tokens['color.foreground'] }]}>
-            {focusDisplayText(state, now)}
-          </Text>
-          <Text style={[text['row-meta'], { color: tokens['color.foreground-muted'] }]}>
-            {labels.phase(state)}
-          </Text>
-        </View>
-      </FocusRing>
-
       {/*
-        模式切换（正计时 / 倒计时）—— **页面中部、环正下方**，不占顶部 tab、不占底部。
-        它改变的是「这一轮怎么计时」，视线本就落在环上，放在环下伸手可及。
+        模式切换（番茄专注 / 正计时）—— 面板顶部居中，位于关联任务轻入口与进度环上方。
         只在 idle 可切（领域层 `selectMode` 也判一次，不靠这里当唯一防线）。
       */}
       {modeLabels === undefined || onModeChange === undefined ? null : (
@@ -288,6 +305,42 @@ export function FocusPanel({
         </View>
       )}
 
+      {header}
+
+      <FocusRing
+        progress={view.progress}
+        elapsedMs={focusElapsedMs(state, now)}
+        variant={view.mode === 'countup' ? 'dial' : 'progress'}
+        tone={view.tone}
+        label={labels.ring(view.percent)}
+        testID="focus-ring"
+      >
+        <View style={styles.face}>
+          {/* 大号计时数字。空闲倒计时态点击本身就是改时长的入口，不另堆说明按钮。 */}
+          {canPressTime ? (
+            <Pressable
+              onPress={onTimePress}
+              accessibilityRole="button"
+              accessibilityLabel={timePressA11y ?? focusDisplayText(state, now)}
+              testID={timePressTestID ?? 'focus-time-trigger'}
+              style={({ pressed }) => [
+                styles.timeHit,
+                { opacity: pressed && !reducedMotion ? tokens['state.pressed-opacity'] : 1 },
+              ]}
+            >
+              {displayNode}
+            </Pressable>
+          ) : (
+            displayNode
+          )}
+          {phaseText === undefined || phaseText === '' ? null : (
+            <Text style={[text['row-meta'], { color: tokens['color.foreground-muted'] }]}>
+              {phaseText}
+            </Text>
+          )}
+        </View>
+      </FocusRing>
+
       {labels.roundLength === undefined ? null : (
         <Text style={[text.caption, { color: tokens['color.foreground-subtle'] }]}>
           {labels.roundLength}
@@ -327,9 +380,9 @@ export function FocusPanel({
             accessibilityLabel={labels.abort}
             testID="focus-abort"
             style={({ pressed }) => [
-              styles.button,
+              styles.abortButton,
               {
-                backgroundColor: 'transparent',
+                backgroundColor: tokens['color.surface-sunken'],
                 opacity: pressed && !reducedMotion ? tokens['state.pressed-opacity'] : 1,
               },
             ]}

@@ -119,6 +119,7 @@ test.describe('任务整理：清单归属 + 标签', () => {
     await pane.getByLabel(`任务「${TITLE}」所属清单`).selectOption({ label: LIST });
     await expect(metaFor(page, TITLE), '归属没有出现在行的元信息槽里').toContainText(LIST);
 
+    await pane.getByTestId('task-detail-tag-trigger').click();
     const checkbox = pane.getByRole('checkbox', {
       name: `给任务「${TITLE}」加上或去掉标签「${TAG}」`,
     });
@@ -191,6 +192,7 @@ test.describe('任务整理：清单归属 + 标签', () => {
     await expect(
       paneAfterReload.getByLabel(`任务「${TITLE}」所属清单`).locator('option:checked'),
     ).toHaveText(LIST);
+    await paneAfterReload.getByTestId('task-detail-tag-trigger').click();
     await expect(
       paneAfterReload.getByRole('checkbox', {
         name: `给任务「${TITLE}」加上或去掉标签「${TAG}」`,
@@ -230,6 +232,7 @@ test.describe('任务整理：清单归属 + 标签', () => {
      */
     await openRowTail(page, row);
     const pane = await openNarrowTaskPane(page, title);
+    await pane.getByTestId('task-detail-tag-trigger').click();
     const checkbox = pane.getByRole('checkbox', {
       name: `给任务「${title}」加上或去掉标签「${TAG}」`,
     });
@@ -264,6 +267,7 @@ test.describe('任务整理：清单归属 + 标签', () => {
     const row2 = rowFor(page, title);
     await openRowTail(page, row2);
     const pane2 = await openNarrowTaskPane(page, title);
+    await pane2.getByTestId('task-detail-tag-trigger').click();
     await pane2
       .getByRole('checkbox', {
         name: `给任务「${title}」加上或去掉标签「${TAG}」`,
@@ -299,6 +303,7 @@ test.describe('任务整理：清单归属 + 标签', () => {
     // 面单里的勾选态也必须是从 op-log 物化出来的那一个（不只是行尾 chip 好看）。
     await openRowTail(page, afterReload);
     const paneAfterReload = await openNarrowTaskPane(page, title);
+    await paneAfterReload.getByTestId('task-detail-tag-trigger').click();
     await expect(
       paneAfterReload.getByRole('checkbox', {
         name: `给任务「${title}」加上或去掉标签「${TAG}」`,

@@ -61,7 +61,7 @@ async function parkAndSettle(page: Page): Promise<void> {
 }
 
 test.describe('专注详情面', () => {
-  test('F1 四张概览卡都在，且都在详情列**那一格里**', async ({ page }) => {
+  test('F1 今日读数在 hero、累计读数在账本行 —— 两批读数都在详情列**那一格里**', async ({ page }) => {
     const errors = watchErrors(page);
     await openApp(page, '/?lang=zh-CN');
     await switchView(page, '番茄钟');
@@ -69,26 +69,40 @@ test.describe('专注详情面', () => {
     const pane = page.getByTestId('focus-detail-pane');
     await expect(pane, '切到专注面之后，详情列里没有专注概览 —— 接线没接上').toBeVisible();
 
-    const cards = page.locator(`${COLUMN} .ht-app__detail-card`);
-    // 🔴 存在性先于取值：四张卡是本单的判据对象，少一张就是少做一件事。
-    await expect(cards).toHaveCount(4);
-    for (const card of await cards.all()) {
-      await expect(card).toBeInViewport();
-      // 标签与数字各就各位（空标签的卡会在截图里看起来"正常"，而它什么都没说）。
-      await expect(card.locator('.ht-app__detail-card-label')).not.toHaveText('');
-      await expect(card.locator('.ht-app__detail-card-value')).not.toHaveText('');
+    /*
+     * 🔴 这一条的前身断的是"`.ht-app__detail-card` 有四张"。
+     * 重设计把 2×2 四个同款灰框拆成了 hero（今日）+ 账本行（累计），
+     * 所以这里改断**两个容器各自的读数条数** —— 判据的强度没降：
+     * 少了任何一个读数都会红，而"今日与累计混在同一容器里"这件事本身也会红。
+     */
+    const heroCells = page.locator(`${COLUMN} .ht-app__detail-hero-cell`);
+    const ledgerRows = page.locator(`${COLUMN} .ht-app__detail-ledger-row`);
+    await expect(heroCells, '今日 Hero 应有 2 格（番茄数 / 时长）').toHaveCount(2);
+    await expect(ledgerRows, '累计账本应有 2 行（总番茄 / 总时长）').toHaveCount(2);
+
+    for (const cell of await heroCells.all()) {
+      await expect(cell).toBeInViewport();
+      // 标签与数字各就各位（空标签的读数会在截图里看起来"正常"，而它什么都没说）。
+      await expect(cell.locator('.ht-app__detail-hero-label')).not.toHaveText('');
+      await expect(cell.locator('.ht-app__detail-hero-value')).not.toHaveText('');
     }
-    // 每一张都在那一列的矩形里面 —— 挂在别处（比如内容区）会看不到这个差别。
+    for (const row of await ledgerRows.all()) {
+      await expect(row).toBeInViewport();
+      await expect(row.locator('.ht-app__detail-ledger-label')).not.toHaveText('');
+      await expect(row.locator('.ht-app__detail-ledger-value')).not.toHaveText('');
+    }
+
+    // 每一块都在那一列的矩形里面 —— 挂在别处（比如内容区）会看不到这个差别。
     const columnBox = await page.locator(COLUMN).boundingBox();
     expect(columnBox, '量不到详情列').not.toBeNull();
-    for (const card of await cards.all()) {
-      const b = await card.boundingBox();
-      expect(b, '量不到卡片').not.toBeNull();
-      const col = columnBox as { x: number; width: number };
+    const col = columnBox as { x: number; width: number };
+    for (const box of [...(await heroCells.all()), ...(await ledgerRows.all())]) {
+      const b = await box.boundingBox();
+      expect(b, '量不到读数块').not.toBeNull();
       expect(
         (b as { x: number }).x >= col.x - 1 &&
           (b as { x: number; width: number }).x + (b as { width: number }).width <= col.x + col.width + 1,
-        `卡片横向越出了详情列：${JSON.stringify(b)} vs ${JSON.stringify(col)}`,
+        `读数块横向越出了详情列：${JSON.stringify(b)} vs ${JSON.stringify(col)}`,
       ).toBe(true);
     }
 
@@ -125,22 +139,52 @@ test.describe('专注详情面', () => {
       `rail 上高亮的格子不是当前视图（读到 ${JSON.stringify(highlighted)}，应为「番茄钟」；` +
         '读出两格以上=过渡没落位，这条判据的等待没生效）',
     ).toEqual(['番茄钟']);
+    // 文件名沿用旧名：§8 的多处历史记录引用着它，而 `--e2e` 每次就是**原地重写**这两枚
+    //（`detail-pane-alignment.md` §8.7368 有原话）。内容是当前布局。
     await page.screenshot({ path: SHOT('f1-four-cards') });
     expect(errors, `界面里有控制台错误：\n${errors.join('\n')}`).toEqual([]);
   });
 
-  test('F2 🔴 数字那两格带 tabular-nums（AGENTS §5：不加它，25→24 会让整列宽度跳）', async ({
+  test('F7 七日脉搏画成 7 格，强度只由 data-level 表达，今天在最右', async ({ page }) => {
+    await openApp(page, '/?lang=zh-CN');
+    await switchView(page, '番茄钟');
+
+    const cells = page.locator(`${COLUMN} [data-testid="focus-pulse-day"]`);
+    // 🔴 窗口宽度是 7：少画一格 = 界面自己截了窗口；多画一格 = 界面自己补了天。
+    // 两者都说明"补天/截窗"这件事从生产者漏到了视图层。
+    await expect(cells, '七日脉搏必须是 7 格').toHaveCount(7);
+
+    // 每格都带 `data-level`（0..4）—— 强度是属性，不是内联样式。
+    const levels = await cells.evaluateAll((nodes) =>
+      nodes.map((n) => (n as HTMLElement).dataset.level),
+    );
+    expect(levels).toHaveLength(7);
+    for (const lv of levels) {
+      expect(['0', '1', '2', '3', '4']).toContain(lv);
+    }
+
+    // 今天在最右一格，且只有它带 `data-today`。
+    const todayFlags = await cells.evaluateAll((nodes) =>
+      nodes.map((n) => (n as HTMLElement).hasAttribute('data-today')),
+    );
+    expect(todayFlags.filter(Boolean), 'data-today 只该落在末位一格上').toHaveLength(1);
+    expect(todayFlags[6], '今天必须是最右一格').toBe(true);
+    // 不再单独出图：这一面的像素与 F1 完全相同（空态），多拍一张只是把同一张图
+    // 换个名字，读者会以为它们是两份证据。判据已经在上面的断言里成立。
+  });
+
+  test('F2 🔴 数字读数带 tabular-nums（AGENTS §5：不加它，25→24 会让整列宽度跳）', async ({
     page,
   }) => {
     await openApp(page, '/?lang=zh-CN');
     await switchView(page, '番茄钟');
 
     const got = await page
-      .locator(`${COLUMN} .ht-app__detail-card-value`)
+      .locator(`${COLUMN} .ht-app__detail-hero-value`)
       .first()
       .evaluate((el) => getComputedStyle(el).fontVariantNumeric);
     // 这条判据只在真浏览器里存在：jsdom 不加载应用的 CSS bundle。
-    expect(got, `卡上的数字没带 tabular-nums（读到 "${got}"）`).toContain('tabular-nums');
+    expect(got, `hero 上的数字没带 tabular-nums（读到 "${got}"）`).toContain('tabular-nums');
   });
 
   test('F3 一条记录都没有时说的是那句话，而不是留一块空白', async ({ page }) => {

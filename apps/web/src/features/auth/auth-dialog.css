@@ -49,8 +49,9 @@ body:has(.ht-sheet__auth) .ht-compact-rail {
 }
 
 /*
- * 2026-11-27：左侧从"抽象计划示意 + 文案"改成**整块插画**（与移动端首启页同一套漫画）。
- * 竖版窄栏（见 `.ht-sheet__auth-dialog` 的 17rem）+ `contain`（见下）：整张竖版漫画完整显示、不裁切。
+ * 2026-11-27（晚2）：左侧做成**横向滚动 Banner**——4 张本地 MOSS 生成的大图
+ * （任务/日历/专注/统计，1536×1152）排队轮播，`translateX` 逐张滑过，~5.2s 一张。
+ * 大图便于向下适配：`object-fit: contain` 缩放到当前栏宽，整张完整、不裁。
  * 面板底用 surface 兜住留白（浅色白 / 深色墨），与右侧表单同一面。
  */
 .ht-sheet__auth-plan {
@@ -65,17 +66,40 @@ body:has(.ht-sheet__auth) .ht-compact-rail {
   border: 0;
 }
 
-.ht-auth-plan-illustration {
+/* 滚动 Banner：一排 slide 的轨道，整体 translateX 逐张滑过（= "滚动的 Banner"）。 */
+.ht-auth-banner {
+  display: flex;
+  inline-size: 100%;
+  block-size: 100%;
+  transition: transform calc(var(--ht-duration-slow) * 4) var(--ht-ease-standard);
+  will-change: transform;
+}
+
+.ht-auth-banner__slide {
+  flex: 0 0 100%;
+  block-size: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+.ht-auth-banner__img {
   position: absolute;
   inset: 0;
   display: block;
   inline-size: 100%;
   block-size: 100%;
-  /* contain：整张画都进框（不裁）；竖版窄栏已贴合比例，几乎铺满、只剩极窄留白。 */
+  /* contain：大图缩放到当前栏宽，整张完整显示、不裁；留白由 panel 底色兜住。 */
   object-fit: contain;
-  object-position: center top;
+  object-position: center;
   pointer-events: none;
   user-select: none;
+  background: var(--ht-color-surface);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ht-auth-banner {
+    transition: none;
+  }
 }
 
 .ht-sheet__auth-plan-kicker {

@@ -23,6 +23,7 @@ export interface ChecklistEditorProps {
   onToggle: (itemId: string, done: boolean) => void;
   onAdd: (text: string) => void;
   onRemove: (itemId: string) => void;
+  forceOpen?: boolean;
 }
 
 const wrapStyle: CSSProperties = {
@@ -111,7 +112,7 @@ export function ChecklistEditor(props: ChecklistEditorProps): React.JSX.Element 
   const [draft, setDraft] = useState('');
 
   // 老数据：只有备注里的 `- [ ]`，没有结构化字段 → 只读展示 + 一个物化按钮。
-  if (task.checklist === undefined) {
+  if (task.checklist === undefined && !props.forceOpen) {
     const legacy = readChecklist(task);
     if (legacy.length === 0) return null;
     return (
@@ -145,7 +146,7 @@ export function ChecklistEditor(props: ChecklistEditorProps): React.JSX.Element 
     );
   }
 
-  const items = task.checklist;
+  const items = task.checklist ?? [];
   const doneCount = items.filter((x) => x.done).length;
   const submit = (): void => {
     const text = draft.trim();

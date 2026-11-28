@@ -98,21 +98,6 @@ const LEDGER = [
     reason: '对话输入框的草稿是否跨开关留存，取决于它住在组件 state 还是会话 store —— 未核。',
   },
   {
-    file: 'apps/web/src/features/ai/AiBreakdown.tsx',
-    status: 'owed',
-    reason: '面板里的输入是一次性参数还是用户 authored 的内容，未逐格核。',
-  },
-  {
-    file: 'apps/web/src/features/ai/AiDuration.tsx',
-    status: 'owed',
-    reason: '同上：时长参数那一格有输入框，关掉是否算丢内容未核。',
-  },
-  {
-    file: 'apps/web/src/features/ai/AiPrioritize.tsx',
-    status: 'owed',
-    reason: '同上：输入框存在，关闭出口与内容归属未核。',
-  },
-  {
     file: 'apps/web/src/features/ai/AiToolRun.tsx',
     status: 'owed',
     reason: '同上：工具入参那一格有输入，关掉是否可恢复未核。',

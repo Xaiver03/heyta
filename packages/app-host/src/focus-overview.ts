@@ -24,10 +24,14 @@
  */
 
 import {
+  addDays,
   focusSessionDay,
   focusStatsForDay,
+  intensityLevel,
   shouldPersistSession,
+  toLocalDate,
   type FocusSession,
+  type LocalDate,
 } from '@heyta/domain';
 
 import { createFocusActions } from './focus-actions.js';
@@ -57,6 +61,40 @@ export interface FocusRecord {
    * 那是发生过的事实。把标题抹成空会让历史记录读起来像数据坏了。
    */
   taskTitle: string | null;
+  /**
+   * 这一段的相对长度档 `0..4`，用来画记录行里那条能量条。
+   *
+   * 🔴 与 `FocusDayPulse.level` **同一个函数**（`intensityLevel`），但峰值不同：
+   * 这里是"相对记录里最长的那一段"。所以 25 分钟与 50 分钟在一屏里立刻分得开，
+   * 而"这周哪天花得最多"是另一个问题（那是 `days` 的峰值）。
+   * ⚠️ 中途放弃的段也参与峰值：它占用的时间是真的。
+   */
+  energyLevel: 0 | 1 | 2 | 3 | 4;
+}
+
+/**
+ * 近 7 日里的一天。
+ *
+ * ⚠️ **顺序是旧 → 新**，且窗口内每一天都在（没有记录的那天也在，`level` 为 0）。
+ * 与 `dailyActivityCountsFromState` 同一形状 —— 那个函数已经证明"补天"必须由
+ * 生产者做：界面自己补就会在"跨零点没写入"时少画一格，而少画的那一格
+ * 看起来和"那天没专注"一模一样。
+ */
+export interface FocusDayPulse {
+  /** 本地日历日 `YYYY-MM-DD`。 */
+  date: LocalDate;
+  /** 那天实际专注时长（ms），**含**中途放弃的那部分（与 `todayFocusMs` 同口径）。 */
+  focusMs: number;
+  /** 那天自然完成的工作段数。 */
+  completedCount: number;
+  /**
+   * 强度档 `0..4`，`0` = 那天没有记录。
+   *
+   * 🔴 分档用的是 `@heyta/domain#intensityLevel`（相对窗口峰值的四等分），
+   * **不是**在这里新写一套阈值：同一个"多少算浓"的问题在全仓已经有一个答案
+   * （分类泳道图那格用的就是它）。颜色仍然不在这里 —— 本层不认识 CSS。
+   */
+  level: 0 | 1 | 2 | 3 | 4;
 }
 
 export interface FocusOverview {
@@ -77,11 +115,66 @@ export interface FocusOverview {
    * 界面拿到什么就画什么 —— 再滤一遍就是第二个所有者。
    */
   records: FocusRecord[];
+  /**
+   * 近 7 日脉搏（**旧 → 新**，末位是今天）。
+   *
+   * 🔴 它是"今天这一格"的**背景**，不是第二组数字：昨天/前天的时长
+   * 必须与 `todayFocusMs` 走同一个口径（`focusStatsForDay` 逐日调用），
+   * 否则柱子高矮与卡上的数会在跨零点那天开始互相矛盾。
+   */
+  days: FocusDayPulse[];
 }
 
 /** 一条 session 的"实际时长"，与 `focusStatsForDay` 同一句兜底。 */
 function actualMsOf(session: FocusSession): number {
   return session.actualMs ?? session.plannedMs;
+}
+
+/** 近 7 日脉搏的窗口宽度（天）。**只有这一处定义**，界面不许写 `7`。 */
+export const FOCUS_PULSE_DAYS = 7;
+
+/**
+ * 把毫秒**按显示口径取整到分钟**，再拿去分档。
+ *
+ * 🔴 不这么做就会当场自相矛盾：一段 3 秒的记录，文字说"0 分钟"（`durationParts`
+ * 先四舍五入到分钟），而强度按原始毫秒算成了满格 —— 界面上"0 分钟 + 满格深蓝条"
+ * 是同一行里两个打架的读数。数字与条必须吃同一个取整，否则用户有理由认为条在说谎。
+ *
+ * ⚠️ 取整口径**故意**是 `Math.round(ms / 60000)`，与 `durationParts` 那条
+ * "先四舍五入到分钟"逐字同源；不要在这里另挑一个阈值。
+ */
+function roundedMinuteMs(ms: number): number {
+  if (!Number.isFinite(ms) || ms <= 0) return 0;
+  return Math.round(ms / 60000) * 60000;
+}
+
+/**
+ * 近 N 日脉搏（旧 → 新，末位是今天）。
+ *
+ * 🔴 **逐日调 `focusStatsForDay`**，不自己按 `dayRange` 切一遍：
+ * "某一天算哪些段""`actualMs` 缺失怎么兜底""跨零点算哪天"这三个问题的答案
+ * 都在那个函数里，而它是 `todayFocusMs` 的来源。在这里重切一次，
+ * 柱子高矮就会在某天开始与卡上的数不一致 —— 那种不一致不会让任何测试变红。
+ *
+ * ⚠️ 分档相对**窗口内峰值**（`intensityLevel` 的口径）：一整周都只专注 10 分钟的人，
+ * 也该看见"相对自己"的高低起伏，而不是七根一样矮的柱子。
+ */
+function focusPulse(sessions: readonly FocusSession[], now: number): FocusDayPulse[] {
+  const raw: Array<Omit<FocusDayPulse, 'level'>> = [];
+  for (let i = FOCUS_PULSE_DAYS - 1; i >= 0; i -= 1) {
+    // 用 addDays + parseLocalDate 那条路取"那天的正午"，不写 `now - i*86400000`：
+    // 夏令时切换那天后者会偏一小时，而偏出来的那一小时足以让一段记录落到邻日。
+    const date = addDays(toLocalDate(now), -i);
+    const noon = new Date(`${date}T12:00:00`).getTime();
+    const stats = focusStatsForDay(sessions, noon);
+    raw.push({ date, focusMs: stats.focusMs, completedCount: stats.completedWorkCount });
+  }
+  // 峰值与逐日都先按显示口径取整到分钟，再分档 —— 见 `roundedMinuteMs` 的理由。
+  const peakMs = raw.reduce((peak, day) => Math.max(peak, roundedMinuteMs(day.focusMs)), 0);
+  return raw.map((day) => ({
+    ...day,
+    level: intensityLevel(roundedMinuteMs(day.focusMs), peakMs),
+  }));
 }
 
 /**
@@ -98,7 +191,7 @@ export function focusOverview(ctx: ActionContext, now: number): FocusOverview {
   const day = focusStatsForDay(sessions, now);
   const totals = activityTotalsFromState(state);
 
-  const records: FocusRecord[] = sessions
+  const records: Array<Omit<FocusRecord, 'energyLevel'>> = sessions
     .filter((session) => shouldPersistSession(session))
     .map((session) => ({
       id: session.id,
@@ -116,12 +209,23 @@ export function focusOverview(ctx: ActionContext, now: number): FocusOverview {
     // 新到旧：记录列表的第一行应该是"最近那一段"，而不是最早那一段。
     .reverse();
 
+  // 能量条的峰值 = 这一屏记录里最长的那一段（放弃的也算：它占用的时间是真的）。
+  // 与文字时长吃同一个取整（`roundedMinuteMs`），否则"0 分钟 + 满格条"会自相矛盾。
+  const peakRecordMs = records.reduce(
+    (peak, record) => Math.max(peak, roundedMinuteMs(record.actualMs)),
+    0,
+  );
+
   return {
     todayCount: day.completedWorkCount,
     todayFocusMs: day.focusMs,
     todayAbortedCount: day.abortedWorkCount,
     totalCount: totals.focusCount,
     totalFocusMs: totals.focusMs,
-    records,
+    records: records.map((record) => ({
+      ...record,
+      energyLevel: intensityLevel(roundedMinuteMs(record.actualMs), peakRecordMs),
+    })),
+    days: focusPulse(sessions, now),
   };
 }
