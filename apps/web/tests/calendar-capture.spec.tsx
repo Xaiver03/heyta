@@ -314,4 +314,20 @@ describe('日历上的「往选中那天加一条」', () => {
     expect(q('capture-input')).toBeNull();
     expect(Object.keys(useTaskStore.getState().entities.tasks)).toHaveLength(0);
   });
+
+  it('🔴 捕获框开着时再次点击**同一格**或日档槽位，关闭捕获框而不是重开', async () => {
+    await mount();
+    await openCalendar();
+    const today = useCalendarViewStore.getState().selected;
+    const todayCell = q<HTMLElement>(`calendar-cell-${today}`);
+    expect(todayCell).not.toBeNull();
+
+    // 第一次点击选中格打开捕获框
+    await click(todayCell);
+    expect(q('capture-input')).not.toBeNull();
+
+    // 第二次点击同一格关闭捕获框
+    await click(todayCell);
+    expect(q('capture-input')).toBeNull();
+  });
 });

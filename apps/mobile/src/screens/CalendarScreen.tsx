@@ -572,7 +572,6 @@ export function CalendarScreen({ active = true }: { active?: boolean } = {}): Re
       backToToday: t('mobile.calendar.backToToday'),
       dayEmpty: t('mobile.calendar.dayEmpty'),
       dayCount: (count: number) => t('mobile.calendar.dayCount', { count }),
-      footnote: t('mobile.calendar.footnote'),
       // 月档左侧周数列（滴答式「W48」）：共享板只在 view==='month' 时渲染该列。
       weekNumber: (d: LocalDate) => t('web.calendar.weekShort', { n: isoWeek(d) }),
       taskRow: {

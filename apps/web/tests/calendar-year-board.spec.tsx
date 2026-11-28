@@ -45,6 +45,7 @@ import {
   CalendarBoard,
   formatDayTitleText,
   monthMessageKey,
+  type CalendarViewKind,
 } from '@heyta/ui';
 import { translate, type I18nValue } from '@heyta/i18n';
 
@@ -83,12 +84,14 @@ function YearBoardProbe(props: {
   today: LocalDate;
   cursor: LocalDate;
   onPickMonth: ((monthFirstDay: LocalDate) => void) | undefined;
+  /** 这一档画哪块板。默认 `year`（本文件的主体），另三档只用来判"页脚四档都没有"。 */
+  view?: CalendarViewKind;
 }) {
   const labels = useCalendarLabels();
   return (
     <HeytaUiProvider>
       <CalendarBoard
-        view="year"
+        view={props.view ?? 'year'}
         tasks={props.tasks}
         events={props.events}
         today={props.today}
@@ -111,6 +114,7 @@ function render(props: {
   year?: LocalDate;
   today?: LocalDate;
   onPickMonth?: (monthFirstDay: LocalDate) => void;
+  view?: CalendarViewKind;
 } = {}): void {
   container = document.createElement('div');
   document.body.appendChild(container);
@@ -125,6 +129,7 @@ function render(props: {
           today={today}
           cursor={props.year ?? today}
           onPickMonth={props.onPickMonth}
+          {...(props.view === undefined ? {} : { view: props.view })}
         />
       </LocaleHost>,
     );
@@ -381,17 +386,17 @@ describe('年档不重复画别的档的东西', () => {
     ).toBeNull();
   });
 
-  it('✅ 页脚那句**留着**（这一档同样只画"有截止的日子"）', () => {
-    // ⚠️ 这里曾经写成"页脚不该出现"，而它**红了** —— 红得对：
-    //   `labels.footnote` 挂在 `CalendarBoard` 的根上、在所有档位分支之外
-    //   （`packages/ui/src/calendar/CalendarBoard.tsx:573`），月/周/日/年四档共用。
-    //   "没设截止的任务不会出现在日历上"这句话在年档同样必要 ——
-    //   撤掉它才会让"任务没设时间"被读成"任务丢了"。原句留在旁边是为了让人看清
-    //   这条判据一开始比错了对象。
-    render();
-    const footnote = container!.querySelector<HTMLElement>('[data-testid="calendar-board-footnote"]');
-    expect(footnote, '年档把那句"这一页看不到什么"弄丢了').not.toBeNull();
-    expect(footnote?.textContent).toBe(t('web.calendar.footnote'));
+  it('✅ 页脚那句**四档都没有了**（"这一页看不到什么"不再用文字解释）', () => {
+    // 产品负责人 2026-11-27：日历里那句话中英文都删掉。它是常驻辅助文案，
+    // 而"没设截止的任务不上日历"这件事由布局本身承担 —— 那些任务就在「任务」页里。
+    // 判据钉在**渲染出来的东西**上：四档共用同一块板，谁把页脚加回来都要转红。
+    for (const view of ['month', 'week', 'day', 'year'] as const) {
+      render({ view });
+      expect(
+        container!.querySelector('[data-testid="calendar-board-footnote"]'),
+        `${view} 档又把页脚那句话加回来了`,
+      ).toBeNull();
+    }
   });
 
   it('工具栏那格在年档说的是**年**（漏接 `yearTitle` 会退回月份，看着像坏了）', () => {

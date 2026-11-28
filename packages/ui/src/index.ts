@@ -1677,3 +1677,4 @@ export {
   projectGestureOffset,
   rubberBandOffset,
 } from './motion/gesture.js';
+export { DAY_SLOT_MINUTES } from './calendar/CalendarDayBoard.js';

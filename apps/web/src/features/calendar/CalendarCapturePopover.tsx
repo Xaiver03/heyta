@@ -37,10 +37,14 @@ export function CalendarCapturePopover({ date, time, title, onClose }: {
     const panel = panelRef.current;
     if (!panel) return;
     const trigger = (time !== undefined
-      ? document.querySelector<HTMLElement>(`[data-testid="calendar-board-day-slot-${time.slice(0, 2)}-${time.slice(3, 5)}"]`)
+      ? (document.querySelector<HTMLElement>(`[data-testid="calendar-multiday-slot-${date}-${time.slice(0, 2)}-${time.slice(3, 5)}"]`)
+        ?? document.querySelector<HTMLElement>(`[data-testid="calendar-board-day-slot-${time.slice(0, 2)}-${time.slice(3, 5)}"]`))
       : null)
       ?? document.querySelector<HTMLElement>(`[data-testid="calendar-cell-${date}"]`)
+      ?? document.querySelector<HTMLElement>(`[data-testid="calendar-multiday-allday-${date}"]`)
+      ?? document.querySelector<HTMLElement>(`[data-testid="calendar-agenda-day-${date}"]`)
       ?? document.querySelector<HTMLElement>('[data-testid="calendar-capture-toggle"]');
+    const toggleBtn = document.querySelector<HTMLElement>('[data-testid="calendar-capture-toggle"]');
     const previousFocus = document.activeElement;
     const place = (): void => {
       if (!trigger) return;
@@ -69,11 +73,25 @@ export function CalendarCapturePopover({ date, time, title, onClose }: {
     observer?.observe(panel);
     const dismiss = (event: PointerEvent): void => {
       if (askingRef.current) return;
-      if (!(event.target instanceof Node) || panel.contains(event.target) || trigger?.contains(event.target)) return;
-      // Selecting another date while the editor is open is an intentional re-anchor,
-      // not an outside dismissal. `onSelectDay` keeps the popover open and the
-      // effect below measures the new cell after React commits the date change.
-      if (event.target instanceof Element && (event.target.closest('[data-testid^="calendar-cell-"]') || event.target.closest('[data-testid^="calendar-board-day-slot-"]'))) return;
+      if (!(event.target instanceof Node) || panel.contains(event.target) || toggleBtn?.contains(event.target)) return;
+      if (event.target instanceof Element) {
+        const cell = event.target.closest<HTMLElement>('[data-testid^="calendar-cell-"]');
+        if (cell !== null) {
+          const clickedDate = cell.getAttribute('data-testid')?.replace('calendar-cell-', '');
+          const field = panel.querySelector<HTMLInputElement>('input, textarea');
+          const dirty = (field?.value ?? '').trim() !== '';
+          // Selecting another date while the editor is clean is an intentional re-anchor,
+          // not an outside dismissal. Clicking the currently anchored date cell or any
+          // date cell while dirty goes through dismissal.
+          if (clickedDate !== undefined && clickedDate !== date && !dirty) return;
+        }
+        if (
+          event.target.closest('[data-testid^="calendar-board-day-slot-"]') ||
+          event.target.closest('[data-testid^="calendar-multiday-slot-"]')
+        ) {
+          return;
+        }
+      }
       requestDismiss('scrim');
     };
     const escape = (event: KeyboardEvent): void => {

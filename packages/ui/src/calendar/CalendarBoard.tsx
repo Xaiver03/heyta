@@ -29,6 +29,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { HeytaNativeTokens, TokenName } from '@heyta/design-system';
 import {
+  DAYS_PER_WEEK,
   isoWeek,
   isoWeekday,
   lunarDayLabel,
@@ -59,6 +60,7 @@ import {
   MAX_CALENDAR_BARS,
   MAX_WEEK_CALENDAR_BARS,
   groupEventsByOccurrence,
+  multiWeekGrid,
   yearRangeOf,
   calendarDayMarkerView,
   groupTasksByCalendarDate,
@@ -71,7 +73,7 @@ import {
 } from './model.js';
 
 export interface CalendarBoardProps {
-  /** 全部候选任务。**没设截止时间的不会出现在日历上** —— 见 `labels.footnote`。 */
+  /** 全部候选任务。**没设截止时间的不会出现在日历上**。 */
   readonly tasks: readonly Task[];
   /** 今天的本地日历日。 */
   readonly today: LocalDate;
@@ -290,6 +292,8 @@ export interface CalendarBoardProps {
   readonly activeSlot?: { readonly day: LocalDate; readonly time: LocalTime } | undefined;
   readonly renderSlotWrapper?: ((hour: number, minute: number, node: React.ReactNode) => React.ReactNode) | undefined;
   readonly renderAllDayWrapper?: ((node: React.ReactNode) => React.ReactNode) | undefined;
+  /** 多周档：连续渲染 N 周（从 cursor 所在周的周一开始），不传则走标准 month/week 网格。 */
+  readonly multiWeekCount?: number | undefined;
 }
 
 /**
@@ -332,6 +336,7 @@ function DayCell({
   displayStyle = 'classic',
   inlineWeekNumber = false,
   weekNumber,
+  columnIndex = 0,
 }: {
   date: LocalDate;
   day: number;
@@ -362,6 +367,8 @@ function DayCell({
   inlineWeekNumber?: boolean;
   /** 这一行是当周时，内联周次的文案（只有第一格拿得到）。 */
   weekNumber?: string | undefined;
+  /** 所在周行内的列索引（0..6），用于网格分隔线。 */
+  columnIndex?: number;
 }): React.JSX.Element {
   const tokens = useHeytaTokens();
   const text = useHeytaText();
@@ -464,27 +471,10 @@ function DayCell({
         {
           minHeight: tokens['touch-target.min'],
           gap: tokens['space.1'],
-          /**
-           * 🔴 2026-11-15：去掉格子自己的 `borderTopWidth` / `borderStartWidth`。
-           *
-           * 真机截图里整张月历是**一张 Excel 表**：横线竖线都是 `color.border`，
-           * 28 个格子各带两条边，和日期数字抢注意力；外层的卡片边框还在，
-           * 于是"框套框"。产品负责人的原话是「日历排版…非常难看」。
-           *
-           * 现在只留卡片外框：格子靠位置与留白分列，选中那一格用浅底 + 圆角。
-           * 与 Web 共用同一份实现（那边也一起去掉，两端不会长出两种网格）。
-           */
-          /**
-           * 🔴 2026-11-15：选中底色**从格子移到数字本身**。
-           *
-           * 第一版去掉网格线后仍是"整格浅蓝"：270×100px 的一块浅蓝铺满列宽，
-           * 与旁边那颗蓝圆数字叠成「圆中方」，看起来像被选中的是一整列。
-           * 滴答的选中日是**数字那一圈**。所以：
-           *   · 今天          → 主色实心圆 + 白字（唯一强标记）
-           *   · 选中（非今天）→ 浅蓝圆 + 主色字
-           *   · 今天且选中     → 主色实心圆（同一支，不叠两层）
-           */
-          borderRadius: tokens['radius.sm'],
+          borderTopWidth: tokens['border-width.thin'],
+          borderLeftWidth: columnIndex === 0 ? 0 : tokens['border-width.thin'],
+          borderColor: tokens['color.border-subtle'],
+          borderRadius: 0,
         },
       ]}
     >
@@ -723,6 +713,7 @@ export function CalendarBoard({
   activeSlot,
   renderSlotWrapper,
   renderAllDayWrapper,
+  multiWeekCount,
 }: CalendarBoardProps): React.JSX.Element {
   const tokens = useHeytaTokens();
   const text = useHeytaText();
@@ -730,10 +721,18 @@ export function CalendarBoard({
 
   // 🔴 周视图是**一行**，不是"把六行里的一行挑出来"：`weekGrid` 的 `inMonth`
   //    跟着锚点日走，而 `monthGrid` 的跟着显示月走（两者理由见 `@heyta/domain`）。
-  const weeks = useMemo<MonthGridCell[][]>(
-    () => (view === 'week' ? [weekGrid(cursor)] : monthGrid(cursor)),
-    [cursor, view],
-  );
+  //    多周视图（`multiWeekCount`）从 cursor 所在周的周一开始，按 7 天切分成 N 行。
+  const weeks = useMemo<MonthGridCell[][]>(() => {
+    if (multiWeekCount !== undefined && multiWeekCount > 0) {
+      const cells = multiWeekGrid(cursor, multiWeekCount);
+      const rows: MonthGridCell[][] = [];
+      for (let i = 0; i < cells.length; i += DAYS_PER_WEEK) {
+        rows.push(cells.slice(i, i + DAYS_PER_WEEK));
+      }
+      return rows;
+    }
+    return view === 'week' ? [weekGrid(cursor)] : monthGrid(cursor);
+  }, [cursor, multiWeekCount, view]);
   const calendarTasksByDate = useMemo(() => {
     const first = weeks[0]?.[0]?.date;
     const lastWeek = weeks[weeks.length - 1];
@@ -971,7 +970,7 @@ export function CalendarBoard({
                 </Text>
               </View>
             ) : null}
-            {week.map((cell) => {
+            {week.map((cell, idx) => {
               const cellTasks = calendarTasksByDate.get(cell.date) ?? [];
               const { bars, hidden } = calendarCellBars(
                 cellTasks,
@@ -1047,6 +1046,7 @@ export function CalendarBoard({
                       ? labels.weekNumber(cell.date)
                       : undefined
                   }
+                  columnIndex={idx}
                 />
               );
               // 宿主不传 ⇒ 直接返回原格子（移动端与任何未接拖拽的调用点不变）。
@@ -1250,6 +1250,8 @@ function makeStyles(tokens: HeytaNativeTokens) {
     monthCard: {
       flexShrink: 0,
       gap: 0,
+      padding: 0,
+      overflow: 'hidden',
     },
     monthCardFill: {
       flexGrow: 1,

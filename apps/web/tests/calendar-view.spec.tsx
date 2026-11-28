@@ -14,7 +14,8 @@
  * 这正是本仓反复记的"判据必须是结构性的，不能是「出现了这个词」"。
  *
  * ⇒ 所以这里的判据全部是**渲染出来的东西**：42 个格子、月格里的任务条、
- * 页脚那句"未设截止时间的任务不在日历上"。字符串命中不算。
+ * 以及"未设截止时间的任务确实不在日历上，而页面**不靠一句话**去解释这件事"。
+ * 字符串命中不算。
  *
  * ## 🔴 它同时钉住"共享"这件事
  *
@@ -117,6 +118,9 @@ beforeEach(async () => {
     //    "上一个用例切到了周视图，这一用例数出 7 个格子"，
     //    而失败信息看起来像月历坏了。
     view: 'month',
+    extendedView: 'none',
+    multiDayCount: 5,
+    multiWeekCount: 2,
   });
   void today;
 });
@@ -162,16 +166,19 @@ describe('日历视图（Web）', () => {
     );
   });
 
-  it('🔴 **未设截止时间的任务不在日历上**，而且页面**如实说出来**了', async () => {
+  it('🔴 **未设截止时间的任务不在日历上**，而且页面上**没有一句说明这件事的话**', async () => {
     await useTaskStore.getState().addTask('没有截止时间的事');
     await mount();
     await openCalendar();
 
     const board = container!.querySelector('[data-testid="calendar-board"]');
-    // 页脚必须存在 —— 不说的话，"任务没设截止时间"会被读成"任务丢了"。
-    const footnote = board!.querySelector('[data-testid="calendar-board-footnote"]');
-    expect(footnote, '日历缺少「未设截止时间的任务不在日历上」那句说明').not.toBeNull();
-    expect(footnote!.textContent ?? '').toContain('未设截止时间');
+    expect(board, '没有渲染出日历板').not.toBeNull();
+    // 事实：那条没有截止时间的任务不落进任何一格（它归「任务」页的收集箱）。
+    expect(board!.textContent ?? '').not.toContain('没有截止时间的事');
+    // 判据：这件事**不再**用一句话解释（产品负责人 2026-11-27：日历里那句中英文都删掉）。
+    // 删掉的不是文案而是「靠文字补丁解释布局」这种做法 —— 恢复它必须让这条转红。
+    expect(board!.textContent ?? '').not.toContain('未设截止时间');
+    expect(board!.querySelector('[data-testid="calendar-board-footnote"]')).toBeNull();
   });
 
   it('🔴 当天有任务时，月格里**真的有那一行**（列不出来等于没接上）', async () => {
@@ -436,6 +443,91 @@ describe('日历视图（Web）', () => {
         (b) => b.textContent?.trim() === '日历',
       );
     expect(has(), '日历默认应当是开的').toBe(true);
+  });
+
+  it('🔴 视图下拉菜单支持切换到日程、多日（可调 2..14 天）与多周（可调 2..6 周）', async () => {
+    await seedDueToday(['日程测试任务']);
+    await mount();
+    await openCalendar();
+
+    const trigger = container!.querySelector<HTMLElement>('[data-testid="calendar-view-dropdown-trigger"]');
+    expect(trigger, '找不到视图下拉触发器').not.toBeNull();
+
+    // 打开下拉，切到「日程」
+    await act(async () => {
+      trigger!.click();
+    });
+    await flush();
+    const agendaItem = document.body.querySelector<HTMLElement>('[data-testid="calendar-view-agenda"]');
+    expect(agendaItem, '下拉菜单里找不到「日程」').not.toBeNull();
+    await act(async () => {
+      agendaItem!.click();
+    });
+    await flush();
+    expect(useCalendarViewStore.getState().extendedView).toBe('agenda');
+    expect(container!.querySelector('[data-testid="calendar-board-agenda"]')).not.toBeNull();
+    expect(container!.textContent).toContain('日程测试任务');
+
+    // 打开下拉，调节「多日」步进器 + / -，并渲染多日板
+    await act(async () => {
+      trigger!.click();
+    });
+    await flush();
+    const multiDayInc = document.body.querySelector<HTMLElement>('[data-testid="calendar-view-multiDay-inc"]');
+    const multiDayDec = document.body.querySelector<HTMLElement>('[data-testid="calendar-view-multiDay-dec"]');
+    const multiDayCount = document.body.querySelector<HTMLElement>('[data-testid="calendar-view-multiDay-count"]');
+    expect(multiDayInc).not.toBeNull();
+    expect(multiDayDec).not.toBeNull();
+    expect(multiDayCount?.textContent).toBe('5天');
+
+    await act(async () => {
+      multiDayInc!.click();
+    });
+    await flush();
+    expect(useCalendarViewStore.getState().multiDayCount).toBe(6);
+    expect(useCalendarViewStore.getState().extendedView).toBe('multiDay');
+    expect(multiDayCount?.textContent).toBe('6天');
+    expect(container!.querySelector('[data-testid="calendar-board-multiday"]')).not.toBeNull();
+    expect(
+      container!.querySelectorAll('[data-testid^="calendar-multiday-header-"]'),
+    ).toHaveLength(6);
+
+    await act(async () => {
+      multiDayDec!.click();
+    });
+    await flush();
+    expect(useCalendarViewStore.getState().multiDayCount).toBe(5);
+    expect(
+      container!.querySelectorAll('[data-testid^="calendar-multiday-header-"]'),
+    ).toHaveLength(5);
+
+    // 调节「多周」步进器 + / -，并渲染多周网格行（3 周 × 7 天 = 21 格）
+    const multiWeekInc = document.body.querySelector<HTMLElement>('[data-testid="calendar-view-multiWeek-inc"]');
+    const multiWeekDec = document.body.querySelector<HTMLElement>('[data-testid="calendar-view-multiWeek-dec"]');
+    const multiWeekCount = document.body.querySelector<HTMLElement>('[data-testid="calendar-view-multiWeek-count"]');
+    expect(multiWeekInc).not.toBeNull();
+    expect(multiWeekDec).not.toBeNull();
+    expect(multiWeekCount?.textContent).toBe('2周');
+
+    await act(async () => {
+      multiWeekInc!.click();
+    });
+    await flush();
+    expect(useCalendarViewStore.getState().multiWeekCount).toBe(3);
+    expect(useCalendarViewStore.getState().extendedView).toBe('multiWeek');
+    expect(multiWeekCount?.textContent).toBe('3周');
+    expect(
+      container!.querySelectorAll('[data-testid^="calendar-cell-"][role="button"]'),
+    ).toHaveLength(21);
+
+    await act(async () => {
+      multiWeekDec!.click();
+    });
+    await flush();
+    expect(useCalendarViewStore.getState().multiWeekCount).toBe(2);
+    expect(
+      container!.querySelectorAll('[data-testid^="calendar-cell-"][role="button"]'),
+    ).toHaveLength(14);
   });
 });
 

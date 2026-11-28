@@ -27,6 +27,7 @@ import { create } from 'zustand';
 import {
   FULL_SCOPE,
   startOfMonth,
+  startOfWeek,
   toLocalDate,
   type LocalDate,
   type LocalTime,
@@ -87,8 +88,12 @@ interface CalendarViewState {
    * 默认 `true`（滴答默认开启，也是 web 接上倒数日之后的既有行为）。
    */
   showCountdown: boolean;
-  /** 扩展视图档位（日程 / 5天多日 / 2周多周）；`'none'` 时使用基础 `view`。 */
+  /** 扩展视图档位（日程 / 多日 / 多周）；`'none'` 时使用基础 `view`。 */
   extendedView: CalendarExtendedView;
+  /** 多日视图列数（2..14，默认 5）。 */
+  multiDayCount: number;
+  /** 多周视图周数（2..6，默认 2）。 */
+  multiWeekCount: number;
   /** 日历着色方式：按清单或按四象限。 */
   colorMode: CalendarColorMode;
   /** 日历事件条视觉样式：经典或现代（左侧强调竖条）。 */
@@ -156,6 +161,8 @@ interface CalendarViewActions {
   setShowCompleted: (value: boolean) => void;
   setShowCountdown: (value: boolean) => void;
   setExtendedView: (value: CalendarExtendedView) => void;
+  setMultiDayCount: (count: number) => void;
+  setMultiWeekCount: (count: number) => void;
   setColorMode: (value: CalendarColorMode) => void;
   setDisplayStyle: (value: CalendarDisplayStyle) => void;
   setShowChecklist: (value: boolean) => void;
@@ -192,6 +199,16 @@ function withIds(scope: TaskScope, kind: ScopeKind, ids: readonly string[]): Tas
   return kind === 'project' ? { ...scope, projectIds: ids } : { ...scope, tagIds: ids };
 }
 
+function cursorForState(
+  view: CalendarViewKind,
+  extendedView: CalendarExtendedView,
+  date: LocalDate,
+): LocalDate {
+  if (extendedView === 'multiDay' || extendedView === 'agenda') return date;
+  if (extendedView === 'multiWeek') return startOfWeek(date);
+  return calendarCursorFor(view, date);
+}
+
 export const useCalendarViewStore = create<CalendarViewState & CalendarViewActions>((set) => ({
   // ⚠️ 这里读一次时钟是**给界面播种**，不是业务判断 —— 领域层的
   // "now 显式传入、不在函数里读时钟"那条纪律针对的是判据，不是首屏渲染。
@@ -205,6 +222,8 @@ export const useCalendarViewStore = create<CalendarViewState & CalendarViewActio
   showCompleted: true,
   showCountdown: true,
   extendedView: 'none',
+  multiDayCount: 5,
+  multiWeekCount: 2,
   colorMode: 'project',
   displayStyle: 'classic',
   showChecklist: false,
@@ -222,17 +241,27 @@ export const useCalendarViewStore = create<CalendarViewState & CalendarViewActio
     //   症状是**安静地各指一天**：轴翻到 10-05、侧栏还圈着 10-03、新任务写进了 10-03。
     //   判据：`apps/web/tests/calendar-day-view.spec.tsx`（含变异臂 Z）。
     set((state) => ({
-      cursor: calendarCursorFor(state.view, date),
-      selected: calendarSelectedForCursor(state.view, date, state.selected),
+      cursor: cursorForState(state.view, state.extendedView, date),
+      selected:
+        state.extendedView === 'none'
+          ? calendarSelectedForCursor(state.view, date, state.selected)
+          : state.selected,
     }));
   },
 
   selectDay: (date) => {
-    set((state) => ({ selected: date, cursor: calendarCursorFor(state.view, date), captureTime: undefined }));
+    set((state) => ({
+      selected: date,
+      cursor: cursorForState(state.view, state.extendedView, date),
+      captureTime: undefined,
+    }));
   },
 
   goToToday: (today) => {
-    set((state) => ({ selected: today, cursor: calendarCursorFor(state.view, today) }));
+    set((state) => ({
+      selected: today,
+      cursor: cursorForState(state.view, state.extendedView, today),
+    }));
   },
 
   setView: (view) => {
@@ -240,7 +269,28 @@ export const useCalendarViewStore = create<CalendarViewState & CalendarViewActio
   },
 
   setExtendedView: (extendedView) => {
-    set({ extendedView });
+    set((state) => ({
+      extendedView,
+      cursor: cursorForState(state.view, extendedView, state.selected),
+    }));
+  },
+
+  setMultiDayCount: (count) => {
+    const clamped = Math.max(2, Math.min(14, Math.round(count)));
+    set((state) => ({
+      multiDayCount: clamped,
+      extendedView: 'multiDay',
+      cursor: cursorForState(state.view, 'multiDay', state.selected),
+    }));
+  },
+
+  setMultiWeekCount: (count) => {
+    const clamped = Math.max(2, Math.min(6, Math.round(count)));
+    set((state) => ({
+      multiWeekCount: clamped,
+      extendedView: 'multiWeek',
+      cursor: cursorForState(state.view, 'multiWeek', state.selected),
+    }));
   },
 
   setColorMode: (colorMode) => {

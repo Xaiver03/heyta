@@ -22,7 +22,7 @@
  */
 
 import { ICON_SIZE } from '@heyta/design-system';
-import { dueDateToEpoch, isScopeEmpty, scopeTasks, toLocalDate, type Task } from '@heyta/domain';
+import { addDays, dueDateToEpoch, isScopeEmpty, scopeTasks, toLocalDate, type Task } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -75,7 +75,7 @@ const VIEW_SHORTCUT_HINT: Readonly<Record<(typeof VIEW_MENU_KINDS)[number], stri
  * 快捷键真表：字母与数字两套并列，与上面的提示**一一对应**。
  * 🔴 提示画在界面上就必须真的能按 —— 不然那是一句假承诺。
  */
-const VIEW_SHORTCUTS: Readonly<Record<string, CalendarViewKind>> = {
+const VIEW_SHORTCUTS: Readonly<Record<string, CalendarViewKind | 'agenda'>> = {
   d: 'day',
   '1': 'day',
   w: 'week',
@@ -84,6 +84,8 @@ const VIEW_SHORTCUTS: Readonly<Record<string, CalendarViewKind>> = {
   '3': 'month',
   y: 'year',
   '4': 'year',
+  a: 'agenda',
+  '5': 'agenda',
 };
 
 /** 焦点在可编辑控件里时，快捷键必须让路（否则打字会翻日历）。 */
@@ -112,8 +114,11 @@ export function CalendarHeaderToolbar({
   const projects = useProjectStore((s) => s.projects);
   const tags = useProjectStore((s) => s.tags);
 
-  /** 第②层的大标题文字：与共享 `CalendarToolbar` 的 `copyFor` 同一套取值来源（labels）。 */
+  /** 大标题文字：与共享 `CalendarToolbar` 的 `copyFor` 同一套取值来源（labels）。 */
   const rangeTitle = useMemo(() => {
+    if (view.extendedView !== 'none') {
+      return labels.monthTitle(view.cursor);
+    }
     switch (view.view) {
       case 'week':
         return labels.weekTitle?.(view.cursor) ?? labels.monthTitle(view.cursor);
@@ -124,9 +129,21 @@ export function CalendarHeaderToolbar({
       default:
         return labels.monthTitle(view.cursor);
     }
-  }, [labels, view.cursor, view.view]);
+  }, [labels, view.cursor, view.extendedView, view.view]);
 
   const step = (dir: number): void => {
+    if (view.extendedView === 'multiDay') {
+      view.setCursor(addDays(view.cursor, dir * view.multiDayCount));
+      return;
+    }
+    if (view.extendedView === 'multiWeek') {
+      view.setCursor(addDays(view.cursor, dir * view.multiWeekCount * 7));
+      return;
+    }
+    if (view.extendedView === 'agenda') {
+      view.setCursor(stepCalendarCursor('month', view.cursor, dir));
+      return;
+    }
     view.setCursor(stepCalendarCursor(view.view, view.cursor, dir));
   };
   const prevLabel =
@@ -178,13 +195,13 @@ export function CalendarHeaderToolbar({
       case 'agenda':
         return t('web.calendar.view.agenda');
       case 'multiDay':
-        return t('web.calendar.view.multiDay');
+        return `${t('web.calendar.view.multiDay')} (${t('web.calendar.view.multiDayValue', { n: view.multiDayCount })})`;
       case 'multiWeek':
-        return t('web.calendar.view.multiWeek');
+        return `${t('web.calendar.view.multiWeek')} (${t('web.calendar.view.multiWeekValue', { n: view.multiWeekCount })})`;
       default:
         return t(CALENDAR_VIEW_LABEL_KEYS[view.view]);
     }
-  }, [t, view.extendedView, view.view]);
+  }, [t, view.extendedView, view.multiDayCount, view.multiWeekCount, view.view]);
 
   /*
    * 菜单里承诺的快捷键（D/1 … A/5）。用 `getState()` 而不是闭包里的 `view`：
@@ -205,7 +222,11 @@ export function CalendarHeaderToolbar({
       const next = VIEW_SHORTCUTS[event.key.toLowerCase()];
       if (next === undefined) return;
       event.preventDefault();
-      useCalendarViewStore.getState().setView(next);
+      if (next === 'agenda') {
+        useCalendarViewStore.getState().setExtendedView('agenda');
+      } else {
+        useCalendarViewStore.getState().setView(next);
+      }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => {
@@ -277,25 +298,6 @@ export function CalendarHeaderToolbar({
           />
         </div>
 
-        {/*
-          视图下拉：5 + 2 分组（日/周/月/年/日程 —— 多日/多周）。
-          分段控件只放基础档；扩展档（日程/多日/多周）没有隐形入口，都从这里进。
-        */}
-        <Button
-          ref={viewTriggerRef}
-          tone="ghost"
-          size="sm"
-          className="ht-content__cal-viewtrigger"
-          data-testid="calendar-view-dropdown-trigger"
-          aria-haspopup="menu"
-          aria-expanded={viewMenuOpen}
-          aria-label={t('common.calendar.view.aria')}
-          onClick={() => { setViewMenuOpen((open) => !open); }}
-        >
-          <span className="ht-content__cal-viewtrigger-label">{currentViewLabel}</span>
-          <ChevronDown size={ICON_SIZE.xs} aria-hidden="true" />
-        </Button>
-
         {hasScope ? (
           <div className="ht-header__calendar-scope" data-testid="calendar-scope-summary" role="status">
             <span>{t('web.calendar.scope.active', { names: activeScopeNames })}</span>
@@ -326,6 +328,60 @@ export function CalendarHeaderToolbar({
         >
           +
         </button>
+
+        {/*
+          视图下拉：5 + 2 分组（日/周/月/年/日程 —— 多日/多周）。
+          分段控件只放基础档；扩展档（日程/多日/多周）没有隐形入口，都从这里进。
+        */}
+        <Button
+          ref={viewTriggerRef}
+          tone="ghost"
+          size="sm"
+          className="ht-content__cal-viewtrigger"
+          data-testid="calendar-view-dropdown-trigger"
+          aria-haspopup="menu"
+          aria-expanded={viewMenuOpen}
+          aria-label={t('common.calendar.view.aria')}
+          onClick={() => { setViewMenuOpen((open) => !open); }}
+        >
+          <span className="ht-content__cal-viewtrigger-label">{currentViewLabel}</span>
+          <ChevronDown size={ICON_SIZE.xs} aria-hidden="true" />
+        </Button>
+
+        <div className="ht-content__cal-nav">
+          <button
+            type="button"
+            className="ht-content__cal-navbtn"
+            aria-label={prevLabel}
+            role="button"
+            data-testid="calendar-toolbar-prev"
+            onClick={() => { step(-1); }}
+          >
+            <ChevronLeft size={ICON_SIZE.sm} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            className="ht-content__cal-today"
+            role="button"
+            data-testid="calendar-toolbar-today"
+            onClick={() => {
+              view.goToToday(toLocalDate(now));
+            }}
+          >
+            {labels.backToToday}
+          </button>
+          <button
+            type="button"
+            className="ht-content__cal-navbtn"
+            aria-label={nextLabel}
+            role="button"
+            data-testid="calendar-toolbar-next"
+            onClick={() => { step(1); }}
+          >
+            <ChevronRight size={ICON_SIZE.sm} aria-hidden="true" />
+          </button>
+        </div>
+
         <Button
           ref={menuTriggerRef}
           tone="ghost"
@@ -387,48 +443,15 @@ export function CalendarHeaderToolbar({
         </label>
       </div>
 
-      {/* 第②层：大标题 + ‹ 今天 › */}
+      {/* 左侧大标题 */}
       <div className="ht-content__cal-band ht-content__cal-band--title">
         <h2 className="ht-content__cal-bigtitle" data-testid="calendar-toolbar-month">
           {rangeTitle}
         </h2>
-        <div className="ht-content__cal-nav">
-          <button
-            type="button"
-            className="ht-content__cal-navbtn"
-            aria-label={prevLabel}
-            role="button"
-            data-testid="calendar-toolbar-prev"
-            onClick={() => { step(-1); }}
-          >
-            <ChevronLeft size={ICON_SIZE.sm} aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            className="ht-content__cal-today"
-            role="button"
-            data-testid="calendar-toolbar-today"
-            onClick={() => {
-              view.goToToday(toLocalDate(now));
-            }}
-          >
-            {labels.backToToday}
-          </button>
-          <button
-            type="button"
-            className="ht-content__cal-navbtn"
-            aria-label={nextLabel}
-            role="button"
-            data-testid="calendar-toolbar-next"
-            onClick={() => { step(1); }}
-          >
-            <ChevronRight size={ICON_SIZE.sm} aria-hidden="true" />
-          </button>
-        </div>
       </div>
 
       {/*
-        视图下拉：上组 5 档（基础四档 + 日程），分割线，下组 2 档（多日 5 天 / 多周 2 周）。
+        视图下拉：上组 5 档（基础四档 + 日程），分割线，下组 2 档（多日 / 多周）。
         🔴 基础档走 `setView`（它会把 `extendedView` 归零），扩展档走 `setExtendedView`；
            `'timeline'` 仍只能从 `⋮` 进，绝不混进这份菜单。
       */}
@@ -444,7 +467,7 @@ export function CalendarHeaderToolbar({
           <MenuItem
             key={kind}
             testID={`calendar-view-${kind}`}
-            checked={view.view === kind}
+            checked={view.extendedView === 'none' && view.view === kind}
             onSelect={() => { view.setView(kind); }}
           >
             {t(CALENDAR_VIEW_LABEL_KEYS[kind])}
@@ -453,6 +476,124 @@ export function CalendarHeaderToolbar({
             </span>
           </MenuItem>
         ))}
+        <MenuItem
+          testID="calendar-view-agenda"
+          checked={view.extendedView === 'agenda'}
+          onSelect={() => {
+            view.setExtendedView('agenda');
+            setViewMenuOpen(false);
+          }}
+        >
+          {t('web.calendar.view.agenda')}
+          <span className="ht-content__cal-viewhint" aria-hidden="true">
+            A / 5
+          </span>
+        </MenuItem>
+        <MenuSeparator />
+        <div
+          className="ht-content__cal-view-stepper-row"
+          data-testid="calendar-view-multiDay"
+          data-checked={view.extendedView === 'multiDay' ? 'true' : 'false'}
+        >
+          <button
+            type="button"
+            role="menuitemradio"
+            aria-checked={view.extendedView === 'multiDay'}
+            className="ht-content__cal-view-stepper-main"
+            onClick={() => {
+              view.setExtendedView('multiDay');
+              setViewMenuOpen(false);
+            }}
+          >
+            <span className="ht-content__cal-view-stepper-check" aria-hidden="true">
+              {view.extendedView === 'multiDay' ? '✓' : ''}
+            </span>
+            <span>{t('web.calendar.view.multiDay')}</span>
+          </button>
+          <div className="ht-content__cal-view-stepper-controls">
+            <button
+              type="button"
+              className="ht-content__cal-view-stepper-btn"
+              data-testid="calendar-view-multiDay-dec"
+              aria-label={t('web.calendar.view.multiDay')}
+              disabled={view.multiDayCount <= 2}
+              onClick={(e) => {
+                e.stopPropagation();
+                view.setMultiDayCount(view.multiDayCount - 1);
+              }}
+            >
+              −
+            </button>
+            <span className="ht-content__cal-view-stepper-count" data-testid="calendar-view-multiDay-count">
+              {t('web.calendar.view.multiDayValue', { n: view.multiDayCount })}
+            </span>
+            <button
+              type="button"
+              className="ht-content__cal-view-stepper-btn"
+              data-testid="calendar-view-multiDay-inc"
+              aria-label={t('web.calendar.view.multiDay')}
+              disabled={view.multiDayCount >= 14}
+              onClick={(e) => {
+                e.stopPropagation();
+                view.setMultiDayCount(view.multiDayCount + 1);
+              }}
+            >
+              +
+            </button>
+          </div>
+        </div>
+        <div
+          className="ht-content__cal-view-stepper-row"
+          data-testid="calendar-view-multiWeek"
+          data-checked={view.extendedView === 'multiWeek' ? 'true' : 'false'}
+        >
+          <button
+            type="button"
+            role="menuitemradio"
+            aria-checked={view.extendedView === 'multiWeek'}
+            className="ht-content__cal-view-stepper-main"
+            onClick={() => {
+              view.setExtendedView('multiWeek');
+              setViewMenuOpen(false);
+            }}
+          >
+            <span className="ht-content__cal-view-stepper-check" aria-hidden="true">
+              {view.extendedView === 'multiWeek' ? '✓' : ''}
+            </span>
+            <span>{t('web.calendar.view.multiWeek')}</span>
+          </button>
+          <div className="ht-content__cal-view-stepper-controls">
+            <button
+              type="button"
+              className="ht-content__cal-view-stepper-btn"
+              data-testid="calendar-view-multiWeek-dec"
+              aria-label={t('web.calendar.view.multiWeek')}
+              disabled={view.multiWeekCount <= 2}
+              onClick={(e) => {
+                e.stopPropagation();
+                view.setMultiWeekCount(view.multiWeekCount - 1);
+              }}
+            >
+              −
+            </button>
+            <span className="ht-content__cal-view-stepper-count" data-testid="calendar-view-multiWeek-count">
+              {t('web.calendar.view.multiWeekValue', { n: view.multiWeekCount })}
+            </span>
+            <button
+              type="button"
+              className="ht-content__cal-view-stepper-btn"
+              data-testid="calendar-view-multiWeek-inc"
+              aria-label={t('web.calendar.view.multiWeek')}
+              disabled={view.multiWeekCount >= 6}
+              onClick={(e) => {
+                e.stopPropagation();
+                view.setMultiWeekCount(view.multiWeekCount + 1);
+              }}
+            >
+              +
+            </button>
+          </div>
+        </div>
       </AnchoredMenu>
 
       <AnchoredMenu

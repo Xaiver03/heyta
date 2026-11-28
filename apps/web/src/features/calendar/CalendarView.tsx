@@ -43,9 +43,11 @@ import {
   stepCalendarCursor,
 } from '@heyta/ui';
 
+import { CalendarAgendaBoard } from './CalendarAgendaBoard.js';
 import { CalendarCapturePopover } from './CalendarCapturePopover.js';
 import { CalendarDragBar, CalendarDragProvider, CalendarDropAllDay, CalendarDropDay, CalendarDropHour, CalendarDropSlot } from './CalendarDnd.js';
 import { CalendarDisplaySettingsModal } from './CalendarDisplaySettingsModal.js';
+import { CalendarMultiDayBoard } from './CalendarMultiDayBoard.js';
 import { useCountdownStore } from '../countdown/store.js';
 import { useTaskStore } from '../tasks/store.js';
 import { useProjectStore } from '../projects/store.js';
@@ -220,15 +222,35 @@ export function CalendarView(): React.JSX.Element {
   );
 
   /**
-   * 月格点击是一次完整的新建意图：先选中日期，再打开同一条捕获浮层。
+   * 月格点击是一次完整的新建意图：先选中日期，再打开同一条捕获浮层；
+   * 若当前捕获框已开且点击的正是当前选中的日期格，则收起捕获框。
    * 草稿仍由 `CaptureComposer` 自己持有，取消或关闭只卸载草稿，不触发任何 op。
    */
   const onSelectDay = useCallback(
     (date: LocalDate) => {
+      if (view.captureOpen && view.selected === date && view.captureTime === undefined) {
+        view.toggleCapture();
+        return;
+      }
       view.selectDay(date);
       if (view.view !== 'year' && !view.captureOpen) view.toggleCapture();
     },
-    [view.captureOpen, view.selectDay, view.toggleCapture, view.view],
+    [view.captureOpen, view.captureTime, view.selectDay, view.selected, view.toggleCapture, view.view],
+  );
+
+  /**
+   * 日档 / 多日档 15 分钟槽位点击：捕获浮层已开时点击任意槽位收起浮层，
+   * 未开时定位到该日期与时刻打开捕获浮层。
+   */
+  const onSelectSlot = useCallback(
+    (day: LocalDate, time: LocalTime) => {
+      if (view.captureOpen) {
+        view.toggleCapture();
+        return;
+      }
+      view.openCaptureAtSlot(day, time);
+    },
+    [view.captureOpen, view.openCaptureAtSlot, view.toggleCapture],
   );
 
   /**
@@ -311,6 +333,38 @@ export function CalendarView(): React.JSX.Element {
         {view.captureOpen ? (
           <CalendarCapturePopover date={view.selected} time={view.captureTime} title={labels.dayTitle(view.selected)} onClose={view.toggleCapture} />
         ) : null}
+        {view.extendedView === 'agenda' ? (
+          <CalendarAgendaBoard
+            tasks={tasks}
+            tasksById={tasksById}
+            events={boardEvents}
+            eventLabels={eventLabels}
+            labels={labels}
+            today={today}
+            cursor={view.cursor}
+            selected={view.selected}
+            busyTaskId={busyId}
+            onSelectDay={onSelectDay}
+            onToggleTask={onToggleTask}
+          />
+        ) : view.extendedView === 'multiDay' ? (
+          <CalendarMultiDayBoard
+            tasks={tasks}
+            tasksById={tasksById}
+            events={boardEvents}
+            eventLabels={eventLabels}
+            labels={labels}
+            today={today}
+            cursor={view.cursor}
+            selected={view.selected}
+            multiDayCount={view.multiDayCount}
+            activeSlot={view.captureOpen && view.captureTime !== undefined ? { day: view.selected, time: view.captureTime } : undefined}
+            busyTaskId={busyId}
+            onSelectDay={onSelectDay}
+            onSelectSlot={onSelectSlot}
+            onToggleTask={onToggleTask}
+          />
+        ) : (
         <SharedCalendarBoard
           tasks={tasks}
           today={today}
@@ -318,7 +372,7 @@ export function CalendarView(): React.JSX.Element {
           selected={view.selected}
           onCursorChange={view.setCursor}
           onSelect={onSelectDay}
-          onSelectSlot={(day: LocalDate, time: LocalTime) => view.openCaptureAtSlot(day, time)}
+          onSelectSlot={onSelectSlot}
           activeSlot={view.captureOpen && view.captureTime !== undefined ? { day: view.selected, time: view.captureTime } : undefined}
           /*
             年档里点一张月卡（R13）。🔴 宿主**只做接线**，"去哪"由共享层决定
@@ -330,8 +384,10 @@ export function CalendarView(): React.JSX.Element {
              与下面的 `onToday` 是**一对**：宿主接了跳回，工具栏才有那颗「今天」；
              两处不同时改，结局是"整屏没有回到今天的入口"或"同一屏两个入口"。 */
           toolbar="external"
-          /* 档位由页头那个下拉决定（store 里唯一一份），板子只照它画。 */
-          view={view.view}
+          /* 档位由页头那个下拉决定（store 里唯一一份），板子只照它画；多周档透传 multiWeekCount。 */
+          view={view.extendedView === 'multiWeek' ? 'month' : view.view}
+          multiWeekCount={view.extendedView === 'multiWeek' ? view.multiWeekCount : undefined}
+          todayHighlight="circle"
           showSelectedDayList={false}
           fillMonth
           /* 🔴 日档那条"现在"线的时钟**只有一个来源**：任务 store 的 `now`。
@@ -391,6 +447,7 @@ export function CalendarView(): React.JSX.Element {
           )}
           testID={BOARD_TEST_ID}
         />
+        )}
       </div>
       </CalendarDragProvider>
       {/* 分层卡片式「显示设置」弹窗：由 ⋮ 菜单的 entry 置 `displaySettingsOpen` 打开。 */}
