@@ -215,3 +215,341 @@
 [data-testid='calendar-view-dropdown'] .ht-header__menu-item--radio > .ht-header__menu-label {
   grid-column: 2 / span 2;
 }
+
+/* ── 视图下拉里的可调多日/多周步进器行 ────────────────────────────────────── */
+
+.ht-content__cal-view-stepper-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ht-space-2);
+  min-block-size: var(--ht-touch-target-min);
+  padding-inline-end: var(--ht-space-2);
+  border-radius: var(--ht-radius-sm);
+}
+
+.ht-content__cal-view-stepper-row:hover {
+  background: var(--ht-color-hover);
+}
+
+.ht-content__cal-view-stepper-main {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  flex: 1 1 auto;
+  min-block-size: var(--ht-touch-target-min);
+  padding-inline: var(--ht-space-2);
+  border: 0;
+  background: transparent;
+  color: var(--ht-color-foreground);
+  font: inherit;
+  font-size: var(--ht-font-size-sm);
+  text-align: start;
+  cursor: pointer;
+}
+
+.ht-content__cal-view-stepper-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: var(--ht-icon-sm);
+  block-size: var(--ht-icon-sm);
+  color: var(--ht-color-primary);
+}
+
+.ht-content__cal-view-stepper-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+  flex: 0 0 auto;
+}
+
+.ht-content__cal-view-stepper-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: var(--ht-space-6);
+  block-size: var(--ht-space-6);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+  border-radius: var(--ht-radius-sm);
+  background: var(--ht-color-surface);
+  color: var(--ht-color-foreground);
+  font: inherit;
+  cursor: pointer;
+}
+
+.ht-content__cal-view-stepper-btn:hover:not(:disabled) {
+  background: var(--ht-color-hover);
+  border-color: var(--ht-color-border);
+}
+
+.ht-content__cal-view-stepper-btn:disabled {
+  color: var(--ht-color-disabled-fg);
+  cursor: default;
+}
+
+.ht-content__cal-view-stepper-count {
+  min-inline-size: var(--ht-space-8);
+  text-align: center;
+  font-size: var(--ht-font-size-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--ht-color-foreground-muted);
+}
+
+/* ── 多日视图（CalendarMultiDayBoard） ─────────────────────────────────────── */
+
+.ht-content__cal-multiday {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-block-size: 0;
+  border: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+  background: var(--ht-color-surface);
+}
+
+.ht-content__cal-multiday-head,
+.ht-content__cal-multiday-allday-row,
+.ht-content__cal-multiday-hour-row {
+  display: flex;
+  align-items: stretch;
+}
+
+.ht-content__cal-multiday-head {
+  border-block-end: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+  background: var(--ht-color-surface-subtle);
+}
+
+.ht-content__cal-multiday-allday-row {
+  border-block-end: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+  min-block-size: var(--ht-touch-target-min);
+}
+
+.ht-content__cal-multiday-gutter {
+  flex: 0 0 var(--ht-space-12);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: var(--ht-space-1);
+  color: var(--ht-color-foreground-subtle);
+  font-variant-numeric: tabular-nums;
+  border-inline-end: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+}
+
+.ht-content__cal-multiday-colhead {
+  flex: 1 1 0%;
+  min-inline-size: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ht-space-1);
+  padding: var(--ht-space-2);
+  border: 0;
+  border-inline-start: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+  background: transparent;
+  color: var(--ht-color-foreground);
+  cursor: pointer;
+}
+
+.ht-content__cal-multiday-colhead:hover {
+  background: var(--ht-color-hover);
+}
+
+.ht-content__cal-multiday-weekday {
+  color: var(--ht-color-foreground-muted);
+}
+
+.ht-content__cal-multiday-daynum {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: var(--ht-space-6);
+  block-size: var(--ht-space-6);
+  border-radius: var(--ht-radius-full);
+  font-variant-numeric: tabular-nums;
+}
+
+.ht-content__cal-multiday-colhead[data-today='true'] .ht-content__cal-multiday-daynum {
+  background: var(--ht-color-primary);
+  color: var(--ht-color-on-primary);
+}
+
+.ht-content__cal-multiday-colhead[data-selected='true']:not([data-today='true']) .ht-content__cal-multiday-daynum {
+  background: var(--ht-color-primary-subtle);
+  color: var(--ht-color-primary);
+}
+
+.ht-content__cal-multiday-allday-row > .ht-content__cal-hour-drop,
+.ht-content__cal-multiday-hour-row > .ht-content__cal-hour-drop {
+  flex: 1 1 0%;
+  min-inline-size: 0;
+  display: flex;
+  flex-direction: column;
+  border-inline-start: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+}
+
+.ht-content__cal-multiday-allday-cell {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+  padding: var(--ht-space-1);
+}
+
+.ht-content__cal-multiday-event {
+  padding: var(--ht-space-1) var(--ht-space-2);
+  border-radius: var(--ht-radius-sm);
+  background: var(--ht-color-primary-subtle);
+  color: var(--ht-color-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ht-content__cal-multiday-body {
+  flex: 1 1 auto;
+  min-block-size: 0;
+  overflow-y: auto;
+}
+
+.ht-content__cal-multiday-hour-row {
+  min-block-size: var(--ht-size-row-min-height);
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+}
+
+.ht-content__cal-multiday-hour-row:first-child {
+  border-block-start: 0;
+}
+
+.ht-content__cal-multiday-hour-cell {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  padding-inline: var(--ht-space-1);
+}
+
+.ht-content__cal-multiday-slot {
+  display: flex;
+  align-items: center;
+  inline-size: 100%;
+  min-block-size: var(--ht-space-5);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.ht-content__cal-multiday-slot:hover {
+  background: var(--ht-color-hover);
+}
+
+.ht-content__cal-multiday-draft {
+  display: inline-flex;
+  align-items: center;
+  inline-size: 100%;
+  padding: var(--ht-space-1) var(--ht-space-2);
+  border-radius: var(--ht-radius-sm);
+  background: var(--ht-color-primary);
+  color: var(--ht-color-on-primary);
+}
+
+/* ── 日程视图（CalendarAgendaBoard） ───────────────────────────────────────── */
+
+.ht-content__cal-agenda {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-block-size: 0;
+  overflow-y: auto;
+  background: var(--ht-color-surface);
+}
+
+.ht-content__cal-agenda > .ht-content__cal-drop {
+  flex: 0 0 auto;
+}
+
+.ht-content__cal-agenda-day {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ht-space-4);
+  inline-size: 100%;
+  padding: var(--ht-space-4);
+  border-block-end: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+}
+
+.ht-content__cal-agenda-date {
+  flex: 0 0 var(--ht-space-16);
+  display: flex;
+  align-items: baseline;
+  gap: var(--ht-space-2);
+  padding: var(--ht-space-1);
+  border: 0;
+  border-radius: var(--ht-radius-md);
+  background: transparent;
+  color: var(--ht-color-foreground);
+  cursor: pointer;
+}
+
+.ht-content__cal-agenda-date:hover {
+  background: var(--ht-color-hover);
+}
+
+.ht-content__cal-agenda-day[data-today='true'] .ht-content__cal-agenda-daynum {
+  color: var(--ht-color-primary);
+}
+
+.ht-content__cal-agenda-day[data-today='true'] .ht-content__cal-agenda-weekday {
+  color: var(--ht-color-primary);
+}
+
+.ht-content__cal-agenda-weekday {
+  color: var(--ht-color-foreground-muted);
+}
+
+.ht-content__cal-agenda-items {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+}
+
+.ht-content__cal-agenda-item {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-3);
+  min-inline-size: 0;
+}
+
+.ht-content__cal-agenda-timeline {
+  flex: 0 0 var(--ht-space-16);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--ht-space-2);
+  color: var(--ht-color-foreground-muted);
+}
+
+.ht-content__cal-agenda-time {
+  font-variant-numeric: tabular-nums;
+  color: var(--ht-color-foreground-muted);
+}
+
+.ht-content__cal-agenda-dot {
+  inline-size: var(--ht-space-2);
+  block-size: var(--ht-space-2);
+  border-radius: var(--ht-radius-full);
+  background: var(--ht-color-primary);
+}
+
+.ht-content__cal-agenda-card {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  padding-inline: var(--ht-space-3);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-primary-subtle);
+}
+
+.ht-content__cal-agenda-card--event {
+  padding-block: var(--ht-space-2);
+  color: var(--ht-color-primary);
+}

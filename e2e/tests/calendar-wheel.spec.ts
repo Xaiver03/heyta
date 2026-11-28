@@ -18,7 +18,7 @@ import { openApp } from './helpers';
  *
  * ## 所以这里只做三件事
  *
- * 1. **边界**：Web 月档不再重复渲染当天清单，月格之外的页脚滚轮应该让给页面；
+ * 1. **边界**：Web 月档不再重复渲染当天清单，月历之外的滚轮应该让给页面；
  *    指针在**月历格子**上滚 → 月份变了且事件被月历消费。
  * 2. `defaultPrevented` 由**页面自己在 window 冒泡阶段读回来**，
  *    不是我们自说自话（监听器必须挂在 host 之后收到事件的那一侧 = window 冒泡）。
@@ -140,9 +140,9 @@ test('滚轮归月历：指针在格子上滚翻月，月历之外的滚轮让�
   const before = await monthText(page);
   await page.screenshot({ path: 'test-results/calendar-wheel-before.png' });
 
-  // ── ① 月历之外的区域让出滚轮（当前月档的稳定命中点是页脚） ──
-  const footnotePoint = await pointInside(page, '[data-testid="calendar-board-footnote"]');
-  await page.mouse.move(footnotePoint.x, footnotePoint.y);
+  // ── ① 月历之外的区域让出滚轮（侧栏「显示范围」那一块，在月历宿主之外） ──
+  const outsidePoint = await pointInside(page, '[data-testid="calendar-scope-all"]');
+  await page.mouse.move(outsidePoint.x, outsidePoint.y);
   await page.mouse.wheel(0, 240);
   expect(await lastPrevented(page), '月历之外的滚轮不应被月历吃掉').toBe(false);
 

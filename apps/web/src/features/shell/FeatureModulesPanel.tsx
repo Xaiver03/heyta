@@ -13,23 +13,24 @@
  * ⇒ 只做"默认少"会砍掉别人正在用的东西；只做"可开关"则默认仍然很长。
  * **默认少 + 用户自己决定留哪些**，两个一起才对 —— 而这一节就是后半句的落点。
  *
- * ## 三个刻意的决定
+ * ## 两个刻意的决定
  *
- * 1. **每张卡都有一句"它是什么"**，照滴答的做法（"在 6 种日历视图中规划任务"）。
- *    只有一个开关名的话，用户得先打开才知道那是什么 —— 而打开就意味着改了他的导航。
- *
- * 2. **开关立刻生效、立刻落盘**，没有"保存"按钮。理由与主题/语言切换一致：
+ * 1. **开关立刻生效、立刻落盘**，没有"保存"按钮。理由与主题/语言切换一致：
  *    这是一个即时可见的偏好，加一步确认只会让"我关掉了但没生效"变成可能。
  *    ⚠️ 而它**不是**破坏性操作 —— 关掉只是从导航里收起来，数据一条都不会丢，
  *    再打开就回来。所以不需要确认对话框。
  *
- * 3. **说清它只影响这台设备**（`mobile.shell.modules.intro` 那句）。
- *    用户会预期"我在这台机器上的选择"与"我手机上的"是两件事 ——
- *    不说的话，他在手机上看不到刚打开的模块时会以为坏了。
- *    （为什么不做成同步：见 `modules.ts` 文件头。）
+ * 2. **不加说明文字**（2026-11-27 收敛）。这一节原来有 1 句开场白 + 每行一句
+ *    "它是什么"，一共 9 句 —— 全删。判据是 `docs/agents/ux-principles.md` §11：
+ *    删掉它，用户不会少知道任何**会改变行为**的事：
+ *      · 开关拨一下就看见左边导航跟着变，这件事由**动作本身**说明，不需要预告；
+ *      · 模块名就是它是什么（「日历」「四象限」「看板」），一句话复述等于噪音；
+ *      · "只影响这台设备"此前是唯一有信息量的那句 —— 现在由**布局**承担：
+ *        它是设置页里的一节，与账号/同步那几节物理分开，且不带任何"同步"字样。
+ *
+ *    🔴 所以这一节**不许再加回副标题**。`check:settings-prose` 会按容器类名判红
+ *    （见那道门的 `BANNED_CLASS`）。
  */
-
-import { useState } from 'react';
 
 import { useI18n } from '@heyta/i18n';
 
@@ -45,29 +46,20 @@ export function FeatureModulesPanel({
   testID?: string;
 }): React.JSX.Element {
   const { t } = useI18n();
-  /**
-   * 是否已经动过至少一个开关。
-   *
-   * 🔴 那句"已保存"**只在真的改过之后才显示**。一直挂着它等于在说假话 ——
-   * 用户刚进设置页什么都没动，界面却告诉他"已经保存了"。
-   */
-  const [touched, setTouched] = useState(false);
 
   return (
     <section className="ht-settings" data-testid={testID}>
       <h2 className="ht-settings__title ht-type-section-title">{t('web.shell.modules.title')}</h2>
-      <p className="ht-settings__hint">{t('web.shell.modules.intro')}</p>
 
       {/* 🔴 2026-10-25：这一节原本是**两列复选框卡片**，与上面几节的"左标签 / 右控件"
           不是同一种语法 —— 一屏里两种列表语法，眼睛每翻一节就得重新学一遍。
-          现在改成同一套 `preference-row`：标签+说明在左，开关在最右，
+          现在改成同一套 `preference-row`：标签在左，开关在最右，
           与「任务与显示」那几行**逐格同构**。行为一个字没改（仍是即时生效、仍只影响本设备）。 */}
       <div className="ht-settings__rows" data-testid={`${testID}-cards`}>
         {SHELL_MODULES.map((m) => (
           <div key={m.key} className="ht-settings__preference-row">
             <div className="ht-settings__preference-label">
               <h3 className="ht-settings__h3 ht-type-row-title">{t(m.labelKey)}</h3>
-              <span className="ht-settings__cardNote">{t(m.noteKey)}</span>
             </div>
             {/* 尾格：让"开关"成为一个 44px 的单元格，而不是一枚 13px 的原生方框 ——
                 否则同一列里它比别的控件矮一档，右缘也会差几像素（量到过 1264 vs 1267）。 */}
@@ -80,7 +72,6 @@ export function FeatureModulesPanel({
               data-testid={`${testID}-${m.key}`}
               checked={enabled.has(m.key)}
               onChange={() => {
-                setTouched(true);
                 onToggle(m.key);
               }}
             />
@@ -88,12 +79,6 @@ export function FeatureModulesPanel({
           </div>
         ))}
       </div>
-
-      {touched ? (
-        <p className="ht-settings__hint" data-testid={`${testID}-hint`}>
-          {t('web.shell.modules.savedHint')}
-        </p>
-      ) : null}
     </section>
   );
 }

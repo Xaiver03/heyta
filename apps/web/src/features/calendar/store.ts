@@ -27,6 +27,7 @@ import { create } from 'zustand';
 import {
   FULL_SCOPE,
   startOfMonth,
+  startOfWeek,
   toLocalDate,
   type LocalDate,
   type LocalTime,
@@ -100,8 +101,12 @@ interface CalendarViewState {
    * 默认 `true`（滴答默认开启，也是 web 接上倒数日之后的既有行为）。
    */
   showCountdown: boolean;
-  /** 扩展视图档位（日程 / 5天多日 / 2周多周）；`'none'` 时使用基础 `view`。 */
+  /** 扩展视图档位（日程 / 多日 / 多周）；`'none'` 时使用基础 `view`。 */
   extendedView: CalendarExtendedView;
+  /** 多日视图列数（2..14，默认 5）。 */
+  multiDayCount: number;
+  /** 多周视图周数（2..6，默认 2）。 */
+  multiWeekCount: number;
   /** 日历着色方式：按清单或按四象限。 */
   colorMode: CalendarColorMode;
   /** 日历事件条视觉样式：经典或现代（左侧强调竖条）。 */
@@ -187,6 +192,8 @@ interface CalendarViewActions {
   /** 显示设置：着色模式（见 `colorBy`）。 */
   setColorBy: (value: CalendarColorBy) => void;
   setExtendedView: (value: CalendarExtendedView) => void;
+  setMultiDayCount: (count: number) => void;
+  setMultiWeekCount: (count: number) => void;
   setColorMode: (value: CalendarColorMode) => void;
   setDisplayStyle: (value: CalendarDisplayStyle) => void;
   setShowChecklist: (value: boolean) => void;
@@ -240,6 +247,17 @@ function persistDisplay(state: CalendarViewState): void {
  */
 const displayPref = loadCalendarDisplayPref();
 
+/** 扩展档（多日/多周/日程）的光标归一；课程表由调用处按周单独处理。 */
+function cursorForState(
+  view: CalendarViewKind,
+  extendedView: CalendarExtendedView,
+  date: LocalDate,
+): LocalDate {
+  if (extendedView === 'multiDay' || extendedView === 'agenda') return date;
+  if (extendedView === 'multiWeek') return startOfWeek(date);
+  return calendarCursorFor(view, date);
+}
+
 export const useCalendarViewStore = create<CalendarViewState & CalendarViewActions>((set, get) => ({
   // ⚠️ 这里读一次时钟是**给界面播种**，不是业务判断 —— 领域层的
   // "now 显式传入、不在函数里读时钟"那条纪律针对的是判据，不是首屏渲染。
@@ -256,6 +274,8 @@ export const useCalendarViewStore = create<CalendarViewState & CalendarViewActio
   showCountdown: displayPref.showCountdown,
   colorBy: displayPref.colorBy,
   extendedView: 'none',
+  multiDayCount: 5,
+  multiWeekCount: 2,
   colorMode: 'project',
   displayStyle: 'classic',
   showChecklist: false,
@@ -272,12 +292,20 @@ export const useCalendarViewStore = create<CalendarViewState & CalendarViewActio
     //   日档里"游标必须带走选中"的理由与它的判据写在那里（`calendarSelectedForCursor`），
     //   症状是**安静地各指一天**：轴翻到 10-05、侧栏还圈着 10-03、新任务写进了 10-03。
     //   判据：`apps/web/tests/calendar-day-view.spec.tsx`（含变异臂 Z）。
-    //   课程表档把游标当成"一周里的任意一天"，行为与周档一致（不归到月首、不带选中）。
+    //   课程表档把游标当成"一周里的任意一天"（与周档一致）；扩展档按 cursorForState。
     set((state) => {
-      const kind = state.extraView === 'timetable' ? 'week' : state.view;
+      if (state.extraView === 'timetable') {
+        return {
+          cursor: calendarCursorFor('week', date),
+          selected: calendarSelectedForCursor('week', date, state.selected),
+        };
+      }
       return {
-        cursor: calendarCursorFor(kind, date),
-        selected: calendarSelectedForCursor(kind, date, state.selected),
+        cursor: cursorForState(state.view, state.extendedView, date),
+        selected:
+          state.extendedView === 'none'
+            ? calendarSelectedForCursor(state.view, date, state.selected)
+            : state.selected,
       };
     });
   },
@@ -285,7 +313,10 @@ export const useCalendarViewStore = create<CalendarViewState & CalendarViewActio
   selectDay: (date) => {
     set((state) => ({
       selected: date,
-      cursor: calendarCursorFor(state.extraView === 'timetable' ? 'week' : state.view, date),
+      cursor:
+        state.extraView === 'timetable'
+          ? calendarCursorFor('week', date)
+          : cursorForState(state.view, state.extendedView, date),
       captureTime: undefined,
     }));
   },
@@ -293,7 +324,10 @@ export const useCalendarViewStore = create<CalendarViewState & CalendarViewActio
   goToToday: (today) => {
     set((state) => ({
       selected: today,
-      cursor: calendarCursorFor(state.extraView === 'timetable' ? 'week' : state.view, today),
+      cursor:
+        state.extraView === 'timetable'
+          ? calendarCursorFor('week', today)
+          : cursorForState(state.view, state.extendedView, today),
     }));
   },
 
@@ -312,7 +346,28 @@ export const useCalendarViewStore = create<CalendarViewState & CalendarViewActio
   },
 
   setExtendedView: (extendedView) => {
-    set({ extendedView });
+    set((state) => ({
+      extendedView,
+      cursor: cursorForState(state.view, extendedView, state.selected),
+    }));
+  },
+
+  setMultiDayCount: (count) => {
+    const clamped = Math.max(2, Math.min(14, Math.round(count)));
+    set((state) => ({
+      multiDayCount: clamped,
+      extendedView: 'multiDay',
+      cursor: cursorForState(state.view, 'multiDay', state.selected),
+    }));
+  },
+
+  setMultiWeekCount: (count) => {
+    const clamped = Math.max(2, Math.min(6, Math.round(count)));
+    set((state) => ({
+      multiWeekCount: clamped,
+      extendedView: 'multiWeek',
+      cursor: cursorForState(state.view, 'multiWeek', state.selected),
+    }));
   },
 
   setColorMode: (colorMode) => {

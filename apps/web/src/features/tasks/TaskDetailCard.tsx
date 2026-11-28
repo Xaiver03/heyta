@@ -81,7 +81,7 @@ import {
 } from '@heyta/ui';
 import { FolderOpen, MoreHorizontal, Type } from 'lucide-react';
 
-import { useSelected } from '../../lib/selection.js';
+import { selection, useSelected } from '../../lib/selection.js';
 import { currentState, dispatchChecked, dispatchIntent } from '../../lib/oplog.js';
 import { DangerConfirmDialog } from '../../lib/dialog/DangerConfirmDialog.js';
 import { useSyncStore } from '../sync/store.js';
@@ -760,6 +760,51 @@ export function TaskDetailCard({
    * 另一棵里的那个控件 —— 症状是"按钮跳了，但跳到我没看的那一份"。
    */
   const paneRef = useRef<HTMLDivElement | null>(null);
+  const popoverRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  if (task !== undefined && panelTaskId !== task.id) {
+    setPanelTaskId(task.id);
+    setActivePanel(null);
+    setChecklistOpen(false);
+    setAttachmentBusy(false);
+  }
+
+  useEffect(() => {
+    if (activePanel === null) {
+      if (task === undefined) return undefined;
+      const onDismissTask = (event: KeyboardEvent): void => {
+        if (event.key !== 'Escape' || event.defaultPrevented) return;
+        const activeTag = document.activeElement?.tagName;
+        if (activeTag === 'INPUT' || activeTag === 'TEXTAREA' || activeTag === 'SELECT') return;
+        selection.select('task', null);
+      };
+      document.addEventListener('keydown', onDismissTask);
+      return () => {
+        document.removeEventListener('keydown', onDismissTask);
+      };
+    }
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      event.stopPropagation();
+      setActivePanel(null);
+    };
+    const onPointerDown = (event: PointerEvent): void => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      if (popoverRef.current?.contains(target) === true) return;
+      if (target.closest('[data-detail-popover-trigger="true"]') !== null) return;
+      setActivePanel(null);
+    };
+    document.addEventListener('keydown', onKeyDown, true);
+    document.addEventListener('pointerdown', onPointerDown);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown, true);
+      document.removeEventListener('pointerdown', onPointerDown);
+    };
+  }, [activePanel, task]);
+
   if (task === undefined) return null;
 
   /** 把这一格里的某个控件滚到眼前并交还焦点（工具条两颗按钮干的就是这一件事）。 */

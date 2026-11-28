@@ -188,7 +188,7 @@ export function GanttChart(props: GanttChartProps): React.JSX.Element {
           而 `EmptyState` 的注释里就点名了 `gantt-empty` 这个 testID。
           `testID` 必须原样传进去：e2e 的定位钩子与门禁的登记项都靠它。
         */}
-        <EmptyState title={emptyHint ?? labels.empty} testID="gantt-empty" />
+        <EmptyState illustration="calendar" title={emptyHint ?? labels.empty} testID="gantt-empty" />
       </View>
     );
   }

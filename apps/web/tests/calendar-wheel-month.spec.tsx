@@ -297,12 +297,13 @@ describe('滚轮翻月（接线）', () => {
     expect(monthTitles()).toEqual({ main: '2026年10月', mini: '2026年10月' });
   });
 
-  it('🔴 指针在月历之外：滚轮不归月历（不翻、也不吃掉页面滚动）', async () => {
-    // Web 月档刻意不再渲染重复的选中日清单；页脚在月历卡片之外，
-    // 是页面滚动语义的稳定命中点。
-    const prevented = await wheelOn('calendar-board-footnote', { deltaY: 100 });
+  it('🔴 指针在月历卡片之外：滚轮不归月历（不翻、也不吃掉页面滚动）', async () => {
+    // 命中点是**板的根**：它在滚轮宿主之内、但不在月历卡片之内 ——
+    // 这正是 `within` 圈定范围要判的那条边界（圈成整块宿主就会连板根一起吃掉）。
+    // ⚠️ 这里原来打的是页脚，页脚 2026-11-27 已删（日历里那句说明中英文都不再存在）。
+    const prevented = await wheelOn('calendar-board', { deltaY: 100 });
     expect(monthTitles()).toEqual({ main: '2026年9月', mini: '2026年9月' });
-    expect(prevented, '把清单上的滚轮吃掉 = 那一块再也滚不动页面').toBe(false);
+    expect(prevented, '把卡片之外的滚轮吃掉 = 那一块再也滚不动页面').toBe(false);
   });
 
   it('触控板横向手势不翻月', async () => {

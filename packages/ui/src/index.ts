@@ -1705,6 +1705,7 @@ export {
   projectGestureOffset,
   rubberBandOffset,
 } from './motion/gesture.js';
+export { DAY_SLOT_MINUTES } from './calendar/CalendarDayBoard.js';
 
 // 手写 SVG 图表原语（覆盖图谱 #48 / #50）：无第三方图表库，颜色/线宽全走 token。
 export {

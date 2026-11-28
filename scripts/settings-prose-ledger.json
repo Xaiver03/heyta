@@ -1,6 +1,5 @@
 {
-  "total": 1,
-  "files": {
-    "apps/web/src/features/settings/ProfileOverview.tsx": 1
-  }
+  "total": 0,
+  "files": {},
+  "rebaseline": "2026-11-27：判据按语义列容器（原正则漏驼峰、只认 ht-settings__ 前缀），并把「标题/读数/便签/问号气泡」显式排除"
 }

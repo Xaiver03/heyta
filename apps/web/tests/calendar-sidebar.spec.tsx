@@ -538,14 +538,13 @@ describe('日历侧栏（Web）', () => {
     expect(checkbox('calendar-scope-all').getAttribute('aria-pressed')).toBe('true');
   });
 
-  it('没有 dueDate 的任务不参与侧栏（页脚那句话仍然要说出来）', async () => {
+  it('没有 dueDate 的任务不参与侧栏', async () => {
     await act(async () => {
       await useTaskStore.getState().addTask('没设时间的事');
     });
     await mount();
     await openCalendar();
 
-    expect(need('calendar-board-footnote').textContent).toContain('未设截止时间');
     expect(dots(TODAY)).toBe(0);
     expect(hasRow('没设时间的事')).toBe(false);
     expect(miniDays().every((el) => el.querySelectorAll('.ht-sidebar__day-dots > i').length === 0)).toBe(

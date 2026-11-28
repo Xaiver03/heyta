@@ -247,4 +247,24 @@ describe('B：认证面板在真入口下的模态行为', () => {
     pressKey(window, 'Escape');
     expect(useTaskStore.getState().filter).toEqual(before);
   });
+
+  it('🔴 点遮罩空白处关闭面板；点对话框内部不关（onMouseDown 只认遮罩本体）', async () => {
+    await openPanel();
+    const scrim = document.querySelector<HTMLElement>('.ht-sheet__auth');
+    expect(scrim, '前置：面板没挂出来').not.toBeNull();
+    const dialog = scrim!.querySelector<HTMLElement>('.ht-sheet__auth-dialog');
+    expect(dialog, '前置：找不到对话框本体').not.toBeNull();
+
+    // 在对话框内部按下（target≠currentTarget）⇒ 不关。
+    act(() => {
+      dialog!.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    });
+    expect(document.querySelector('.ht-sheet__auth'), '点对话框内部竟把面板关了').not.toBeNull();
+
+    // 在遮罩本体按下（target===currentTarget）⇒ 关。
+    act(() => {
+      scrim!.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    });
+    expect(document.querySelector('.ht-sheet__auth'), '点遮罩空白处没关面板').toBeNull();
+  });
 });

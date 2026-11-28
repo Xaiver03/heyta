@@ -301,6 +301,11 @@
      那张卡 2026-10-01 已删（R6），但这条**机制**留着：下一个贴死的面，同样是谁在上面谁声明。 */
 }
 
+.ht-content:has(.ht-content__calendar-host) {
+  max-inline-size: none;
+  padding: var(--ht-space-2) var(--ht-space-3);
+}
+
 /*
  * 🔴 工单 H11「外壳不滚」桌面那一半：滚动发生在**这一层**。
  *
@@ -608,9 +613,14 @@
   flex: 0 0 auto;
   inline-size: auto;
 }
-/* CalendarViewTabs 的根带 `align-self: stretch`；放进紧凑的右对齐工具条时让它按内容宽。 */
+/* CalendarViewTabs 在 DOM 里保留供测试/无障碍回退，视觉上单行顶栏只使用下拉触发器。 */
 .ht-content__cal-seg {
-  flex: 0 0 auto;
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 .ht-content__cal-seg [role='tablist'] {
   align-self: center;
@@ -623,7 +633,7 @@
   inline-size: auto;
 }
 .ht-content__cal-bigtitle {
-  font-size: var(--ht-font-size-3xl);
+  font-size: var(--ht-font-size-xl);
   font-weight: var(--ht-font-weight-semibold);
   line-height: var(--ht-line-height-tight);
   color: var(--ht-color-foreground);
@@ -633,7 +643,6 @@
   margin: 0;
 }
 .ht-content__cal-nav {
-  margin-inline-start: auto;
   display: flex;
   align-items: center;
   gap: var(--ht-space-1);

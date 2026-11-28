@@ -781,7 +781,18 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
         store.countPendingUpload(),
         store.countRejectedUpload(),
       ]);
-      set({ pendingUpload: pending + rejected, rejectedUpload: rejected });
+      /*
+        🔴 值没变就**不 set**。zustand 的 `set` 只要收到一个新的 partial 对象就会通知
+        所有订阅者（哪怕值一个字没变），而 `armWebShareSession` 一收到通知就可能再
+        `attachShareWiring` / `notify` 一轮 —— 这是"登录框打字卡"那个环的另一半。
+        这里返回同一个 state 引用时 zustand 会跳过通知，环因此在原地停住。
+      */
+      const nextPending = pending + rejected;
+      set((state) =>
+        state.pendingUpload === nextPending && state.rejectedUpload === rejected
+          ? state
+          : { pendingUpload: nextPending, rejectedUpload: rejected },
+      );
     } catch {
       // 计数读失败不改变任何数据；保留上一次的值，不谎报 0。
     }

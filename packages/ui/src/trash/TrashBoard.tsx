@@ -151,6 +151,7 @@ export function TrashBoard({
         // 空态走**共享那一个实现**（`check:empty-state` 的判据 3）。
         <EmptyState
           icon={Trash2}
+          illustration="tasks"
           title={labels.emptyTitle}
           hint={labels.emptyHint}
           testID={`${testID}-empty`}

@@ -60,8 +60,6 @@ export interface ShellModule {
   readonly key: ShellModuleKey;
   /** 模块名（开关的标题）。 */
   readonly labelKey: MessageKey;
-  /** 一句话说清它是什么 —— 滴答的每张卡下都有一句（"在 6 种日历视图中规划任务"）。 */
-  readonly noteKey: MessageKey;
   /**
    * 默认是否开启。
    *
@@ -77,13 +75,11 @@ export const SHELL_MODULES: readonly ShellModule[] = [
     // 日历默认开：它是滴答 rail 的 5 个主菜单之一，属于"任务类"而不是"额外玩法"。
     key: 'calendar',
     labelKey: 'web.shell.modules.calendar.label',
-    noteKey: 'web.shell.modules.calendar.note',
     defaultOn: true,
   },
   {
     key: 'quadrant',
     labelKey: 'web.shell.modules.quadrant.label',
-    noteKey: 'web.shell.modules.quadrant.note',
     defaultOn: true,
   },
   {
@@ -105,37 +101,31 @@ export const SHELL_MODULES: readonly ShellModule[] = [
      */
     key: 'kanban',
     labelKey: 'web.shell.modules.kanban.label',
-    noteKey: 'web.shell.modules.kanban.note',
     defaultOn: true,
   },
   {
     key: 'habits',
     labelKey: 'web.shell.modules.habits.label',
-    noteKey: 'web.shell.modules.habits.note',
     defaultOn: true,
   },
   {
     key: 'timeline',
     labelKey: 'web.shell.modules.timeline.label',
-    noteKey: 'web.shell.modules.timeline.note',
     defaultOn: true,
   },
   {
     key: 'focus',
     labelKey: 'web.shell.modules.focus.label',
-    noteKey: 'web.shell.modules.focus.note',
     defaultOn: false,
   },
   {
     key: 'growth',
     labelKey: 'web.shell.modules.growth.label',
-    noteKey: 'web.shell.modules.growth.note',
     defaultOn: false,
   },
   {
     key: 'notes',
     labelKey: 'web.shell.modules.notes.label',
-    noteKey: 'web.shell.modules.notes.note',
     defaultOn: false,
   },
   {
@@ -145,7 +135,6 @@ export const SHELL_MODULES: readonly ShellModule[] = [
     //    所以这条默认值不会动到任何既有的 tab 计数断言。
     key: 'countdown',
     labelKey: 'web.shell.modules.countdown.label',
-    noteKey: 'web.shell.modules.countdown.note',
     defaultOn: false,
   },
 ];

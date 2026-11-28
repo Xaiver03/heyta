@@ -92,7 +92,6 @@ export function useCalendarLabels(): CalendarBoardLabels {
        * 于是"完整构建"从那一刻起就是红的，只是没人跑过。
        */
       dayCount: (count: number) => t('mobile.calendar.dayCount', { count }),
-      footnote: t('web.calendar.footnote'),
       taskRow: {
         toggleOn: (row: { title: string }) => t('web.shell.tasks.complete', { title: row.title }),
         toggleOff: (row: { title: string }) =>
