@@ -110,7 +110,9 @@ import {
   type LiveRow,
   type LiveTurn,
 } from '@heyta/app-host';
+import { startAssistantJournal, type AssistantJournal } from '@heyta/app-host';
 import { webManagedTransport } from './managed-transport.js';
+import { createWebJournalTransport } from './server-journal.js';
 import type { LocalApiHost } from '@heyta/local-api';
 
 import { AiDisclosureHost } from './AiDisclosureHost.js';
@@ -306,6 +308,8 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
   const conversationRef = useRef<HTMLDivElement>(null);
   /** 本轮的中断句柄：「停止」按钮 abort 它，app-host 循环在步骤边界消费。 */
   const abortRef = useRef<AbortController | null>(null);
+  /** 服务端 run/session 的会话 id（托管档持久化；本地/自备端点不用）。 */
+  const journalSessionRef = useRef<string | undefined>(undefined);
   /**
    * 是否跟随最新内容（流式期间自动滚到底）。
    *
@@ -573,13 +577,34 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
     if (props.useCloudHarness === true) {
       setHarnessPreparing(false);
       ephemeral.write(session.account, { live: EMPTY_LIVE });
+      // 托管档：把本轮挂成服务端 run（best-effort —— journal 失败不影响 AI 本身）。
+      let journal: AssistantJournal | undefined;
+      try {
+        const transport = createWebJournalTransport();
+        if (transport !== undefined) {
+          journal = await startAssistantJournal(
+            transport,
+            journalSessionRef.current === undefined ? {} : { sessionId: journalSessionRef.current },
+          );
+          journalSessionRef.current = journal.sessionId;
+        }
+      } catch {
+        journal = undefined;
+      }
+      const journalRecord = (type: string, payload?: unknown): void => {
+        void journal?.record(type, payload).catch(() => undefined);
+      };
       try {
         const res = await runWebCloudTurn(text, {
           routing: props.routing,
           consents: props.consents,
           grants: assistantGrants(),
-          onToolCall: () => { if (ephemeral.isCurrent() && epoch === controls.epoch) setHarnessPreparing(true); },
+          onToolCall: () => {
+            journalRecord('tool', {});
+            if (ephemeral.isCurrent() && epoch === controls.epoch) setHarnessPreparing(true);
+          },
           onTextDelta: (delta) => {
+            journalRecord('text', { delta });
             if (!ephemeral.isCurrent() || epoch !== controls.epoch) return;
             ephemeral.write(session.account, {
               live: reduceAssistantLive(ephemeral.value.live, { type: 'text', delta }),
@@ -599,15 +624,20 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
         setHarnessPreparing(false);
         ephemeral.write(session.account, { live: undefined });
         if (res.error !== undefined) {
+          void journal?.finish('failed', res.error).catch(() => undefined);
           setHarnessUndo(res.undo ?? null);
           append({ role: 'assistant', text: `出错：${res.error}`, steps: [], stoppedAt: undefined });
           return;
         }
         const wrote = hasAppliedWrite(res.turn.steps);
         setHarnessUndo(wrote ? (res.undo ?? null) : null);
+        void journal?.finish('completed').catch(() => undefined);
         if (usedMemory.length > 0) append({ role: 'memory', items: [...usedMemory] });
         append({ role: 'assistant', text: wrote ? `${res.turn.text}\n\n${t('web.ai.chat.harnessApplied')}` : res.turn.text, steps: [], stoppedAt: undefined });
       } catch (error: unknown) {
+        void journal
+          ?.finish('failed', error instanceof Error ? error.message : 'cloud-turn-failed')
+          .catch(() => undefined);
         if (!ephemeral.isCurrent() || epoch !== controls.epoch) return;
         setPhase('idle');
         setHarnessPreparing(false);

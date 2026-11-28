@@ -105,6 +105,20 @@ describe('agentSessionsRoutes', () => {
     await app.close();
   });
 
+  it('finish completed 落终态', async () => {
+    const app = await makeApp({ userId: ME });
+    const sessionId = (await app.inject({ method: 'POST', url: '/api/ai/agent/sessions', payload: {} })).json().data.id as string;
+    const runId = (await app.inject({ method: 'POST', url: `/api/ai/agent/sessions/${sessionId}/runs` })).json().data.id as string;
+    const res = await app.inject({ method: 'POST', url: `/api/ai/agent/runs/${runId}/finish`, payload: { status: 'completed' } });
+    expect(res.statusCode).toBe(200);
+    const owner = await getAgentRunOwner(sql, runId);
+    expect(owner?.status).toBe('completed');
+    // 非法状态被挡
+    const bad = await app.inject({ method: 'POST', url: `/api/ai/agent/runs/${runId}/finish`, payload: { status: 'weird' } });
+    expect(bad.statusCode).toBe(400);
+    await app.close();
+  });
+
   it('托管闸门关闭 ⇒ 建会话 403 managed-required', async () => {
     const app = await makeApp({ userId: ME, requireManaged: false });
     const res = await app.inject({ method: 'POST', url: '/api/ai/agent/sessions', payload: {} });

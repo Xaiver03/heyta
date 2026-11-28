@@ -163,4 +163,24 @@ export const agentSessionsRoutes: FastifyPluginAsync<AgentSessionsRoutesOptions>
     await finishAgentRun(options.sql, { runId, status: 'cancelled' });
     return { ok: true, data: { id: runId } };
   });
+
+  app.post('/api/ai/agent/runs/:id/finish', async (request, reply) => {
+    const userId = userIdOf(request);
+    if (userId === undefined) return unauthorized(reply);
+    const runId = (request.params as { id: string }).id;
+    const owner = await getAgentRunOwner(options.sql, runId);
+    if (owner === undefined || owner.user_id !== userId) return notFound(reply);
+    const body = (request.body ?? {}) as { status?: unknown; error?: unknown };
+    const status = body.status;
+    if (status !== 'completed' && status !== 'failed' && status !== 'cancelled') {
+      reply.code(400);
+      return { ok: false, reason: 'bad-status', message: 'status 需 completed/failed/cancelled。' };
+    }
+    await finishAgentRun(options.sql, {
+      runId,
+      status,
+      error: typeof body.error === 'string' ? body.error : null,
+    });
+    return { ok: true, data: { id: runId } };
+  });
 };

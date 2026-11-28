@@ -1394,3 +1394,12 @@ export {
   type AssistantCardItem,
   type AssistantDataCard,
 } from './assistant-cards.js';
+
+// 服务端 run/session 的客户端 journal 核心（ADR-0093）
+export {
+  startAssistantJournal,
+  type AssistantJournal,
+  type JournalFinishStatus,
+  type JournalTransport,
+  type StartAssistantJournalOptions,
+} from './assistant-server-journal.js';
