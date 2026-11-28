@@ -51,7 +51,7 @@ import {
   type HealthMap,
   type RoutedDeps,
 } from '@heyta/ai';
-import { listAuthorizedTools, type LocalApiConfig, type LocalApiHost } from '@heyta/local-api';
+import { listAuthorizedTools, scopeToolsByIntent, type LocalApiConfig, type LocalApiHost } from '@heyta/local-api';
 
 import {
   resolveToolSelection,
@@ -265,7 +265,9 @@ export async function requestToolCall(
   }
 
   // ── 第二步：模型（出境）──────────────────────────────────────────────
-  const tools = toToolDescriptors(currentGrants);
+  // 与多步助手同一条确定性意图收敛：先按实体域缩小候选工具集，低置信回退全量，
+  // 再由模型在候选里精准选择。缩小的是出境面，不改"模型选工具"这件事本身。
+  const tools = scopeToolsByIntent(toToolDescriptors(currentGrants), text).tools;
   if (tools.length === 0) {
     return {
       ok: false,

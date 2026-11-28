@@ -213,7 +213,8 @@ describe('执行档的写风险与重放保护', () => {
     intent,
   });
 
-  it('低风险写意图可自动提交，危险写意图仍要求确认', () => {
+  it('任务读写一律自动执行；只有非任务（记忆等）与不可逆动作要确认', () => {
+    // 任务：读与写都不确认（软删进回收站 + op-log 可整段撤销兜底，D1）。
     expect(aiToolProposalRequiresConfirmation(proposal({ action: 'create-task', title: '买牛奶' }))).toBe(false);
     expect(aiToolProposalRequiresConfirmation(proposal({ action: 'complete-task', taskId: 't1' }))).toBe(false);
     expect(
@@ -225,12 +226,12 @@ describe('执行档的写风险与重放保护', () => {
       aiToolProposalRequiresConfirmation(
         proposal({ action: 'complete-tasks', taskIds: ['t1', 't2'] }),
       ),
-    ).toBe(true);
+    ).toBe(false);
     expect(
       aiToolProposalRequiresConfirmation(
         proposal({ action: 'append-task-checklist', taskId: 't1', items: ['准备说明'] }),
       ),
-    ).toBe(true);
+    ).toBe(false);
     expect(
       aiToolProposalRequiresConfirmation(
         proposal({
@@ -238,12 +239,20 @@ describe('执行档的写风险与重放保护', () => {
           entries: [{ taskId: 't1', priority: 'high' }],
         }),
       ),
-    ).toBe(true);
+    ).toBe(false);
+    expect(
+      aiToolProposalRequiresConfirmation(proposal({ action: 'set-task-estimate', taskId: 't1', minutes: 30 })),
+    ).toBe(false);
     expect(
       aiToolProposalRequiresConfirmation(proposal({ action: 'set-task-tags', taskId: 't1', tagIds: [] })),
-    ).toBe(true);
+    ).toBe(false);
     expect(
       aiToolProposalRequiresConfirmation(proposal({ action: 'update-task', taskId: 't1', fields: { title: null } })),
+    ).toBe(false);
+
+    // 非任务：记忆会进入之后每一轮 system prompt，写错一条影响后续每一轮 ⇒ 仍要确认。
+    expect(
+      aiToolProposalRequiresConfirmation(proposal({ action: 'remember-memory', text: '我偏好早上做难事' })),
     ).toBe(true);
   });
 
@@ -274,25 +283,32 @@ describe('执行档的写风险与重放保护', () => {
     expect(host.submits).toBe(1);
   });
 
-  it('高风险批量动作不会绕过确认闸门', async () => {
+  it('任务批量/追加清单也不再被确认闸门拦住（任务读写一律自动执行）', async () => {
     const host = fakeHost();
-    const result = await executeAiToolProposal(
+    const batch = await executeAiToolProposal(
       host,
       proposal({ action: 'complete-tasks', taskIds: ['t1', 't2'] }),
       'risky-1',
       authorization('complete-tasks'),
     );
-    expect(result).toEqual({ ok: false, reason: 'invalid', message: '这项改动需要先确认。' });
-    expect(host.submits).toBe(0);
-  });
-
-  it('追加清单不会绕过确认闸门', async () => {
-    const host = fakeHost();
-    const result = await executeAiToolProposal(
+    expect(batch).toEqual({ ok: true, taskId: 'created-1' });
+    const checklist = await executeAiToolProposal(
       host,
       proposal({ action: 'append-task-checklist', taskId: 't1', items: ['准备说明'] }),
       'checklist-1',
       authorization('append-task-checklist'),
+    );
+    expect(checklist).toEqual({ ok: true, taskId: 'created-1' });
+    expect(host.submits).toBe(2);
+  });
+
+  it('非任务的高风险写（记忆）仍不能绕过确认闸门', async () => {
+    const host = fakeHost();
+    const result = await executeAiToolProposal(
+      host,
+      proposal({ action: 'remember-memory', text: '我偏好早上做难事' }),
+      'mem-1',
+      authorization('remember-memory'),
     );
     expect(result).toEqual({ ok: false, reason: 'invalid', message: '这项改动需要先确认。' });
     expect(host.submits).toBe(0);

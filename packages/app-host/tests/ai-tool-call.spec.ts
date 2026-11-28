@@ -149,6 +149,21 @@ describe('规则优先：命中就不出境', () => {
 });
 
 describe('模型路径：严格校验', () => {
+  it('确定性意图分类：任务问句 → 候选工具只带任务域（不含笔记/习惯工具）', async () => {
+    const grants = { list_tasks: true, create_task: true, list_notes: true, list_habits: true } as const;
+    const { impl, calls } = countingFetch(toolCallResponse('create_task', '{"title":"写周报"}'));
+    const outcome = await requestToolCall(
+      { text: '帮我建一个任务：写周报' },
+      { ...deps(impl), grants },
+    );
+    expect(outcome.ok).toBe(true);
+    const tools = (calls[0]?.body?.['tools'] ?? []) as Array<{ function?: { name?: string } }>;
+    const names = tools.map((tool) => tool.function?.name ?? '');
+    expect(names).toContain('create_task');
+    expect(names).not.toContain('list_notes');
+    expect(names).not.toContain('list_habits');
+  });
+
   it('模型选中只读工具 → 执行并返回观察；请求体带 tools', async () => {
     const { impl, calls } = countingFetch(toolCallResponse('list_tasks', '{}'));
     const outcome = await requestToolCall({ text: '帮我看看下周三评审要准备什么' }, deps(impl));
@@ -186,7 +201,7 @@ describe('模型路径：严格校验', () => {
     expect(host.submits).toBe(1);
   });
 
-  it('高风险批量完成 → 仍返回提案，不自动提交', async () => {
+  it('任务批量完成 + 执行标识 → 自动执行一次（任务读写不再要求确认）', async () => {
     const host = fakeHost();
     const { impl } = countingFetch(toolCallResponse('complete_task', '{"taskIds":["t1","t2"]}'));
     const outcome = await requestToolCall(
@@ -195,8 +210,8 @@ describe('模型路径：严格校验', () => {
     );
     expect(outcome.ok).toBe(true);
     if (!outcome.ok) return;
-    expect(outcome.result.kind).toBe('proposal');
-    expect(host.submits).toBe(0);
+    expect(outcome.result.kind).toBe('executed');
+    expect(host.submits).toBe(1);
   });
 
   it('🔴 模型编了一个目录外的工具 → failed unknown-tool（不猜）', async () => {

@@ -149,3 +149,14 @@ export {
   type ToolReadOutcome,
   type ToolWriteIntentOutcome,
 } from './server.js';
+
+// ── 确定性意图分类（域级）——只收敛候选工具集，具体工具/参数仍由模型选 ──
+export {
+  INTENT_SCOPE_CONFIDENCE_THRESHOLD,
+  classifyIntentDomains,
+  filterToolsByEntity,
+  scopeToolsByIntent,
+  type IntentClassification,
+  type IntentToolScope,
+} from './tools/intent.js';
+export { packForTool } from './tools/registry.js';
