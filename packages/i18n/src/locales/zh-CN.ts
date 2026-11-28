@@ -2730,6 +2730,8 @@ export const zhCN = {
   'web.ai.chat.inputAria': '要对助手说的话',
   'web.ai.chat.placeholder': '描述一件任务，或问点什么…',
   'web.ai.chat.send': '发送',
+  'web.ai.chat.stop': '停止',
+  'web.ai.chat.stoppedByUser': '已停止。',
   'web.ai.chat.newSession': '新会话',
   'web.ai.chat.history.title': '会话',
   'web.ai.chat.history.today': '今天',

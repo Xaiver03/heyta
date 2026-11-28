@@ -197,6 +197,59 @@ const GRANTED_TOOL_CALLING_CONSENT: readonly EgressConsent[] = [
 
 // ─────────────────────────────────────────────────────────────────────────
 
+describe('用户主动停止', () => {
+  it('已 abort 的信号 ⇒ 返回 cancelled，且一个请求都没发', async () => {
+    const host = fakeHost(TASKS, PROJECTS);
+    // 脚本为空：只要发出任何请求，假端点就会抛"没有回包"——所以 calls=0 是真证据。
+    const { impl, calls } = scriptedFetch([]);
+    const controller = new AbortController();
+    controller.abort();
+    const outcome = await requestAssistantTurn(
+      { text: '你好呀' },
+      {
+        routing: routing(LOCAL),
+        consents: [],
+        localize: LOCALIZE_ZH,
+        host,
+        routed: { fetchImpl: impl },
+        signal: controller.signal,
+      },
+    );
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+    expect(outcome.kind).toBe('cancelled');
+    expect(calls.length).toBe(0);
+    expect(host.submits).toBe(0);
+  });
+
+  it('请求进行中按下停止 ⇒ 不采用这次结果，报 cancelled（请求确实发过一次）', async () => {
+    const host = fakeHost(TASKS, PROJECTS);
+    const { impl, calls } = scriptedFetch([{ kind: 'text', text: '这句不该被采用' }]);
+    const controller = new AbortController();
+    // 在"发出请求的那一刻"同步 abort：模拟用户正好在请求飞行中按下停止。
+    const abortDuringFetch = ((url: unknown, init?: { body?: unknown }) => {
+      const p = impl(url as never, init as never);
+      controller.abort();
+      return p;
+    }) as unknown as typeof fetch;
+    const outcome = await requestAssistantTurn(
+      { text: '你好呀' },
+      {
+        routing: routing(LOCAL),
+        consents: [],
+        localize: LOCALIZE_ZH,
+        host,
+        routed: { fetchImpl: abortDuringFetch },
+        signal: controller.signal,
+      },
+    );
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+    expect(outcome.kind).toBe('cancelled');
+    expect(calls.length).toBe(1);
+  });
+});
+
 describe('多步读循环', () => {
   it('读 → 读 → 答：三次请求，观察结果真的回送了模型', async () => {
     const host = fakeHost(TASKS, PROJECTS);

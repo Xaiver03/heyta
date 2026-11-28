@@ -304,6 +304,8 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
   const historyCloseRef = useRef<HTMLButtonElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const conversationRef = useRef<HTMLDivElement>(null);
+  /** 本轮的中断句柄：「停止」按钮 abort 它，app-host 循环在步骤边界消费。 */
+  const abortRef = useRef<AbortController | null>(null);
   /**
    * 是否跟随最新内容（流式期间自动滚到底）。
    *
@@ -617,6 +619,9 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
     // 🔴 这一行是**流式的开关**：`onEvent` 给了，app-host 才会在请求里带 `stream`
     // 并逐片回调。省略它 = 回到"整段回来再显示"（移动端就是这样）。
     ephemeral.write(session.account, { live: EMPTY_LIVE });
+    // 本轮的中断句柄：面板「停止」按钮 abort 它；循环在步骤边界消费（见 app-host 注释）。
+    const controller = new AbortController();
+    abortRef.current = controller;
     const outcome = await requestAssistantTurn(
       {
         text,
@@ -653,6 +658,7 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
             live: reduceAssistantLive(previous.live, event),
           }));
         },
+        signal: controller.signal,
         routed: {
           secretStore: props.secrets,
           managedTransport: webManagedTransport,
@@ -660,6 +666,7 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
         },
       },
     );
+    abortRef.current = null;
     // 请求可能跨过了「新会话」才回包；它不能结束新会话的运行态，
     // 也不能把旧回答追加到新会话。
     if (!ephemeral.isCurrent() || epoch !== controls.epoch || currentAccount() !== session.account) return;
@@ -684,6 +691,11 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
     }
     if (outcome.kind === 'proposal') {
       append({ role: 'proposal', text: outcome.text, proposal: outcome.proposal, confirmed: undefined });
+      return;
+    }
+    if (outcome.kind === 'cancelled') {
+      // 用户按了「停止」：明确告诉他停在这里，已经发生的步骤照常保留（不谎报"没跑过"）。
+      append({ role: 'assistant', text: t('web.ai.chat.stoppedByUser'), steps: outcome.steps, stoppedAt: undefined });
       return;
     }
     if (usedMemory.length > 0) {
@@ -875,17 +887,30 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
           }
         }}
       />
-      <Button
-        tone="primary"
-        className="ht-ai__send-button"
-        aria-label={t('web.ai.chat.send')}
-        data-testid="ai-assistant-send-button"
-        onClick={send}
-        disabled={(draft.trim() === '' && images.length === 0) || phase === 'running'}
-      >
-        <Send size={ICON_SIZE.xs} aria-hidden="true" />
-        <span className="sr-only">{t('web.ai.chat.send')}</span>
-      </Button>
+      {phase !== 'running' && (
+        <Button
+          tone="primary"
+          className="ht-ai__send-button"
+          aria-label={t('web.ai.chat.send')}
+          data-testid="ai-assistant-send-button"
+          onClick={send}
+          disabled={draft.trim() === '' && images.length === 0}
+        >
+          <Send size={ICON_SIZE.xs} aria-hidden="true" />
+          <span className="sr-only">{t('web.ai.chat.send')}</span>
+        </Button>
+      )}
+      {phase === 'running' && (
+        <Button
+          tone="secondary"
+          className="ht-ai__send-button"
+          aria-label={t('web.ai.chat.stop')}
+          data-testid="ai-assistant-stop"
+          onClick={() => abortRef.current?.abort()}
+        >
+          {t('web.ai.chat.stop')}
+        </Button>
+      )}
       </div>
     </div>
   );

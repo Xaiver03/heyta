@@ -322,6 +322,15 @@ export type AssistantOutcome =
       readonly health: HealthMap;
     }
   | {
+      ok: true;
+      kind: 'cancelled';
+      /** 用户主动停止；`steps` 保留已经发生的部分，界面自己决定怎么说。 */
+      readonly text: string;
+      readonly steps: readonly AssistantStep[];
+      readonly appended: readonly AssistantMessage[];
+      readonly health: HealthMap;
+    }
+  | {
       ok: false;
       reason: AssistantFailureReason;
       readonly message: string;
@@ -403,6 +412,13 @@ export interface AssistantTurnDeps {
    * 单步面板零出境、在对话里却把数据发出去了，而且两边都"正常工作"。
    */
   readonly rules?: readonly ToolSelectionRule[];
+  /**
+   * 用户主动「停止」的信号（可选）。**只在循环边界消费**：每一步开始前、
+   * 调模型前、执行工具前各看一次；命中即返回 `kind:'cancelled'` 并保留已发生的步骤。
+   * 不把它推进 `invokeRouted`（出境层不接外部 signal）——单次请求会自然跑完再被丢弃，
+   * 所以停止最多晚一个请求，不静默丢数据、不谎报"没请求就已停"。
+   */
+  readonly signal?: AbortSignal;
 }
 
 const ASSISTANT_SYSTEM_PROMPT = [
@@ -841,6 +857,8 @@ export async function requestAssistantTurn(
   let health: HealthMap = {};
   let destination: EgressDestination | undefined;
   let lastText = '';
+  /** 用户是否已按「停止」。包成函数调用，避免 TS 把属性比较在多次判断间窄化成字面量。 */
+  const stopRequested = (): boolean => deps.signal?.aborted === true;
 
   // 🔴 循环上界是 `MAX_ASSISTANT_TOOL_STEPS`，而**每一次**循环都是一次模型调用，
   // 所以"最多几次请求"也是被这个常量推导的（见 `planAssistantEgress`），不是另写一个数。
@@ -855,6 +873,11 @@ export async function requestAssistantTurn(
         appended: [],
         health,
       };
+    }
+
+    // 用户已按「停止」：在进入这一步之前就退出，不发起新的出境。
+    if (stopRequested()) {
+      return { ok: true, kind: 'cancelled', text: '', steps, appended: [], health };
     }
 
     const messages = assistantMessages(system, deps.history ?? [], text, toolTranscript);
@@ -908,6 +931,11 @@ export async function requestAssistantTurn(
       };
     }
 
+    // 发请求前再判一次：上一步拖长时用户可能刚好按了停止。
+    if (stopRequested()) {
+      return { ok: true, kind: 'cancelled', text: '', steps, appended: [], health };
+    }
+
     const outcome = await invokeRouted(
       deps.routing,
       invocation,
@@ -917,6 +945,12 @@ export async function requestAssistantTurn(
     );
     health = outcome.health;
     const result = outcome.result;
+
+    // 单次请求期间用户按了停止：结果虽然回来了，但不采用它 —— 明确报「已停止」，
+    // 不回一句"其实已经答完了"。代价是这一次请求照样花掉，换来的是用户按下去就有明确回执。
+    if (stopRequested()) {
+      return { ok: true, kind: 'cancelled', text: '', steps, appended: [], health };
+    }
 
     if (!result.ok) {
       return {
@@ -986,6 +1020,11 @@ export async function requestAssistantTurn(
     // 放在 `runSelectedTool` 之后发，等于承认"过程可见"只在跑完之后成立。
     const onEvent = deps.onEvent;
     onEvent?.({ type: 'tool-started', tool: call.name, kind });
+
+    // 执行工具前再判一次：模型这一步回来后用户可能已经点了停止。
+    if (stopRequested()) {
+      return { ok: true, kind: 'cancelled', text: '', steps, appended: [], health };
+    }
 
     const run = await runSelectedTool(
       { kind: 'tool', ruleId: `assistant:${call.name}`, tool: call.name, args: parsed.args },

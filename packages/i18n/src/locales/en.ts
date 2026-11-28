@@ -2529,6 +2529,8 @@ export const en = {
   'web.ai.chat.inputAria': 'What to ask the assistant',
   'web.ai.chat.placeholder': 'Describe a task, or ask a question…',
   'web.ai.chat.send': 'Send',
+  'web.ai.chat.stop': 'Stop',
+  'web.ai.chat.stoppedByUser': 'Stopped.',
   'web.ai.chat.newSession': 'New chat',
   'web.ai.chat.history.title': 'Chats',
   'web.ai.chat.history.today': 'Today',
