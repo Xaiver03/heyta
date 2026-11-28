@@ -476,6 +476,7 @@ export function CalendarView(): React.JSX.Element {
           )}
           testID={BOARD_TEST_ID}
         />
+        )}
           </>
         )}
       </div>
