@@ -100,10 +100,12 @@ async function settleLanding(page: Page): Promise<void> {
  * 但它们验的对象不同，所以**先问服务端是哪一支**，不要靠"我以为线上是什么"。
  */
 async function readCentralMode(page: Page): Promise<string> {
-  return page.evaluate(async (origin: string) => {
-    const config = (await fetch(`${origin}/api/auth/central/config`).then((r) => r.json())) as { mode?: string };
-    return config.mode ?? 'unknown';
-  }, ORIGIN);
+  // 🔴 用 page.request 而不是浏览器内 fetch：线上 local 模式没有 central/config 端点、回 404，
+  //   浏览器 fetch 会把这条 404 记进 console.error，污染本文件 line176 的"控制台无错"判据。
+  const res = await page.request.get(`${ORIGIN}/api/auth/central/config`).catch(() => null);
+  if (res === null || !res.ok()) return 'local';
+  const body = (await res.json().catch(() => ({}))) as { mode?: string };
+  return body.mode ?? 'local';
 }
 
 test('线上「登录」：点一次就到登录界面，中途不落在那段说明上', async ({ page }) => {
